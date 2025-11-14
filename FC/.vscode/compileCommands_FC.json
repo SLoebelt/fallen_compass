@@ -1,0 +1,362 @@
+[
+	{
+		"file": "W:\\GameDev\\FallenCompass\\FC\\Source\\FC\\FC.Build.cs",
+		"arguments": [
+			"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
+			"@W:\\GameDev\\FallenCompass\\FC\\.vscode\\compileCommands_FC\\FC.1.rsp"
+		],
+		"directory": "W:\\GameDev\\UE_5.7\\Engine\\Source"
+	},
+	{
+		"file": "W:\\GameDev\\FallenCompass\\FC\\Source\\FC\\FC.cpp",
+		"arguments": [
+			"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
+			"@W:\\GameDev\\FallenCompass\\FC\\.vscode\\compileCommands_FC\\FC.1.rsp"
+		],
+		"directory": "W:\\GameDev\\UE_5.7\\Engine\\Source"
+	},
+	{
+		"file": "W:\\GameDev\\FallenCompass\\FC\\Source\\FC\\FC.h",
+		"arguments": [
+			"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
+			"@W:\\GameDev\\FallenCompass\\FC\\.vscode\\compileCommands_FC\\FC.1.rsp"
+		],
+		"directory": "W:\\GameDev\\UE_5.7\\Engine\\Source"
+	},
+	{
+		"file": "W:\\GameDev\\FallenCompass\\FC\\Source\\FC\\FCCharacter.cpp",
+		"arguments": [
+			"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
+			"@W:\\GameDev\\FallenCompass\\FC\\.vscode\\compileCommands_FC\\FC.1.rsp"
+		],
+		"directory": "W:\\GameDev\\UE_5.7\\Engine\\Source"
+	},
+	{
+		"file": "W:\\GameDev\\FallenCompass\\FC\\Source\\FC\\FCCharacter.h",
+		"arguments": [
+			"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
+			"@W:\\GameDev\\FallenCompass\\FC\\.vscode\\compileCommands_FC\\FC.1.rsp"
+		],
+		"directory": "W:\\GameDev\\UE_5.7\\Engine\\Source"
+	},
+	{
+		"file": "W:\\GameDev\\FallenCompass\\FC\\Source\\FC\\FCGameMode.cpp",
+		"arguments": [
+			"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
+			"@W:\\GameDev\\FallenCompass\\FC\\.vscode\\compileCommands_FC\\FC.1.rsp"
+		],
+		"directory": "W:\\GameDev\\UE_5.7\\Engine\\Source"
+	},
+	{
+		"file": "W:\\GameDev\\FallenCompass\\FC\\Source\\FC\\FCGameMode.h",
+		"arguments": [
+			"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
+			"@W:\\GameDev\\FallenCompass\\FC\\.vscode\\compileCommands_FC\\FC.1.rsp"
+		],
+		"directory": "W:\\GameDev\\UE_5.7\\Engine\\Source"
+	},
+	{
+		"file": "W:\\GameDev\\FallenCompass\\FC\\Source\\FC\\FCPlayerController.cpp",
+		"arguments": [
+			"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
+			"@W:\\GameDev\\FallenCompass\\FC\\.vscode\\compileCommands_FC\\FC.1.rsp"
+		],
+		"directory": "W:\\GameDev\\UE_5.7\\Engine\\Source"
+	},
+	{
+		"file": "W:\\GameDev\\FallenCompass\\FC\\Source\\FC\\FCPlayerController.h",
+		"arguments": [
+			"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
+			"@W:\\GameDev\\FallenCompass\\FC\\.vscode\\compileCommands_FC\\FC.1.rsp"
+		],
+		"directory": "W:\\GameDev\\UE_5.7\\Engine\\Source"
+	},
+	{
+		"file": "W:\\GameDev\\FallenCompass\\FC\\Source\\FC\\Variant_Strategy\\StrategyGameMode.cpp",
+		"arguments": [
+			"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
+			"@W:\\GameDev\\FallenCompass\\FC\\.vscode\\compileCommands_FC\\FC.1.rsp"
+		],
+		"directory": "W:\\GameDev\\UE_5.7\\Engine\\Source"
+	},
+	{
+		"file": "W:\\GameDev\\FallenCompass\\FC\\Source\\FC\\Variant_Strategy\\StrategyGameMode.h",
+		"arguments": [
+			"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
+			"@W:\\GameDev\\FallenCompass\\FC\\.vscode\\compileCommands_FC\\FC.1.rsp"
+		],
+		"directory": "W:\\GameDev\\UE_5.7\\Engine\\Source"
+	},
+	{
+		"file": "W:\\GameDev\\FallenCompass\\FC\\Source\\FC\\Variant_Strategy\\StrategyPawn.cpp",
+		"arguments": [
+			"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
+			"@W:\\GameDev\\FallenCompass\\FC\\.vscode\\compileCommands_FC\\FC.1.rsp"
+		],
+		"directory": "W:\\GameDev\\UE_5.7\\Engine\\Source"
+	},
+	{
+		"file": "W:\\GameDev\\FallenCompass\\FC\\Source\\FC\\Variant_Strategy\\StrategyPawn.h",
+		"arguments": [
+			"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
+			"@W:\\GameDev\\FallenCompass\\FC\\.vscode\\compileCommands_FC\\FC.1.rsp"
+		],
+		"directory": "W:\\GameDev\\UE_5.7\\Engine\\Source"
+	},
+	{
+		"file": "W:\\GameDev\\FallenCompass\\FC\\Source\\FC\\Variant_Strategy\\StrategyPlayerController.cpp",
+		"arguments": [
+			"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
+			"@W:\\GameDev\\FallenCompass\\FC\\.vscode\\compileCommands_FC\\FC.1.rsp"
+		],
+		"directory": "W:\\GameDev\\UE_5.7\\Engine\\Source"
+	},
+	{
+		"file": "W:\\GameDev\\FallenCompass\\FC\\Source\\FC\\Variant_Strategy\\StrategyPlayerController.h",
+		"arguments": [
+			"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
+			"@W:\\GameDev\\FallenCompass\\FC\\.vscode\\compileCommands_FC\\FC.1.rsp"
+		],
+		"directory": "W:\\GameDev\\UE_5.7\\Engine\\Source"
+	},
+	{
+		"file": "W:\\GameDev\\FallenCompass\\FC\\Source\\FC\\Variant_Strategy\\StrategyUnit.cpp",
+		"arguments": [
+			"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
+			"@W:\\GameDev\\FallenCompass\\FC\\.vscode\\compileCommands_FC\\FC.1.rsp"
+		],
+		"directory": "W:\\GameDev\\UE_5.7\\Engine\\Source"
+	},
+	{
+		"file": "W:\\GameDev\\FallenCompass\\FC\\Source\\FC\\Variant_Strategy\\StrategyUnit.h",
+		"arguments": [
+			"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
+			"@W:\\GameDev\\FallenCompass\\FC\\.vscode\\compileCommands_FC\\FC.1.rsp"
+		],
+		"directory": "W:\\GameDev\\UE_5.7\\Engine\\Source"
+	},
+	{
+		"file": "W:\\GameDev\\FallenCompass\\FC\\Source\\FC\\Variant_Strategy\\UI\\StrategyHUD.cpp",
+		"arguments": [
+			"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
+			"@W:\\GameDev\\FallenCompass\\FC\\.vscode\\compileCommands_FC\\FC.1.rsp"
+		],
+		"directory": "W:\\GameDev\\UE_5.7\\Engine\\Source"
+	},
+	{
+		"file": "W:\\GameDev\\FallenCompass\\FC\\Source\\FC\\Variant_Strategy\\UI\\StrategyHUD.h",
+		"arguments": [
+			"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
+			"@W:\\GameDev\\FallenCompass\\FC\\.vscode\\compileCommands_FC\\FC.1.rsp"
+		],
+		"directory": "W:\\GameDev\\UE_5.7\\Engine\\Source"
+	},
+	{
+		"file": "W:\\GameDev\\FallenCompass\\FC\\Source\\FC\\Variant_Strategy\\UI\\StrategyUI.cpp",
+		"arguments": [
+			"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
+			"@W:\\GameDev\\FallenCompass\\FC\\.vscode\\compileCommands_FC\\FC.1.rsp"
+		],
+		"directory": "W:\\GameDev\\UE_5.7\\Engine\\Source"
+	},
+	{
+		"file": "W:\\GameDev\\FallenCompass\\FC\\Source\\FC\\Variant_Strategy\\UI\\StrategyUI.h",
+		"arguments": [
+			"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
+			"@W:\\GameDev\\FallenCompass\\FC\\.vscode\\compileCommands_FC\\FC.1.rsp"
+		],
+		"directory": "W:\\GameDev\\UE_5.7\\Engine\\Source"
+	},
+	{
+		"file": "W:\\GameDev\\FallenCompass\\FC\\Source\\FC\\Variant_TwinStick\\AI\\TwinStickAIController.cpp",
+		"arguments": [
+			"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
+			"@W:\\GameDev\\FallenCompass\\FC\\.vscode\\compileCommands_FC\\FC.1.rsp"
+		],
+		"directory": "W:\\GameDev\\UE_5.7\\Engine\\Source"
+	},
+	{
+		"file": "W:\\GameDev\\FallenCompass\\FC\\Source\\FC\\Variant_TwinStick\\AI\\TwinStickAIController.h",
+		"arguments": [
+			"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
+			"@W:\\GameDev\\FallenCompass\\FC\\.vscode\\compileCommands_FC\\FC.1.rsp"
+		],
+		"directory": "W:\\GameDev\\UE_5.7\\Engine\\Source"
+	},
+	{
+		"file": "W:\\GameDev\\FallenCompass\\FC\\Source\\FC\\Variant_TwinStick\\AI\\TwinStickNPC.cpp",
+		"arguments": [
+			"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
+			"@W:\\GameDev\\FallenCompass\\FC\\.vscode\\compileCommands_FC\\FC.1.rsp"
+		],
+		"directory": "W:\\GameDev\\UE_5.7\\Engine\\Source"
+	},
+	{
+		"file": "W:\\GameDev\\FallenCompass\\FC\\Source\\FC\\Variant_TwinStick\\AI\\TwinStickNPC.h",
+		"arguments": [
+			"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
+			"@W:\\GameDev\\FallenCompass\\FC\\.vscode\\compileCommands_FC\\FC.1.rsp"
+		],
+		"directory": "W:\\GameDev\\UE_5.7\\Engine\\Source"
+	},
+	{
+		"file": "W:\\GameDev\\FallenCompass\\FC\\Source\\FC\\Variant_TwinStick\\AI\\TwinStickNPCDestruction.cpp",
+		"arguments": [
+			"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
+			"@W:\\GameDev\\FallenCompass\\FC\\.vscode\\compileCommands_FC\\FC.1.rsp"
+		],
+		"directory": "W:\\GameDev\\UE_5.7\\Engine\\Source"
+	},
+	{
+		"file": "W:\\GameDev\\FallenCompass\\FC\\Source\\FC\\Variant_TwinStick\\AI\\TwinStickNPCDestruction.h",
+		"arguments": [
+			"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
+			"@W:\\GameDev\\FallenCompass\\FC\\.vscode\\compileCommands_FC\\FC.1.rsp"
+		],
+		"directory": "W:\\GameDev\\UE_5.7\\Engine\\Source"
+	},
+	{
+		"file": "W:\\GameDev\\FallenCompass\\FC\\Source\\FC\\Variant_TwinStick\\AI\\TwinStickSpawner.cpp",
+		"arguments": [
+			"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
+			"@W:\\GameDev\\FallenCompass\\FC\\.vscode\\compileCommands_FC\\FC.1.rsp"
+		],
+		"directory": "W:\\GameDev\\UE_5.7\\Engine\\Source"
+	},
+	{
+		"file": "W:\\GameDev\\FallenCompass\\FC\\Source\\FC\\Variant_TwinStick\\AI\\TwinStickSpawner.h",
+		"arguments": [
+			"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
+			"@W:\\GameDev\\FallenCompass\\FC\\.vscode\\compileCommands_FC\\FC.1.rsp"
+		],
+		"directory": "W:\\GameDev\\UE_5.7\\Engine\\Source"
+	},
+	{
+		"file": "W:\\GameDev\\FallenCompass\\FC\\Source\\FC\\Variant_TwinStick\\AI\\TwinStickStateTreeUtility.cpp",
+		"arguments": [
+			"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
+			"@W:\\GameDev\\FallenCompass\\FC\\.vscode\\compileCommands_FC\\FC.1.rsp"
+		],
+		"directory": "W:\\GameDev\\UE_5.7\\Engine\\Source"
+	},
+	{
+		"file": "W:\\GameDev\\FallenCompass\\FC\\Source\\FC\\Variant_TwinStick\\AI\\TwinStickStateTreeUtility.h",
+		"arguments": [
+			"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
+			"@W:\\GameDev\\FallenCompass\\FC\\.vscode\\compileCommands_FC\\FC.1.rsp"
+		],
+		"directory": "W:\\GameDev\\UE_5.7\\Engine\\Source"
+	},
+	{
+		"file": "W:\\GameDev\\FallenCompass\\FC\\Source\\FC\\Variant_TwinStick\\Gameplay\\TwinStickAoEAttack.cpp",
+		"arguments": [
+			"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
+			"@W:\\GameDev\\FallenCompass\\FC\\.vscode\\compileCommands_FC\\FC.1.rsp"
+		],
+		"directory": "W:\\GameDev\\UE_5.7\\Engine\\Source"
+	},
+	{
+		"file": "W:\\GameDev\\FallenCompass\\FC\\Source\\FC\\Variant_TwinStick\\Gameplay\\TwinStickAoEAttack.h",
+		"arguments": [
+			"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
+			"@W:\\GameDev\\FallenCompass\\FC\\.vscode\\compileCommands_FC\\FC.1.rsp"
+		],
+		"directory": "W:\\GameDev\\UE_5.7\\Engine\\Source"
+	},
+	{
+		"file": "W:\\GameDev\\FallenCompass\\FC\\Source\\FC\\Variant_TwinStick\\Gameplay\\TwinStickPickup.cpp",
+		"arguments": [
+			"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
+			"@W:\\GameDev\\FallenCompass\\FC\\.vscode\\compileCommands_FC\\FC.1.rsp"
+		],
+		"directory": "W:\\GameDev\\UE_5.7\\Engine\\Source"
+	},
+	{
+		"file": "W:\\GameDev\\FallenCompass\\FC\\Source\\FC\\Variant_TwinStick\\Gameplay\\TwinStickPickup.h",
+		"arguments": [
+			"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
+			"@W:\\GameDev\\FallenCompass\\FC\\.vscode\\compileCommands_FC\\FC.1.rsp"
+		],
+		"directory": "W:\\GameDev\\UE_5.7\\Engine\\Source"
+	},
+	{
+		"file": "W:\\GameDev\\FallenCompass\\FC\\Source\\FC\\Variant_TwinStick\\Gameplay\\TwinStickProjectile.cpp",
+		"arguments": [
+			"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
+			"@W:\\GameDev\\FallenCompass\\FC\\.vscode\\compileCommands_FC\\FC.1.rsp"
+		],
+		"directory": "W:\\GameDev\\UE_5.7\\Engine\\Source"
+	},
+	{
+		"file": "W:\\GameDev\\FallenCompass\\FC\\Source\\FC\\Variant_TwinStick\\Gameplay\\TwinStickProjectile.h",
+		"arguments": [
+			"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
+			"@W:\\GameDev\\FallenCompass\\FC\\.vscode\\compileCommands_FC\\FC.1.rsp"
+		],
+		"directory": "W:\\GameDev\\UE_5.7\\Engine\\Source"
+	},
+	{
+		"file": "W:\\GameDev\\FallenCompass\\FC\\Source\\FC\\Variant_TwinStick\\TwinStickCharacter.cpp",
+		"arguments": [
+			"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
+			"@W:\\GameDev\\FallenCompass\\FC\\.vscode\\compileCommands_FC\\FC.1.rsp"
+		],
+		"directory": "W:\\GameDev\\UE_5.7\\Engine\\Source"
+	},
+	{
+		"file": "W:\\GameDev\\FallenCompass\\FC\\Source\\FC\\Variant_TwinStick\\TwinStickCharacter.h",
+		"arguments": [
+			"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
+			"@W:\\GameDev\\FallenCompass\\FC\\.vscode\\compileCommands_FC\\FC.1.rsp"
+		],
+		"directory": "W:\\GameDev\\UE_5.7\\Engine\\Source"
+	},
+	{
+		"file": "W:\\GameDev\\FallenCompass\\FC\\Source\\FC\\Variant_TwinStick\\TwinStickGameMode.cpp",
+		"arguments": [
+			"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
+			"@W:\\GameDev\\FallenCompass\\FC\\.vscode\\compileCommands_FC\\FC.1.rsp"
+		],
+		"directory": "W:\\GameDev\\UE_5.7\\Engine\\Source"
+	},
+	{
+		"file": "W:\\GameDev\\FallenCompass\\FC\\Source\\FC\\Variant_TwinStick\\TwinStickGameMode.h",
+		"arguments": [
+			"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
+			"@W:\\GameDev\\FallenCompass\\FC\\.vscode\\compileCommands_FC\\FC.1.rsp"
+		],
+		"directory": "W:\\GameDev\\UE_5.7\\Engine\\Source"
+	},
+	{
+		"file": "W:\\GameDev\\FallenCompass\\FC\\Source\\FC\\Variant_TwinStick\\TwinStickPlayerController.cpp",
+		"arguments": [
+			"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
+			"@W:\\GameDev\\FallenCompass\\FC\\.vscode\\compileCommands_FC\\FC.1.rsp"
+		],
+		"directory": "W:\\GameDev\\UE_5.7\\Engine\\Source"
+	},
+	{
+		"file": "W:\\GameDev\\FallenCompass\\FC\\Source\\FC\\Variant_TwinStick\\TwinStickPlayerController.h",
+		"arguments": [
+			"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
+			"@W:\\GameDev\\FallenCompass\\FC\\.vscode\\compileCommands_FC\\FC.1.rsp"
+		],
+		"directory": "W:\\GameDev\\UE_5.7\\Engine\\Source"
+	},
+	{
+		"file": "W:\\GameDev\\FallenCompass\\FC\\Source\\FC\\Variant_TwinStick\\UI\\TwinStickUI.cpp",
+		"arguments": [
+			"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
+			"@W:\\GameDev\\FallenCompass\\FC\\.vscode\\compileCommands_FC\\FC.1.rsp"
+		],
+		"directory": "W:\\GameDev\\UE_5.7\\Engine\\Source"
+	},
+	{
+		"file": "W:\\GameDev\\FallenCompass\\FC\\Source\\FC\\Variant_TwinStick\\UI\\TwinStickUI.h",
+		"arguments": [
+			"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
+			"@W:\\GameDev\\FallenCompass\\FC\\.vscode\\compileCommands_FC\\FC.1.rsp"
+		],
+		"directory": "W:\\GameDev\\UE_5.7\\Engine\\Source"
+	}
+]

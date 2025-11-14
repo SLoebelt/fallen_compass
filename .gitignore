@@ -1,0 +1,54 @@
+# Unreal Engine
+KindergartenSim/Binaries/
+KindergartenSim/DerivedDataCache/
+KindergartenSim/Intermediate/
+KindergartenSim/Saved/
+KindergartenSim/Build/
+KindergartenSim/.vs/
+
+# General Unreal patterns (for any future projects)
+*/Binaries/
+*/DerivedDataCache/
+*/Intermediate/
+*/Saved/
+*/Build/
+*/.vs/
+
+# Visual Studio
+*.sln
+*.vcxproj*
+*.user
+*.opensdf
+*.sdf
+*.VC.db
+# Mac
+.DS_Store
+# Editor backups
+*.log
+*.backup
+# Crash reports and cooked content
+*.pdb
+*.xcuserdata
+
+# Render outputs and screenshots (temporary/test renders)
+KindergartenSim/Saved/Screenshots/
+KindergartenSim/Saved/MovieRenders/
+KindergartenSim/Saved/VideoCaptures/
+**/Screenshots/
+**/MovieRenders/
+**/VideoCaptures/
+
+# However, keep official marketing/promotional materials in a dedicated folder
+# (If you create Marketing/ or Promo/ folders, remove them from gitignore)
+# !Marketing/
+# !Promo/
+
+# Ignore local config (store only default or required config in repo)
+Config/DefaultEditorPerProjectUserSettings.ini
+# Ignore compiled plugins and local generated files
+Plugins/*/Binaries/
+Plugins/*/Intermediate/
+# Ignore Unreal Derived Data cache folders
+*/DerivedDataCache/*
+# Ignore launch/config local overrides
+*.local
