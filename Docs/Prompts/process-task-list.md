@@ -6,12 +6,9 @@ Guidelines for managing task lists in markdown files to track progress on comple
 
 Following files MUST be respected and taken in consideration:
 
-- Documentations/cabin-crew-simulator-prd.md – Primary product requirements for the Cabin Crew Simulator MVP.
-- Documentations/UE_NamingConventions.md – Unreal Engine naming standards and folder expectations.
-- Documentations/tasks-cabin-crew-simulator-prd.md – Legacy task list for historical reference only.
-- Documentations/tasks-cabin-crew-simulator-prd-rev1.md – Legacy task list for historical reference only.
-- Documentations/git-workflow-guide.md – Rules for commits.
-- Documentations/technical_documentation.md – Central technical documentation.
+- `/Docs/UE_NamingConventions.md` – Unreal Engine naming standards and folder expectations.
+- `/Docs/Fallen_Compass_GDD_v0.2.md` - Game Design Document
+- `/Docs/Fallen_Compass_DRM.md` - Development Roadmap
 
 ## Task Implementation
 
@@ -20,9 +17,9 @@ Following files MUST be respected and taken in consideration:
   1. THINK - what is the best implementation solution (Unreal Engine best practices).
   2. COMPARE with existing implementations (files listed above). You are ALOOWED to suggest renaming existing files to follow conventions.
   3. ASK if information is missing to decide how to implement the best way. WAIT for the answers before generating instructions. DO NOT proceed before dev says "implement".
-  4. PROVIDE SOLUTION INSTRUCTION in chat window. provide an in detail step-by-step instruction to solve the task by providing graph node flows diagrams. Whenever possible even as Mermaid diagrams (classes, functions, events). Mermaid diagrams MUST NOT include `(` or `)`. Use other declaration like --Input: GameInstance-- for params.
+  4. PROVIDE SOLUTION INSTRUCTION in chat window. provide an in detail step-by-step instruction to solve the task by providing graph node flows diagrams. Whenever possible even as Mermaid diagrams (classes, functions, events). Mermaid diagrams MUST NOT include `(` or `)`. Use other declaration like --Input: GameInstance-- for params. For C++ implementations always provide the whole file.
   5. ASK the dev if he finished the implementation or needs further instructions. WAIT for the dev to ask questions or to say "document" to proceed to step 6.
-  6. Tell the dev to use the blueprint exporter tool to create a technical documentation of the changed files. Tell him what files were changed.
+  6. Tell the dev to use the blueprint exporter tool to create a technical documentation of the changed files, or create your own documentation from C++ files. Tell him what files were changed.
 - **One sub-task at a time:** Do **NOT** start the next sub‑task until you ask the user for permission and they say "yes" or "y"
 - **Completion protocol:**
 
@@ -30,7 +27,7 @@ Following files MUST be respected and taken in consideration:
   2. If **all** subtasks underneath a parent task are now `[x]`, follow this sequence:
 
   - **Clean up**: Remove any temporary files before committing
-  - **Commit**: Use a descriptive commit message that:
+  - **Commit**: IF parent task (e.g. 1 with all subtasks) is complete, commit the changes and mark the **parent task** as completed. Use a descriptive commit message that:
 
     - Uses conventional commit format (`feat:`, `fix:`, `refactor:`, etc.)
     - Summarizes what was accomplished in the parent task
@@ -42,9 +39,8 @@ Following files MUST be respected and taken in consideration:
       git commit -m "feat: add payment validation logic" -m "- Validates card type and expiry" -m "- Adds unit tests for edge cases" -m "Related to T123 in PRD"
       ```
 
-  3. Once all the subtasks are marked completed and changes have been committed, mark the **parent task** as completed.
-  4. If the implementation differs from the documentation in the PRD, update the PRD.
-  5. Create a detailed technical documentation after each task and add it to the main documentation `Documentations/technical_documentation.md`. Work with Heading, subheadings and always update the TOC.
+  3. If the implementation differs from the documentation in the PRD or GDD, update the documents.
+  4. Create a detailed technical documentation after each task and add it to the main documentation `Documentations/technical_documentation.md`. Work with Heading, subheadings and always update the TOC.
 
 - Stop after each sub‑task and wait for the user's go‑ahead.
 
@@ -73,4 +69,4 @@ When working with task lists, the AI must:
 6. After implementing a sub‑task, update the file and then pause for user approval.
 7. Always provide an in detail step-by-step instruction to solve the task by providing graph node flows and diagrams. Whenever possible even as Mermaid diagrams (classes, functions, events)
 8. Always update the technical documentation. Add as many mermaid diagrams as make sense. Mermaid diagrams MUST NOT include `(` or `)`. Use other declaration like --Input: GameInstance-- for params
-9. Update the PRD when changes make it neccessary and update Last Updated date and Document Version.
+9. Update the PRD and GDD when changes make it neccessary and update Last Updated date and Document Version.

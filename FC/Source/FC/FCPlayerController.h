@@ -3,83 +3,69 @@
 #pragma once
 
 #include "CoreMinimal.h"
-//#include "Templates/SubclassOf.h"
 #include "GameFramework/PlayerController.h"
 #include "FCPlayerController.generated.h"
 
-class UNiagaraSystem;
-class UInputMappingContext;
 class UInputAction;
-class UPathFollowingComponent;
+class UInputMappingContext;
 
-DECLARE_LOG_CATEGORY_EXTERN(LogTemplateCharacter, Log, All);
+DECLARE_LOG_CATEGORY_EXTERN(LogFallenCompassPlayerController, Log, All);
+
+UENUM(BlueprintType)
+enum class EFCPlayerCameraMode : uint8
+{
+	FirstPerson = 0,
+	TableView
+};
 
 /**
- *  Player controller for a top-down perspective game.
- *  Implements point and click based controls
+ * Lightweight PlayerController scaffold for Week 1 prototypes.
+ * Provides logging hooks for interaction, pause, and camera-mode changes.
  */
-UCLASS(abstract)
-class AFCPlayerController : public APlayerController
+UCLASS()
+class FC_API AFCPlayerController : public APlayerController
 {
 	GENERATED_BODY()
 
-protected:
-
-	/** Component used for moving along a NavMesh path. */
-	UPROPERTY(VisibleDefaultsOnly, Category = AI)
-	TObjectPtr<UPathFollowingComponent> PathFollowingComponent;
-
-	/** Time Threshold to know if it was a short press */
-	UPROPERTY(EditAnywhere, Category="Input")
-	float ShortPressThreshold;
-
-	/** FX Class that we will spawn when clicking */
-	UPROPERTY(EditAnywhere, Category="Input")
-	TObjectPtr<UNiagaraSystem> FXCursor;
-
-	/** MappingContext */
-	UPROPERTY(EditAnywhere, Category="Input")
-	TObjectPtr<UInputMappingContext> DefaultMappingContext;
-	
-	/** Jump Input Action */
-	UPROPERTY(EditAnywhere, Category="Input")
-	TObjectPtr<UInputAction> SetDestinationClickAction;
-
-	/** Jump Input Action */
-	UPROPERTY(EditAnywhere, Category="Input")
-	TObjectPtr<UInputAction> SetDestinationTouchAction;
-
-	/** True if the controlled character should navigate to the mouse cursor. */
-	uint32 bMoveToMouseCursor : 1;
-
-	/** Set to true if we're using touch input */
-	uint32 bIsTouch : 1;
-
-	/** Saved location of the character movement destination */
-	FVector CachedDestination;
-
-	/** Time that the click input has been pressed */
-	float FollowTime = 0.0f;
-
 public:
-
-	/** Constructor */
 	AFCPlayerController();
 
-protected:
-
-	/** Initialize input bindings */
+	virtual void BeginPlay() override;
 	virtual void SetupInputComponent() override;
-	
-	/** Input handlers */
-	void OnInputStarted();
-	void OnSetDestinationTriggered();
-	void OnSetDestinationReleased();
-	void OnTouchTriggered();
-	void OnTouchReleased();
 
-	/** Helper function to get the move destination */
-	void UpdateCachedDestination();
+	EFCPlayerCameraMode GetCameraMode() const { return CameraMode; }
+	bool IsPauseMenuDisplayed() const { return bIsPauseMenuDisplayed; }
+
+protected:
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "State")
+	EFCPlayerCameraMode CameraMode;
+
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "State")
+	bool bIsPauseMenuDisplayed;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Input")
+	int32 DefaultMappingPriority = 0;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Input")
+	TObjectPtr<UInputMappingContext> DefaultMappingContext;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Input")
+	TObjectPtr<UInputAction> InteractAction;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Input")
+	TObjectPtr<UInputAction> PauseAction;
+
+	void HandleInteractPressed();
+	void HandlePausePressed();
+
+	void EnterTableViewPlaceholder();
+	void ExitTableViewPlaceholder();
+	void ShowPauseMenuPlaceholder();
+	void HidePauseMenuPlaceholder();
+	void SetFallenCompassCameraMode(EFCPlayerCameraMode NewMode);
+
+private:
+	void LogStateChange(const FString& Context) const;
 };
 
 

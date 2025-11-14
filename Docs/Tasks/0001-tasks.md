@@ -45,43 +45,43 @@
   - [x] Add a UE-focused `.gitignore` (exclude `Binaries/`, `Intermediate/`, `DerivedDataCache/`, most of `Saved/`).
   - [x] Ensure large auto-generated files and caches are ignored.
 
-- [ ] **1.5 Create README & branching conventions**
-  - [ ] Create `/README.md` with:
-    - [ ] Short project description (“Fallen Compass”).
-    - [ ] Engine version (UE 5.7).
-    - [ ] Branching strategy (e.g., `master` + `feature/<name>`).
-  - [ ] Commit initial project state to `master` with message like `chore: initial UE5 C++ project setup`.
+- [x] **1.5 Create README & branching conventions**
+  - [x] Create `/README.md` with:
+    - [x] Short project description (“Fallen Compass”).
+    - [x] Engine version (UE 5.7).
+    - [x] Branching strategy (e.g., `master` + `feature/<name>`).
+  - [x] Commit initial project state to `master` with message like `chore: initial UE5 C++ project setup`.
 
 ---
 
 ### 2.0 Implement core FC framework classes (GameInstance, GameMode, PlayerController)
 
-- [ ] **2.1 Create custom GameInstance class**
+- [x] **2.1 Create custom GameInstance class**
 
-  - [ ] In C++, create `UFCGameInstance` derived from `UGameInstance`.
-  - [ ] Register `UFCGameInstance` in Project Settings → Maps & Modes → Game Instance Class.
-  - [ ] Add placeholder fields/comments for future global data (e.g. current expedition, settings).
+  - [x] In C++, create `UFCGameInstance` derived from `UGameInstance`.
+  - [x] Register `UFCGameInstance` in Project Settings → Maps & Modes → Game Instance Class.
+  - [x] Add placeholder fields/comments for future global data (e.g. current expedition, settings).
 
-- [ ] **2.2 Create custom GameMode class**
+- [x] **2.2 Create custom GameMode class**
 
-  - [ ] Create `AFCGameMode` derived from `AGameModeBase`.
-  - [ ] Configure it as the default GameMode for the Office level (later, once Office level exists).
-  - [ ] Add basic logging in `BeginPlay()` to confirm it’s being used.
+  - [x] Create `AFCGameMode` derived from `AGameModeBase`.
+  - [x] Configure it as the default GameMode for the Office level (later, once Office level exists).
+  - [x] Add basic logging in `BeginPlay()` to confirm it’s being used.
 
-- [ ] **2.3 Create custom PlayerController class**
+- [x] **2.3 Create custom PlayerController class**
 
-  - [ ] Create `AFCPlayerController` derived from `APlayerController`.
-  - [ ] Set it as the default PlayerController Class in `AFCGameMode`.
-  - [ ] Add empty stubs / placeholders for:
-    - [ ] Handling interaction input.
-    - [ ] Handling ESC/pause menu logic.
-    - [ ] Managing camera state (first-person vs table-view).
+  - [x] Create `AFCPlayerController` derived from `APlayerController`.
+  - [x] Set it as the default PlayerController Class in `AFCGameMode`.
+  - [x] Add empty stubs / placeholders for:
+    - [x] Handling interaction input.
+    - [x] Handling ESC/pause menu logic.
+    - [x] Managing camera state (first-person vs table-view).
 
-- [ ] **2.4 Verify framework wiring**
-  - [ ] Launch project in a simple test level using `AFCGameMode` and `AFCPlayerController`.
-  - [ ] Confirm via logs or debugger that:
-    - [ ] `UFCGameInstance` is constructed.
-    - [ ] `AFCGameMode` and `AFCPlayerController` are active.
+- [x] **2.4 Verify framework wiring**
+  - [x] Launch project in a simple test level using `AFCGameMode` and `AFCPlayerController`.
+  - [x] Confirm via logs or debugger that:
+    - [x] `UFCGameInstance` is constructed.
+    - [x] `AFCGameMode` and `AFCPlayerController` are active.
 
 ---
 

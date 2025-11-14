@@ -1,138 +1,222 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "FCPlayerController.h"
-#include "GameFramework/Pawn.h"
-#include "Blueprint/AIBlueprintHelperLibrary.h"
-#include "NiagaraSystem.h"
-#include "NiagaraFunctionLibrary.h"
-#include "FCCharacter.h"
+#include "Engine/Engine.h"
+#include "Engine/LocalPlayer.h"
 #include "Engine/World.h"
 #include "EnhancedInputComponent.h"
-#include "Navigation/PathFollowingComponent.h"
-#include "InputActionValue.h"
 #include "EnhancedInputSubsystems.h"
-#include "Engine/LocalPlayer.h"
-#include "FC.h"
+#include "InputAction.h"
+#include "InputMappingContext.h"
+#include "UObject/ConstructorHelpers.h"
+
+DEFINE_LOG_CATEGORY(LogFallenCompassPlayerController);
 
 AFCPlayerController::AFCPlayerController()
 {
-	bIsTouch = false;
-	bMoveToMouseCursor = false;
+	CameraMode = EFCPlayerCameraMode::FirstPerson;
+	bIsPauseMenuDisplayed = false;
+	bShowMouseCursor = false;
 
-	// create the path following comp
-	PathFollowingComponent = CreateDefaultSubobject<UPathFollowingComponent>(TEXT("Path Following Component"));
+	static ConstructorHelpers::FObjectFinder<UInputMappingContext> MappingContextFinder(TEXT("/Game/FC/Input/IMC_FC_Default"));
+	if (MappingContextFinder.Succeeded())
+	{
+		DefaultMappingContext = MappingContextFinder.Object;
+	}
+	else
+	{
+		UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("Failed to load IMC_FC_Default mapping context."));
+	}
 
-	// configure the controller
-	bShowMouseCursor = true;
-	DefaultMouseCursor = EMouseCursor::Default;
-	CachedDestination = FVector::ZeroVector;
-	FollowTime = 0.f;
+	static ConstructorHelpers::FObjectFinder<UInputAction> InteractActionFinder(TEXT("/Game/FC/Input/IA_Interact"));
+	if (InteractActionFinder.Succeeded())
+	{
+		InteractAction = InteractActionFinder.Object;
+	}
+	else
+	{
+		UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("Failed to load IA_Interact."));
+	}
+
+	static ConstructorHelpers::FObjectFinder<UInputAction> PauseActionFinder(TEXT("/Game/FC/Input/IA_Pause"));
+	if (PauseActionFinder.Succeeded())
+	{
+		PauseAction = PauseActionFinder.Object;
+	}
+	else
+	{
+		UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("Failed to load IA_Pause."));
+	}
+}
+
+void AFCPlayerController::BeginPlay()
+{
+	Super::BeginPlay();
+	LogStateChange(TEXT("AFCPlayerController ready"));
+
+	if (GEngine)
+	{
+		GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Green, TEXT("FC controller active"));
+	}
 }
 
 void AFCPlayerController::SetupInputComponent()
 {
-	// set up gameplay key bindings
 	Super::SetupInputComponent();
 
-	// Only set up input on local player controllers
-	if (IsLocalPlayerController())
+	if (ULocalPlayer* LocalPlayer = GetLocalPlayer())
 	{
-		// Add Input Mapping Context
-		if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer()))
+		if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(LocalPlayer))
 		{
-			Subsystem->AddMappingContext(DefaultMappingContext, 0);
-		}
-
-		// Set up action bindings
-		if (UEnhancedInputComponent* EnhancedInputComponent = Cast<UEnhancedInputComponent>(InputComponent))
-		{
-			// Setup mouse input events
-			EnhancedInputComponent->BindAction(SetDestinationClickAction, ETriggerEvent::Started, this, &AFCPlayerController::OnInputStarted);
-			EnhancedInputComponent->BindAction(SetDestinationClickAction, ETriggerEvent::Triggered, this, &AFCPlayerController::OnSetDestinationTriggered);
-			EnhancedInputComponent->BindAction(SetDestinationClickAction, ETriggerEvent::Completed, this, &AFCPlayerController::OnSetDestinationReleased);
-			EnhancedInputComponent->BindAction(SetDestinationClickAction, ETriggerEvent::Canceled, this, &AFCPlayerController::OnSetDestinationReleased);
-
-			// Setup touch input events
-			EnhancedInputComponent->BindAction(SetDestinationTouchAction, ETriggerEvent::Started, this, &AFCPlayerController::OnInputStarted);
-			EnhancedInputComponent->BindAction(SetDestinationTouchAction, ETriggerEvent::Triggered, this, &AFCPlayerController::OnTouchTriggered);
-			EnhancedInputComponent->BindAction(SetDestinationTouchAction, ETriggerEvent::Completed, this, &AFCPlayerController::OnTouchReleased);
-			EnhancedInputComponent->BindAction(SetDestinationTouchAction, ETriggerEvent::Canceled, this, &AFCPlayerController::OnTouchReleased);
-		}
-		else
-		{
-			UE_LOG(LogFC, Error, TEXT("'%s' Failed to find an Enhanced Input Component! This template is built to use the Enhanced Input system. If you intend to use the legacy system, then you will need to update this C++ file."), *GetNameSafe(this));
+			if (DefaultMappingContext)
+			{
+				Subsystem->AddMappingContext(DefaultMappingContext, DefaultMappingPriority);
+			}
+			else
+			{
+				UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("DefaultMappingContext is null on %s."), *GetName());
+			}
 		}
 	}
-}
 
-void AFCPlayerController::OnInputStarted()
-{
-	StopMovement();
-
-	// Update the move destination to wherever the cursor is pointing at
-	UpdateCachedDestination();
-}
-
-void AFCPlayerController::OnSetDestinationTriggered()
-{
-	// We flag that the input is being pressed
-	FollowTime += GetWorld()->GetDeltaSeconds();
-	
-	// Update the move destination to wherever the cursor is pointing at
-	UpdateCachedDestination();
-	
-	// Move towards mouse pointer or touch
-	APawn* ControlledPawn = GetPawn();
-	if (ControlledPawn != nullptr)
+	UEnhancedInputComponent* EnhancedInput = Cast<UEnhancedInputComponent>(InputComponent);
+	if (!EnhancedInput)
 	{
-		FVector WorldDirection = (CachedDestination - ControlledPawn->GetActorLocation()).GetSafeNormal();
-		ControlledPawn->AddMovementInput(WorldDirection, 1.0, false);
-	}
-}
-
-void AFCPlayerController::OnSetDestinationReleased()
-{
-	// If it was a short press
-	if (FollowTime <= ShortPressThreshold)
-	{
-		// We move there and spawn some particles
-		UAIBlueprintHelperLibrary::SimpleMoveToLocation(this, CachedDestination);
-		UNiagaraFunctionLibrary::SpawnSystemAtLocation(this, FXCursor, CachedDestination, FRotator::ZeroRotator, FVector(1.f, 1.f, 1.f), true, true, ENCPoolMethod::None, true);
+		UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("EnhancedInputComponent missing on %s; bindings skipped."), *GetName());
+		return;
 	}
 
-	FollowTime = 0.f;
-}
-
-// Triggered every frame when the input is held down
-void AFCPlayerController::OnTouchTriggered()
-{
-	bIsTouch = true;
-	OnSetDestinationTriggered();
-}
-
-void AFCPlayerController::OnTouchReleased()
-{
-	bIsTouch = false;
-	OnSetDestinationReleased();
-}
-
-void AFCPlayerController::UpdateCachedDestination()
-{
-	// We look for the location in the world where the player has pressed the input
-	FHitResult Hit;
-	bool bHitSuccessful = false;
-	if (bIsTouch)
+	if (InteractAction)
 	{
-		bHitSuccessful = GetHitResultUnderFinger(ETouchIndex::Touch1, ECollisionChannel::ECC_Visibility, true, Hit);
+		EnhancedInput->BindAction(InteractAction, ETriggerEvent::Started, this, &AFCPlayerController::HandleInteractPressed);
 	}
 	else
 	{
-		bHitSuccessful = GetHitResultUnderCursor(ECollisionChannel::ECC_Visibility, true, Hit);
+		UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("InteractAction not assigned on %s."), *GetName());
 	}
 
-	// If we hit a surface, cache the location
-	if (bHitSuccessful)
+	if (PauseAction)
 	{
-		CachedDestination = Hit.Location;
+		EnhancedInput->BindAction(PauseAction, ETriggerEvent::Started, this, &AFCPlayerController::HandlePausePressed);
+	}
+	else
+	{
+		UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("PauseAction not assigned on %s."), *GetName());
+	}
+}
+
+void AFCPlayerController::HandleInteractPressed()
+{
+	UE_LOG(LogFallenCompassPlayerController, Verbose, TEXT("HandleInteractPressed | Camera=%s"), *StaticEnum<EFCPlayerCameraMode>()->GetNameStringByValue(static_cast<int64>(CameraMode)));
+
+	if (CameraMode == EFCPlayerCameraMode::FirstPerson)
+	{
+		UE_LOG(LogFallenCompassPlayerController, Log, TEXT("TODO: Trace forward and interact with focused actor."));
+		if (GEngine)
+		{
+			GEngine->AddOnScreenDebugMessage(-1, 3.f, FColor::Yellow, TEXT("Interact: Trace forward and interact with focused actor"));
+		}
+		EnterTableViewPlaceholder();
+	}
+	else
+	{
+		UE_LOG(LogFallenCompassPlayerController, Log, TEXT("TODO: Route table-view interaction to board UI or exit handles."));
+		if (GEngine)
+		{
+			GEngine->AddOnScreenDebugMessage(-1, 3.f, FColor::Yellow, TEXT("Interact: Route table-view interaction to board UI"));
+		}
+	}
+}
+
+void AFCPlayerController::HandlePausePressed()
+{
+	if (CameraMode == EFCPlayerCameraMode::TableView)
+	{
+		UE_LOG(LogFallenCompassPlayerController, Log, TEXT("ESC pressed while in table view. Returning to first-person instead of pause menu."));
+		if (GEngine)
+		{
+			GEngine->AddOnScreenDebugMessage(-1, 3.f, FColor::Cyan, TEXT("ESC: Returning to first-person"));
+		}
+		ExitTableViewPlaceholder();
+		return;
+	}
+
+	if (bIsPauseMenuDisplayed)
+	{
+		HidePauseMenuPlaceholder();
+	}
+	else
+	{
+		ShowPauseMenuPlaceholder();
+	}
+}
+
+void AFCPlayerController::EnterTableViewPlaceholder()
+{
+	SetFallenCompassCameraMode(EFCPlayerCameraMode::TableView);
+	UE_LOG(LogFallenCompassPlayerController, Display, TEXT("TODO: Blend to table-view camera and disable movement."));
+	if (GEngine)
+	{
+		GEngine->AddOnScreenDebugMessage(-1, 4.f, FColor::Orange, TEXT("Entering Table View (TODO: Blend camera)"));
+	}
+}
+
+void AFCPlayerController::ExitTableViewPlaceholder()
+{
+	SetFallenCompassCameraMode(EFCPlayerCameraMode::FirstPerson);
+	UE_LOG(LogFallenCompassPlayerController, Display, TEXT("TODO: Restore first-person camera and re-enable input."));
+	if (GEngine)
+	{
+		GEngine->AddOnScreenDebugMessage(-1, 4.f, FColor::Orange, TEXT("Exiting Table View (TODO: Restore camera)"));
+	}
+}
+
+void AFCPlayerController::ShowPauseMenuPlaceholder()
+{
+	bIsPauseMenuDisplayed = true;
+	SetPause(true);
+	UE_LOG(LogFallenCompassPlayerController, Display, TEXT("TODO: Instantiate pause menu widget."));
+	if (GEngine)
+	{
+		GEngine->AddOnScreenDebugMessage(-1, 4.f, FColor::Magenta, TEXT("Pause Menu Requested (TODO: Instantiate widget)"));
+	}
+	LogStateChange(TEXT("Pause menu requested"));
+}
+
+void AFCPlayerController::HidePauseMenuPlaceholder()
+{
+	bIsPauseMenuDisplayed = false;
+	SetPause(false);
+	UE_LOG(LogFallenCompassPlayerController, Display, TEXT("TODO: Dismiss pause menu widget."));
+	if (GEngine)
+	{
+		GEngine->AddOnScreenDebugMessage(-1, 4.f, FColor::Magenta, TEXT("Pause Menu Dismissed (TODO: Remove widget)"));
+	}
+	LogStateChange(TEXT("Pause menu dismissed"));
+}
+
+void AFCPlayerController::SetFallenCompassCameraMode(EFCPlayerCameraMode NewMode)
+{
+	if (CameraMode == NewMode)
+	{
+		return;
+	}
+
+	CameraMode = NewMode;
+	LogStateChange(TEXT("Camera mode updated"));
+}
+
+void AFCPlayerController::LogStateChange(const FString& Context) const
+{
+	const UEnum* ModeEnum = StaticEnum<EFCPlayerCameraMode>();
+	const FString ModeLabel = ModeEnum ? ModeEnum->GetNameStringByValue(static_cast<int64>(CameraMode)) : TEXT("Unknown");
+	UE_LOG(LogFallenCompassPlayerController, Log, TEXT("%s | CameraMode=%s | PauseMenu=%s"),
+		*Context,
+		*ModeLabel,
+		bIsPauseMenuDisplayed ? TEXT("Shown") : TEXT("Hidden"));
+	if (GEngine)
+	{
+		const FString DebugMsg = FString::Printf(TEXT("%s | CameraMode=%s | PauseMenu=%s"), *Context, *ModeLabel, bIsPauseMenuDisplayed ? TEXT("Shown") : TEXT("Hidden"));
+		GEngine->AddOnScreenDebugMessage(-1, 3.f, FColor::White, DebugMsg);
 	}
 }

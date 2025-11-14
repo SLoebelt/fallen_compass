@@ -28,7 +28,7 @@
 		},
 		{
 			"Name": "PCG",
-			"Enabled": true
+			"Enabled": false
 		}
 	],
 	"TargetPlatforms": [

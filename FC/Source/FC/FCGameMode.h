@@ -6,21 +6,19 @@
 #include "GameFramework/GameModeBase.h"
 #include "FCGameMode.generated.h"
 
+DECLARE_LOG_CATEGORY_EXTERN(LogFallenCompassGameMode, Log, All);
+
 /**
- *  Simple Game Mode for a top-down perspective game
- *  Sets the default gameplay framework classes
- *  Check the Blueprint derived class for the set values
+ * Simple GameMode stub for early prototypes.
+ * Keeps template defaults until FC-specific pawn/controller are ready.
  */
-UCLASS(abstract)
-class AFCGameMode : public AGameModeBase
+UCLASS()
+class FC_API AFCGameMode : public AGameModeBase
 {
-	GENERATED_BODY()
+    GENERATED_BODY()
 
 public:
+    AFCGameMode();
 
-	/** Constructor */
-	AFCGameMode();
+    virtual void BeginPlay() override;
 };
-
-
-

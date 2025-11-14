@@ -27,6 +27,7 @@ public class FC : ModuleRules
 
 		PublicIncludePaths.AddRange(new string[] {
 			"FC",
+			"FC/Core",
 			"FC/Variant_Strategy",
 			"FC/Variant_Strategy/UI",
 			"FC/Variant_TwinStick",
