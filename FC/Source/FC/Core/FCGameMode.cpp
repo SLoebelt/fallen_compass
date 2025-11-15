@@ -36,8 +36,6 @@ void AFCGameMode::BeginPlay()
         *ControllerName,
         *MapName);
 
-    UE_LOG(LogFallenCompassGameMode, Verbose, TEXT("Task 3.1 complete: AFCFirstPersonCharacter active. Next: Input mappings (3.2-3.3) and Office level (4.x)."));
-
     // TODO: Remove once proper UI system is in place.
     if (GEngine)
 	{

@@ -9,6 +9,7 @@
 #include "GameFramework/Controller.h"
 #include "InputAction.h"
 #include "UObject/ConstructorHelpers.h"
+#include "UObject/SoftObjectPtr.h"
 #include "Animation/AnimInstance.h"
 
 DEFINE_LOG_CATEGORY(LogFallenCompassCharacter);
@@ -56,21 +57,8 @@ AFCFirstPersonCharacter::AFCFirstPersonCharacter()
                 TEXT("Failed to load SKM_Manny_Simple. Ensure Characters/Mannequins content is available."));
         }
 
-            // Try to load a project-specific animation blueprint first (e.g. APC_Unarmed).
-            // Replace the path below with your actual AnimBlueprint asset path if it differs.
-			static ConstructorHelpers::FClassFinder<UAnimInstance> UnarmedAnimBP(
-				TEXT("/Game/Characters/Mannequins/Anims/Unarmed/ABP_Unarmed"));
-            if (UnarmedAnimBP.Succeeded())
-            {
-                MeshComp->SetAnimInstanceClass(UnarmedAnimBP.Class);
-				MeshComp->SetAnimationMode(EAnimationMode::AnimationBlueprint);
-                UE_LOG(LogFallenCompassCharacter, Log, TEXT("Loaded APB_Unarmed animation blueprint"));
-            }
-			else
-			{
-				UE_LOG(LogFallenCompassCharacter, Warning,
-					TEXT("Failed to load APB_Unarmed. Ensure Characters/Mannequins content is available."));
-			}
+            // AnimBlueprint will be assigned at runtime from DefaultAnimBlueprint (soft reference)
+            // to avoid synchronous editor loads during CDO construction.
 
         // Position mesh relative to capsule (standard FPS setup - mesh at feet)
         MeshComp->SetRelativeLocation(FVector(0.0f, 0.0f, -96.0f));
@@ -118,6 +106,22 @@ void AFCFirstPersonCharacter::BeginPlay()
     USkeletalMeshComponent* MeshComp = GetMesh();
     if (MeshComp)
     {
+        // If a DefaultAnimBlueprint soft-class is set in editor defaults, load and apply it now.
+        if (DefaultAnimBlueprint.ToSoftObjectPath().IsValid())
+        {
+            UClass* AnimBPClass = DefaultAnimBlueprint.LoadSynchronous();
+            if (AnimBPClass)
+            {
+                MeshComp->SetAnimInstanceClass(AnimBPClass);
+                MeshComp->SetAnimationMode(EAnimationMode::AnimationBlueprint);
+                UE_LOG(LogFallenCompassCharacter, Log, TEXT("Applied DefaultAnimBlueprint: %s"), *AnimBPClass->GetName());
+            }
+            else
+            {
+                UE_LOG(LogFallenCompassCharacter, Warning, TEXT("DefaultAnimBlueprint set but failed to load synchronously."));
+            }
+        }
+
         UAnimInstance* AnimInst = MeshComp->GetAnimInstance();
         if (AnimInst)
         {

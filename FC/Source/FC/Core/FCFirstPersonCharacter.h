@@ -60,6 +60,10 @@ protected:
     UPROPERTY(EditDefaultsOnly, Category = "Input")
     TObjectPtr<UInputAction> LookAction;
 
+    /** Optional AnimBlueprint to use for this character. Use Editor defaults to assign `ABP_Unarmed`. */
+    UPROPERTY(EditDefaultsOnly, Category = "Animation")
+    TSoftClassPtr<UAnimInstance> DefaultAnimBlueprint;
+
     // Input Handlers
     /** Handle movement input (WASD) */
     void HandleMove(const FInputActionValue& Value);

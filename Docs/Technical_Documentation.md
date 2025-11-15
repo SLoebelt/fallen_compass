@@ -1065,7 +1065,204 @@ void AFCPlayerController::HandleInteractPressed()
 
 ## Office Level & Greybox (Task 4)
 
-_Placeholder: to be populated when Task 4 is completed._
+### Overview
+
+Created the first playable level for Fallen Compass - a greyboxed office environment with basic geometry, lighting, interactable props, and camera target positions for the table view transition system.
+
+### 4.1 Office Level Creation
+
+#### Level Asset
+
+- **Location**: `/Game/FC/World/Levels/L_Office.umap`
+- **Game Mode**: `FCGameMode` assigned via World Settings override
+- **PlayerStart**: Positioned at central spawn location facing the desk
+
+#### World Settings Configuration
+
+```
+Game Mode Override: FCGameMode
+Default Pawn Class: AFCFirstPersonCharacter (inherited from GameMode)
+```
+
+### 4.2 Greybox Geometry
+
+#### Room Structure
+
+**Dimensions**: 2000x2000 units (20x20 meters)
+- **Floor**: Basic geometry with collision enabled
+- **Walls**: Four walls at 300 units height (3 meters)
+- **Ceiling**: Enclosed room for proper lighting
+- **Collision**: BlockAll preset on all geometry to prevent player clipping
+
+#### Organization
+
+Level geometry organized in World Outliner:
+```
+L_Office
+├── WorldLighting/
+│   ├── DirectionalLight
+│   ├── SkyLight
+│   ├── SkyAtmosphere
+│   └── ExponentialHeightFog
+├── Geometry/
+│   ├── Floor
+│   ├── Walls
+│   └── Ceiling
+└── Props/
+    ├── BP_OfficeDesk
+    └── SM_Door
+```
+
+### 4.3 Office Desk Blueprint
+
+#### BP_OfficeDesk
+
+- **Location**: `/Game/FC/World/Props/BP_OfficeDesk`
+- **Purpose**: Primary interactable object for table view transitions
+- **Components**:
+  - Root: Static Mesh Component (table mesh)
+  - **CameraTargetPoint**: Scene Component (child of root)
+
+#### CameraTargetPoint Setup
+
+```
+Component Hierarchy:
+└── BP_OfficeDesk (Root)
+    └── CameraTargetPoint (SceneComponent)
+        └── Transform: Positioned above desk, looking down
+```
+
+**Purpose**: 
+- Target transform for table-focused camera view (Task 6)
+- Provides consistent camera position for card game/board interactions
+- Can be adjusted per-instance without Blueprint changes
+
+**Configuration**:
+- Position: Above and angled toward desk surface
+- Rotation: Angled downward to frame entire desk
+- Field of View: Will be applied when camera transitions (Task 6)
+
+### 4.4 Door Placeholder
+
+#### SM_Door
+
+- **Type**: Static Mesh (basic cube geometry)
+- **Purpose**: Exit door placeholder for future level transitions
+- **Position**: Placed on wall as clearly marked "exit"
+- **Collision**: Enabled for interaction detection
+- **Future**: Will be upgraded to Blueprint with door opening animation and level transition logic (Task 6)
+
+### 4.5 Camera Positions for Table View
+
+#### Implementation Approach
+
+**Chosen Method**: SceneComponent on Blueprint (Option 2)
+- Allows per-instance adjustment
+- No separate camera actor clutter
+- Easier to reference in code (`BP_OfficeDesk->FindComponentByClass<USceneComponent>()`)
+
+#### Camera Target Configuration
+
+**CameraTargetPoint Transform**:
+- Positioned to provide clear view of entire desk surface
+- Angled top-down perspective (similar to board game view)
+- Distance adjusted to frame desk without clipping
+- Will be used by `AFCPlayerController::EnterTableView()` in Task 6
+
+#### Future Camera Transition System
+
+```mermaid
+sequenceDiagram
+    participant Player
+    participant Controller as AFCPlayerController
+    participant Desk as BP_OfficeDesk
+    participant Camera
+
+    Player->>Controller: Press E near desk
+    Controller->>Desk: Get CameraTargetPoint transform
+    Desk->>Controller: Return target transform
+    Controller->>Camera: Blend to target (ViewTarget)
+    Camera->>Player: Table view active
+```
+
+### 4.6 Lighting & Navigation
+
+#### Lighting Setup
+
+**WorldLighting Folder**:
+- **DirectionalLight**: Primary outdoor light source (sun)
+  - Intensity: Default
+  - Color: Natural daylight
+  - Angle: Creates shadows through windows (future)
+- **SkyLight**: Ambient fill light from sky
+  - Source Type: SLS_CapturedScene
+  - Recaptured after geometry changes
+- **SkyAtmosphere**: Realistic atmospheric scattering
+  - Provides blue sky gradient
+  - Enhances outdoor lighting feel
+- **ExponentialHeightFog**: Atmospheric depth and mood
+  - Subtle fog for visual depth
+
+**Lighting Quality**: 
+- Development/PIE: Fast lighting for iteration
+- Final: Will be baked for production (Task 7+)
+
+#### Navigation & Movement Testing
+
+**Collision Verification**:
+- Player cannot walk through walls ✅
+- Floor collision prevents falling ✅
+- Desk collision allows interaction ✅
+- Door collision blocks passage ✅
+
+**Movement Feel**:
+- Room scale appropriate for first-person navigation
+- Desk height realistic relative to character
+- Door positioned at logical exit height
+- Comfortable walking space around props
+
+**Character Movement**:
+- WASD movement: Responsive and smooth
+- Mouse look: Proper sensitivity and pitch clamping
+- Collision response: Natural sliding along walls
+- No clipping or geometry penetration
+
+#### NavMesh (Optional)
+
+- Not critical for player character (uses CharacterMovement)
+- Useful for future AI/NPC pathfinding
+- Can be generated later if needed
+
+### Design Rationale
+
+1. **Greybox First**: Focus on layout and scale before art pass
+2. **Modular Props**: Desk and door as separate Blueprints for reusability
+3. **Scene Component Target**: Flexible camera positioning without cluttering level
+4. **Comprehensive Lighting**: Realistic atmosphere aids in visual testing
+5. **Organized Hierarchy**: Clean World Outliner for maintainability
+
+### Asset Dependencies
+
+- **Mannequin Assets**: Used in BP_OfficeDesk for scale reference
+- **Level Prototyping**: Basic geometry meshes
+- **Engine Content**: Lighting components (DirectionalLight, SkyLight, etc.)
+
+### Testing & Validation
+
+- ✅ Player spawns correctly at PlayerStart
+- ✅ WASD movement and mouse look functional
+- ✅ Collision prevents wall clipping
+- ✅ Desk accessible and positioned correctly
+- ✅ Door visible as exit point
+- ✅ Lighting provides clear visibility
+- ✅ Scale feels appropriate for office environment
+
+### Open Hooks for Task 6
+
+- `BP_OfficeDesk::CameraTargetPoint` ready for camera transitions
+- `SM_Door` ready for interaction logic and level transitions
+- Desk interaction will trigger table view mode
+- Door interaction will trigger level change or game exit
 
 ---
 
@@ -1167,16 +1364,21 @@ w:\GameDev\FallenCompass\Engine\Build\BatchFiles\Build.bat FCEditor Win64 Develo
 - ✅ **Task 3.3**: Movement & look implemented with sensitivity and pitch clamping (completed)
 - ✅ **Task 3.5**: Interaction and ESC hooks exposed with forward trace (completed)
 
+### Task 4 Follow-Ups
+
+- ✅ **Task 4.1-4.6**: Office level greybox with desk, door, lighting, and camera positions (completed)
+
 ### Codebase Organization
 
 - ✅ **File Reorganization**: Moved core classes (`FCGameMode`, `FCPlayerController`, `FCFirstPersonCharacter`, `UFCGameInstance`) to `Source/FC/Core/` for better project structure
+- ✅ **Level Organization**: Created `/Game/FC/World/Levels/` for maps and `/Game/FC/World/Props/` for level actors
 
 ### Future Documentation Sections
 
-- Task 4: Office level greybox, table/door props, camera target transforms
 - Task 5: Main menu UMG widget, level transitions, button bindings
 - Task 6: Interaction system, table-view camera blending, pause menu flow
+- Task 7+: Polish, audio, save/load systems
 
 ---
 
-_Last updated: November 15, 2025 (Tasks 3.1-3.5 complete, files reorganized to FC/Core/)_
+_Last updated: November 15, 2025 (Tasks 3.1-3.5 and 4.1-4.6 complete, Office level created)_

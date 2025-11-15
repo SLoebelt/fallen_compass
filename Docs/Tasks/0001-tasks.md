@@ -129,42 +129,42 @@
 
 ### 4.0 Create greybox Office level with spawn, table & door interactables, and camera positions
 
-- [ ] **4.1 Create Office level**
+- [x] **4.1 Create Office level**
 
-  - [ ] Create a new level asset (e.g. `/Content/Levels/L_Office`).
-  - [ ] Assign `AFCGameMode` as the GameMode for this level (World Settings).
-  - [ ] Place a `PlayerStart` at a reasonable position in the room.
+  - [x] Create a new level asset (e.g. `/Content/Levels/L_Office`).
+  - [x] Assign `AFCGameMode` as the GameMode for this level (World Settings).
+  - [x] Place a `PlayerStart` at a reasonable position in the room.
 
-- [ ] **4.2 Build basic greybox geometry**
+- [x] **4.2 Build basic greybox geometry**
 
-  - [ ] Add static meshes or BSP/geometry for:
-    - [ ] Floor.
-    - [ ] Four walls.
-    - [ ] Ceiling.
-  - [ ] Confirm that collision is active to prevent falling out.
+  - [x] Add static meshes or BSP/geometry for:
+    - [x] Floor.
+    - [x] Four walls.
+    - [x] Ceiling.
+  - [x] Confirm that collision is active to prevent falling out.
 
-- [ ] **4.3 Add placeholder table prop**
+- [x] **4.3 Add placeholder table prop**
 
-  - [ ] Add a mesh (e.g. a cube or simple table asset) at a logical position in the room.
-  - [ ] Name it clearly (e.g. `SM_Table_Office` or `BP_OfficeTable`).
-  - [ ] Ensure it’s reachable by walking.
+  - [x] Add a mesh (e.g. a cube or simple table asset) at a logical position in the room.
+  - [x] Name it clearly (e.g. `SM_Table_Office` or `BP_OfficeTable`).
+  - [x] Ensure it’s reachable by walking.
 
-- [ ] **4.4 Add placeholder door prop**
+- [x] **4.4 Add placeholder door prop**
 
-  - [ ] Add a door mesh or placeholder rectangle to represent the exit door.
-  - [ ] Name it clearly (e.g. `SM_OfficeDoor` or `BP_OfficeDoor`).
-  - [ ] Place it on one wall in a position that is clearly an “exit”.
+  - [x] Add a door mesh or placeholder rectangle to represent the exit door.
+  - [x] Name it clearly (e.g. `SM_OfficeDoor` or `BP_OfficeDoor`).
+  - [x] Place it on one wall in a position that is clearly an “exit”.
 
-- [ ] **4.5 Set up camera positions for table view**
+- [x] **4.5 Set up camera positions for table view**
 
-  - [ ] Create a target transform for the **table-focused camera view**:
-    - [ ] Either place a `Camera` actor pointing at the table, or define a `SceneComponent` on the table blueprint that acts as camera target.
-  - [ ] Verify that from this transform, the table is clearly visible and framed.
+  - [x] Create a target transform for the **table-focused camera view**:
+    - [x] Either place a `Camera` actor pointing at the table, or define a `SceneComponent` on the table blueprint that acts as camera target.
+  - [x] Verify that from this transform, the table is clearly visible and framed.
 
-- [ ] **4.6 Basic lighting & navigation**
-  - [ ] Add at least one light so the room is visible.
-  - [ ] Ensure NavMesh (if used) or character movement navigates correctly in the room.
-  - [ ] Quick test: run PIE, walk around, ensure scale and movement feel okay.
+- [x] **4.6 Basic lighting & navigation**
+  - [x] Add at least one light so the room is visible (sun light from putdoor for now).
+  - [x] Ensure character movement navigates correctly in the room.
+  - [x] Quick test: run PIE, walk around, ensure scale and movement feel okay.
 
 ---
 
