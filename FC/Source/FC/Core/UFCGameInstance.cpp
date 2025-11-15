@@ -1,5 +1,6 @@
 #include "UFCGameInstance.h"
 #include "Engine/Engine.h"
+#include "Misc/ConfigCacheIni.h"
 
 void UFCGameInstance::Init()
 {
@@ -39,4 +40,23 @@ void UFCGameInstance::SetCurrentExpeditionId(const FString& InExpeditionId)
 void UFCGameInstance::MarkSessionSaved()
 {
     bIsSessionDirty = false;
+}
+
+FString UFCGameInstance::GetGameVersion() const
+{
+    // Return the game version - you can set this in Project Settings → Project → Description → Version
+    FString ProjectVersion;
+    if (GConfig->GetString(
+            TEXT("/Script/EngineSettings.GeneralProjectSettings"),
+            TEXT("ProjectVersion"),
+            ProjectVersion,
+            GGameIni))
+    {
+        UE_LOG(LogTemp, Log, TEXT("Project Version: %s"), *ProjectVersion);
+    }
+    else
+    {
+        UE_LOG(LogTemp, Warning, TEXT("ProjectVersion not found in config!"));
+    }
+    return ProjectVersion;
 }

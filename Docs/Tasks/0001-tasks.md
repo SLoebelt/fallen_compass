@@ -168,36 +168,173 @@
 
 ---
 
-### 5.0 Implement dedicated Main Menu level with Start & Quit
+### 5.0 Implement in-world Main Menu in Office level (Diegetic Menu System)
 
-- [ ] **5.1 Create Main Menu level**
+> **Design:** Menu state within L_Office using static camera on desk + UI overlay. Eliminates separate menu level for immersive experience.  
+> **Reference:** See `/Docs/Tasks/0005-MainMenu-Concept.md` for full technical specification.
 
-  - [ ] Create a new level (e.g. `/Content/Levels/L_MainMenu`).
-  - [ ] Use a simple background (e.g. static camera with basic environment or flat color).
-  - [ ] Set this level as the **Editor Startup Map** and **Game Default Map** in Project Settings → Maps & Modes.
+- [x] **5.1 Set up Menu Camera system**
 
-- [ ] **5.2 Create Main Menu widget**
+  - [x] Create `ACameraActor` named "MenuCamera" in L_Office
+    - [x] Position ~300-500 units from desk, angled down at desk
+    - [x] Configure as `CineCameraComponent` with FOV 60-75°
+    - [ ] Optional: Add slow oscillation (±2° over 10-15s) for subtle movement
+  - [x] Add reference to MenuCamera in `AFCPlayerController`
+  - [x] Extend `EFCPlayerCameraMode` enum:
+    - [x] Add `MainMenu` state
+    - [x] Add `SaveSlotView` state (for future map UI)
+  - [x] Implement `SetCameraMode()` with smooth blend (2s, VTBlend_Cubic)
+  - [x] Test: Camera blends smoothly between menu and first-person views
 
-  - [ ] Create a UMG widget (e.g. `WBP_MainMenu`).
-  - [ ] Add buttons:
-    - [ ] “Start Game”
-    - [ ] “Quit Game”
-  - [ ] Optionally add a simple title text.
+- [x] **5.2 Extend State Management in AFCPlayerController**
 
-- [ ] **5.3 Hook Main Menu widget into level**
+  - [x] Create `EFCGameState` enum:
+    - [x] `MainMenu`, `Gameplay`, `TableView`, `Paused`, `Loading`
+  - [x] Add `CurrentGameState` property to `AFCPlayerController`
+  - [x] Implement `InitializeMainMenu()`:
+    - [x] Disable all input contexts
+    - [x] Set `FInputModeUIOnly()`
+    - [x] Show mouse cursor
+    - [x] Spawn and add `WBP_MainMenu` to viewport (Task 5.3)
+    - [x] Set camera to MenuCamera
+  - [x] Implement `TransitionToGameplay()`:
+    - [x] Remove menu widget (Task 5.3)
+    - [x] Blend camera to first-person
+    - [ ] Teleport player to gameplay start position (Task 5.4)
+    - [x] Restore FirstPerson input mapping context
+    - [x] Set `FInputModeGameOnly()`, hide cursor
+  - [x] Modify L_Office to call `InitializeMainMenu()` on BeginPlay
 
-  - [ ] In the Main Menu level blueprint (or a custom menu GameMode/Controller if desired):
-    - [ ] On level begin play, create and add `WBP_MainMenu` to the viewport.
-  - [ ] Implement button behavior:
-    - [ ] “Start Game” → open Office level (`L_Office`).
-    - [ ] “Quit Game” → call `QuitGame`.
+- [x] **5.3 Create Main Menu Widget (WBP_MainMenu)**
 
-- [ ] **5.4 Verify menu → Office flow**
-  - [ ] Start game from UE.
-  - [ ] Confirm Main Menu level loads.
-  - [ ] Click “Start Game”:
-    - [ ] Office level loads.
-    - [ ] Player spawns as `AFCFirstPersonCharacter`.
+  - [x] Create UMG widget `WBP_MainMenu` at `/Game/FC/UI/Menus/`
+  - [x] Add logo placeholder (top left)
+  - [x] Add vertical button container with styled buttons:
+    - [x] "New Legacy" (starts new game)
+    - [x] "Continue" (loads most recent save, disabled if no saves)
+    - [x] "Load Game" (opens save slot selector)
+    - [x] "Options" (placeholder for settings)
+    - [x] "Quit" (exits application)
+  - [x] Add version text (bottom right, small font)
+  - [x] Implement button hover effects (highlight, scale, sound)
+  - [x] Hook buttons to `AFCPlayerController` functions
+
+- [x] **5.4 Implement New Legacy flow**
+
+  - [x] Implement `AFCPlayerController::OnNewLegacyClicked()`:
+    - [x] Set `CurrentGameState = EFCGameState::Gameplay`
+    - [x] Call `TransitionToGameplay()`
+    - [x] Store gameplay start transform (position + rotation)
+  - [x] Test flow:
+    - [x] Game starts in menu state (static camera, UI visible)
+    - [x] Click "New Legacy" → smooth camera blend to first-person
+    - [x] Player spawns at correct location in office
+    - [x] Movement, look, and interact inputs all functional
+    - [x] Menu widget removed from screen
+
+- [x] **5.5 Implement Door Return-to-Menu flow**
+
+  - [x] Update `BP_OfficeDoor::Interact()`:
+    - [x] Call `AFCPlayerController::ReturnToMainMenu()`
+  - [x] Implement `ReturnToMainMenu()`:
+    - [x] Fade camera to black (1s using CameraManager)
+    - [x] Play door open sound effect
+    - [x] After fade completes, reload L_Office level
+  - [x] On level reload, ensure `InitializeMainMenu()` is called
+  - [x] Test flow:
+    - [x] In gameplay, walk to door and press E
+    - [x] Screen fades to black smoothly
+    - [x] Level reloads
+    - [x] Menu state reinitialized (camera, widget, input mode)
+    - [x] No gameplay state carries over
+
+- [ ] **5.6 Implement basic Save/Load system foundation**
+
+  - [ ] Create `UFCSaveGame` class derived from `USaveGame`:
+    - [ ] Add properties: `SaveSlotName`, `Timestamp`, `CurrentLevelName`
+    - [ ] Add properties: `PlayerLocation`, `PlayerRotation`
+    - [ ] Add placeholder for expedition data (Week 2+)
+  - [ ] Implement save/load manager in `UFCGameInstance`:
+    - [ ] `SaveGame(const FString& SlotName)` - serialize current state
+    - [ ] `LoadGameAsync(const FString& SlotName)` - async load with callback
+    - [ ] `GetAvailableSaveSlots()` - scan and return save metadata
+    - [ ] `GetMostRecentSave()` - return latest auto/quick save
+  - [ ] Implement slot naming convention:
+    - [ ] `AutoSave_001`, `AutoSave_002`, `AutoSave_003` (rotating)
+    - [ ] `QuickSave` (single slot)
+    - [ ] `Manual_001`, `Manual_002`, etc. (player saves)
+  - [ ] Test: Can create and load save games, data persists correctly
+
+- [ ] **5.7 Create Save Slot Selector Widget (WBP_SaveSlotSelector)**
+
+  - [ ] Create UMG widget `WBP_SaveSlotSelector` at `/Game/FC/UI/Menus/`
+  - [ ] Add map/parchment background texture
+  - [ ] Add ScrollBox for save slot list
+  - [ ] Create `WBP_SaveSlotItem` widget template:
+    - [ ] Display: Slot name, timestamp, location, expedition progress
+    - [ ] Click detection for selection
+    - [ ] Hover state highlighting
+  - [ ] Add "Back" button to return to main menu
+  - [ ] Populate list with `GetAvailableSaveSlots()` results
+  - [ ] Hook selection to `LoadGameAsync()`
+
+- [ ] **5.8 Hook up Continue and Load Save Game buttons**
+
+  - [ ] Implement `OnContinueClicked()`:
+    - [ ] Get most recent save from GameInstance
+    - [ ] If no saves exist, disable button (grayed out)
+    - [ ] If save exists, call `LoadGameAsync()` with that slot
+  - [ ] Implement `OnLoadSaveClicked()`:
+    - [ ] Hide `WBP_MainMenu`
+    - [ ] Show `WBP_SaveSlotSelector`
+    - [ ] Optional: Pan camera to map area on desk
+  - [ ] Implement async loading flow:
+    - [ ] Show loading screen widget during level stream
+    - [ ] Restore player state after level loads
+    - [ ] Transition to gameplay state at saved location
+  - [ ] Test flow:
+    - [ ] Create manual save in office
+    - [ ] Return to menu via door
+    - [ ] Click "Continue" → loads into saved position
+    - [ ] Verify: Player location, rotation, level all correct
+
+- [ ] **5.9 Add atmospheric details and polish**
+
+  - [ ] Add ambient effects to menu camera view:
+    - [ ] Particle system: Dust motes in light shafts (`P_DustMotes`)
+    - [ ] Animated material: Candle flicker emissive pulse
+    - [ ] Window lighting: Subtle animated caustics
+  - [ ] Add audio:
+    - [ ] Ambient loop: Clock ticking, distant wind, paper rustle (`A_Office_Ambience`)
+    - [ ] Button click sound effects (`S_ButtonClick`)
+    - [ ] Menu transition whoosh (`S_MenuTransition`)
+    - [ ] Door open sound (`S_DoorOpen`)
+  - [ ] Camera enhancements:
+    - [ ] Add subtle camera shake or slow rotation for "breathing"
+    - [ ] Depth of field focusing on desk area
+  - [ ] Widget polish:
+    - [ ] Smooth fade-in on menu appear (1s delay after level load)
+    - [ ] Font selection (period-appropriate serif)
+    - [ ] Drop shadows for text readability
+  - [ ] Test: Menu feels atmospheric but UI remains readable
+
+- [ ] **5.10 Implement Quit button and verify all flows**
+  - [ ] Implement `OnQuitClicked()`:
+    - [ ] Call `UKismetSystemLibrary::QuitGame()`
+    - [ ] Ensure clean shutdown (save auto-save if needed)
+  - [ ] Full playthrough test:
+    - [ ] Game starts → L_Office menu state
+    - [ ] "New Legacy" → gameplay transition works
+    - [ ] Door interaction → returns to menu
+    - [ ] "Continue" → loads most recent save (if exists)
+    - [ ] "Load Save Game" → shows slot selector → loads selected slot
+    - [ ] "Options" → placeholder message (implement in Week 2)
+    - [ ] "Quit" → exits cleanly
+  - [ ] Edge case testing:
+    - [ ] Rapid button clicks don't break state
+    - [ ] Loading non-existent save shows error
+    - [ ] Corrupted save handled gracefully
+  - [ ] Set L_Office as Editor Startup Map and Game Default Map
 
 ---
 
@@ -252,12 +389,12 @@
   - [ ] On “Quit Game”:
     - [ ] Call `QuitGame`.
 
-- [ ] **6.5 Implement door interaction → Main Menu**
+- [x] **6.5 Implement door interaction → Main Menu**
 
-  - [ ] Create a blueprint for the door (e.g. `BP_OfficeDoor`) implementing `Interact`.
-  - [ ] On `Interact` from first-person:
-    - [ ] Load the Main Menu level (`L_MainMenu`).
-    - [ ] Optionally ensure the game is unpaused and in a clean state.
+  - [x] Create a blueprint for the door (e.g. `BP_OfficeDoor`) implementing `Interact`.
+  - [x] On `Interact` from first-person:
+    - [x] Load the Main Menu level (`L_MainMenu`).
+    - [x] Optionally ensure the game is unpaused and in a clean state.
 
 - [ ] **6.6 State sanity checks**
   - [ ] Verify transitions:

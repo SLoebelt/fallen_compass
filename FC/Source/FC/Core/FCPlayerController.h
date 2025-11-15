@@ -15,7 +15,9 @@ UENUM(BlueprintType)
 enum class EFCPlayerCameraMode : uint8
 {
 	FirstPerson = 0,
-	TableView
+	TableView,
+	MainMenu,
+	SaveSlotView
 };
 
 UENUM(BlueprintType)
@@ -25,6 +27,16 @@ enum class EFCInputMappingMode : uint8
 	TopDown,
 	Fight,
 	StaticScene
+};
+
+UENUM(BlueprintType)
+enum class EFCGameState : uint8
+{
+	MainMenu = 0,
+	Gameplay,
+	TableView,
+	Paused,
+	Loading
 };
 
 /**
@@ -45,10 +57,43 @@ public:
 	EFCPlayerCameraMode GetCameraMode() const { return CameraMode; }
 	bool IsPauseMenuDisplayed() const { return bIsPauseMenuDisplayed; }
 	EFCInputMappingMode GetCurrentMappingMode() const { return CurrentMappingMode; }
+	EFCGameState GetCurrentGameState() const { return CurrentGameState; }
 
 	/** Switch to a different input mapping context (e.g., FirstPerson → TopDown) */
 	UFUNCTION(BlueprintCallable, Category = "Input")
 	void SetInputMappingMode(EFCInputMappingMode NewMode);
+
+	/** Transition to the specified camera mode with smooth blending */
+	UFUNCTION(BlueprintCallable, Category = "Camera")
+	void SetCameraModeLocal(EFCPlayerCameraMode NewMode, float BlendTime = 2.0f);
+
+	/** Initialize the main menu state (called on level start) */
+	UFUNCTION(BlueprintCallable, Category = "GameFlow")
+	void InitializeMainMenu();
+
+	/** Transition from main menu to gameplay */
+	UFUNCTION(BlueprintCallable, Category = "GameFlow")
+	void TransitionToGameplay();
+
+	/** Return to main menu state (from gameplay) */
+	UFUNCTION(BlueprintCallable, Category = "GameFlow")
+	void ReturnToMainMenu();
+
+	/** Main menu button callbacks */
+	UFUNCTION(BlueprintCallable, Category = "UI")
+	void OnNewLegacyClicked();
+
+	UFUNCTION(BlueprintCallable, Category = "UI")
+	void OnContinueClicked();
+
+	UFUNCTION(BlueprintCallable, Category = "UI")
+	void OnLoadSaveClicked();
+
+	UFUNCTION(BlueprintCallable, Category = "UI")
+	void OnOptionsClicked();
+
+	UFUNCTION(BlueprintCallable, Category = "UI")
+	void OnQuitClicked();
 
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "State")
@@ -56,6 +101,22 @@ protected:
 
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "State")
 	bool bIsPauseMenuDisplayed;
+
+	/** Current game state (MainMenu, Gameplay, etc.) */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "State")
+	EFCGameState CurrentGameState;
+
+	/** Reference to the MenuCamera actor in L_Office */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera")
+	TObjectPtr<class ACameraActor> MenuCamera;
+
+	/** Main menu widget class */
+	UPROPERTY(EditDefaultsOnly, Category = "UI")
+	TSubclassOf<class UUserWidget> MainMenuWidgetClass;
+
+	/** Current main menu widget instance */
+	UPROPERTY()
+	TObjectPtr<class UUserWidget> MainMenuWidget;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
 	int32 DefaultMappingPriority = 0;

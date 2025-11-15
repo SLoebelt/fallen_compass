@@ -30,7 +30,7 @@ Konflikte werden in **rundenbasierten, gridbasierten Taktik-Kämpfen** ausgetrag
   - schneller,
   - stabiler oder
   - besser wartbar
-  werden (z. B. Pathfinding, komplexe Simulation, speicherintensive Systeme, Metasysteme wie Routenrisiko).
+    werden (z. B. Pathfinding, komplexe Simulation, speicherintensive Systeme, Metasysteme wie Routenrisiko).
 - Blueprints bleiben primär für **Content-nahe Logik** (UI, einfache Skripte, Events, Prototyping).
 - Es gibt **kein starres „Blueprint First“-Dogma** – stattdessen einen pragmatischen Ansatz:
   > „Was technisch sinnvoll ist, bekommt C++; der Rest bleibt agil in Blueprints.“
@@ -96,7 +96,7 @@ Konflikte werden in **rundenbasierten, gridbasierten Taktik-Kämpfen** ausgetrag
     - erbeutete Ressourcen,
     - Kartenerkundung,
     - Moral/Stimmung
-    abbilden.
+      abbilden.
   - Meta-Systeme, bei denen der Spieler bewusst abwägen muss:
     - „Primärziel durchdrücken“ vs. „Crew schonen / Risiko reduzieren“.
 
@@ -111,10 +111,33 @@ Konflikte werden in **rundenbasierten, gridbasierten Taktik-Kämpfen** ausgetrag
   - Zusammenstellung der **Crew** und Auswahl von **Ausrüstung/Tieren/Wagen**.
   - **Kartentisch** als diegetische UI für Weltkarte, bekannte Regionen und Routenplanung.
 
-#### 3.1.1 Routenplanung bis zum Expeditionsstartpunkt
+#### 3.1.1 In-World Main Menu (Design-Update: November 2025)
+
+- Das Spiel startet **direkt im Büro-Level (L_Office)** in einem **Main Menu-Zustand**:
+  - Eine **statische oder langsam bewegte Kamera** (MenuCamera) fokussiert den Schreibtisch.
+  - Eine **UI-Overlay** (WBP_MainMenu) zeigt:
+    - Spiellogo (diegetisch oder als Overlay)
+    - "New Legacy" (neue Expedition starten)
+    - "Continue" (letzten Speicherstand laden, deaktiviert wenn keine Speicherstände vorhanden)
+    - "Load Save Game" (Speicherstand-Auswahl öffnen)
+    - "Options" (Einstellungen)
+    - "Quit" (Spiel beenden)
+  - **Atmosphärische Details**: Staubpartikel, flackernde Kerzen, Umgebungsgeräusche (Uhr, Wind, raschelndes Papier).
+- Bei Klick auf **"New Legacy"**:
+  - Sanfter **Kameraübergang** (2 Sekunden, kubisches Easing) von MenuCamera zur First-Person-Kamera.
+  - Spieler-Charakter wird gespawnt/aktiviert.
+  - UI wird entfernt, Eingabe aktiviert.
+- Die **Tür im Büro** kehrt zum Main Menu-Zustand zurück:
+  - Fade to Black (1-2 Sekunden).
+  - Level-Reload (L_Office).
+  - Initialisierung im Main Menu-Zustand (MenuCamera + WBP_MainMenu).
+  - Gameplay-Zustand wird gelöscht (Position, Inventar etc.).
+- **Vorteile**: Immersiv, keine Ladebildschirme beim Start, atmosphärische Einführung, nahtloser Übergang zwischen Meta-Ebene und Gameplay.
+
+#### 3.1.2 Routenplanung bis zum Expeditionsstartpunkt
 
 - Die Routenplanung beginnt im Büro am **Kartentisch**.
-- Von hier aus wird die **Route bis zum eigentlichen Expeditionsstartpunkt** geplant, z. B.:
+- Von hier aus wird die **Route bis zum eigentlichen Expeditionsstartpunkt** geplant, z. B.:
   - Küste,
   - befahrbarer Fluss,
   - Rand einer erforschten Region.
@@ -263,7 +286,7 @@ Konflikte werden in **rundenbasierten, gridbasierten Taktik-Kämpfen** ausgetrag
   - Sicherheit,
   - Geschwindigkeit und
   - Ressourcenverbrauch
-  sein und sich spürbar unterschiedlich anfühlen (sicherer Umweg vs. riskante Abkürzung).
+    sein und sich spürbar unterschiedlich anfühlen (sicherer Umweg vs. riskante Abkürzung).
 
 ---
 
@@ -304,5 +327,4 @@ Die folgenden Punkte sind bewusst noch offen und werden später konkretisiert. S
    - Aktueller Status: Kandidaten sind identifiziert, finale Auswahl und Gewichtung stehen noch aus.
 3. **Detailtiefe der Büro-Ebene**
    - Welche zusätzlichen Interaktionen neben Kartentisch und Berichten (z. B. Forschungsabteilung, Diplomatie mit Auftraggebern, Museums-/Trophäenraum)?
-   - Wie stark sollen Spieler*innen zwischen Expeditionen „im Büro“ beschäftigt sein vs. schnell neue Expedition starten?
-
+   - Wie stark sollen Spieler\*innen zwischen Expeditionen „im Büro“ beschäftigt sein vs. schnell neue Expedition starten?

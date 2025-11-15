@@ -12,32 +12,54 @@ Every week aims to leave the game **playable and compiling**. Multi-week feature
 
 ### Week 1 – Project Skeleton & First-Person Office Basics - 14.11.-20.11.2025
 
-- **Feature: Project & Tooling Setup**
+**Status: Tasks 1-4 Complete (as of November 15, 2025) | Task 5 In Progress**
+
+- **Feature: Project & Tooling Setup** ✅ **COMPLETE**
 
   - Create UE 5.7 C++ project (top-down + FPS hybrid).
   - Set up source control (Git) and basic branching strategy.
   - Create base `GameInstance`, core `GameMode` and `PlayerController` classes.
 
-- **Feature: First-Person Controller – Part 1**
+- **Feature: First-Person Controller – Part 1** ✅ **COMPLETE**
 
   - Implement simple first-person pawn (WASD + mouse look).
-  - Create **placeholder office level** (greybox room).
-  - Ensure you can walk around and quit to main menu.
+  - Create **L_Office level** (greybox room with full collision, lighting, props).
+  - Ensure you can walk around with proper collision and scale.
+
+- **Feature: Office Level & Interactables** ✅ **COMPLETE**
+
+  - BP_OfficeDesk with CameraTargetPoint for future camera targeting.
+  - SM_Door placeholder for exit interactions.
+  - Comprehensive lighting: DirectionalLight, SkyLight, SkyAtmosphere, ExponentialHeightFog.
+  - PlayerStart configured for proper spawn location.
+
+- **Feature: In-World Main Menu System – Part 1** 🔄 **IN PROGRESS (Task 5)**
+
+  - Implement main menu **within L_Office** (not a separate level).
+  - Add MenuCamera (static/slow-moving view focused on desk).
+  - Create WBP_MainMenu widget with "New Legacy", "Continue", "Load Save Game", "Options", "Quit".
+  - Implement smooth camera transition from menu state to first-person gameplay.
+  - Door interaction returns to menu state (fade + level reload).
+  - Add atmospheric effects: dust motes, candle flicker, ambient sounds.
+  - See `/Docs/Tasks/0005-MainMenu-Concept.md` for detailed technical specification.
 
 ---
 
 ### Week 2 – Office Scene & Map Table Interaction (Meta Layer Start) - 21.11.-28.11.2025
 
-- **Feature: Office Scene – Part 1 (Layout & Navigation)**
+**Note:** Week 1 Task 5 (In-World Main Menu) is in progress and will complete before Week 2 starts.
 
-  - Refine office greybox: define area, door, main props.
-  - Implement interaction system (look at object + key press / click to interact).
+- **Feature: Office Scene – Part 1 (Layout & Navigation)** ✅ **COMPLETE (Task 4)**
+
+  - Refine office greybox: define area, door, main props. **DONE**
+  - Implement interaction system (look at object + key press / click to interact). **DEFERRED to Task 5/6**
 
 - **Feature: Map Table Interaction – Part 1 (Placeholder World Map)**
 
-  - Add **map table** as interactable.
-  - On interaction, open a simple **2D world map widget** (placeholder texture).
-  - Add basic button: **“Start Expedition”** → triggers loading Overworld level.
+  - Add **map table** as interactable (already in place as BP_OfficeDesk with CameraTargetPoint).
+  - On interaction, transition camera to table view (Task 5.1 camera system enables this).
+  - Display a simple **2D world map widget** (placeholder texture).
+  - Add basic button: **"Start Expedition"** → triggers loading Overworld level.
 
 ---
 

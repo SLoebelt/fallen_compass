@@ -66,6 +66,9 @@ FC/
 │   ├── FCPlayerController.h/cpp
 │   ├── FCFirstPersonCharacter.h/cpp
 │   └── FCCharacter.h/cpp (top-down variant)
+├── Source/FC/Interaction
+│   ├── IFCInteractable.h/cpp
+│   └── FCInteractionComponent.h/cpp
 ├── Content/FC/
 │   ├── Input/
 │   │   ├── IMC_FC_Default
@@ -121,7 +124,7 @@ sequenceDiagram
 - **Files**: `Source/FC/UFCGameInstance.h/.cpp`
 - **Inheritance**: `UGameInstance`
 - **Registration**: Project Settings → Maps & Modes → Game Instance Class
-- **Purpose**: Manages global state across map transitions; houses session flags, expedition metadata, and data asset references.
+- **Purpose**: Manages global state across map transitions; houses session flags, expedition metadata, data asset references, and game version information.
 
 #### Key Members
 
@@ -137,6 +140,9 @@ int32 StartupDifficulty;
 
 UPROPERTY(BlueprintReadOnly, Category = "Session")
 bool bTutorialCompleted;
+
+UFUNCTION(BlueprintPure, Category = "Version")
+FString GetGameVersion() const;
 
 DECLARE_MULTICAST_DELEGATE_OneParam(FOnExpeditionAboutToStart, const FString&);
 FOnExpeditionAboutToStart OnExpeditionAboutToStart;
@@ -1089,6 +1095,7 @@ Default Pawn Class: AFCFirstPersonCharacter (inherited from GameMode)
 #### Room Structure
 
 **Dimensions**: 2000x2000 units (20x20 meters)
+
 - **Floor**: Basic geometry with collision enabled
 - **Walls**: Four walls at 300 units height (3 meters)
 - **Ceiling**: Enclosed room for proper lighting
@@ -1097,6 +1104,7 @@ Default Pawn Class: AFCFirstPersonCharacter (inherited from GameMode)
 #### Organization
 
 Level geometry organized in World Outliner:
+
 ```
 L_Office
 ├── WorldLighting/
@@ -1132,12 +1140,14 @@ Component Hierarchy:
         └── Transform: Positioned above desk, looking down
 ```
 
-**Purpose**: 
+**Purpose**:
+
 - Target transform for table-focused camera view (Task 6)
 - Provides consistent camera position for card game/board interactions
 - Can be adjusted per-instance without Blueprint changes
 
 **Configuration**:
+
 - Position: Above and angled toward desk surface
 - Rotation: Angled downward to frame entire desk
 - Field of View: Will be applied when camera transitions (Task 6)
@@ -1157,6 +1167,7 @@ Component Hierarchy:
 #### Implementation Approach
 
 **Chosen Method**: SceneComponent on Blueprint (Option 2)
+
 - Allows per-instance adjustment
 - No separate camera actor clutter
 - Easier to reference in code (`BP_OfficeDesk->FindComponentByClass<USceneComponent>()`)
@@ -1164,6 +1175,7 @@ Component Hierarchy:
 #### Camera Target Configuration
 
 **CameraTargetPoint Transform**:
+
 - Positioned to provide clear view of entire desk surface
 - Angled top-down perspective (similar to board game view)
 - Distance adjusted to frame desk without clipping
@@ -1190,6 +1202,7 @@ sequenceDiagram
 #### Lighting Setup
 
 **WorldLighting Folder**:
+
 - **DirectionalLight**: Primary outdoor light source (sun)
   - Intensity: Default
   - Color: Natural daylight
@@ -1203,25 +1216,29 @@ sequenceDiagram
 - **ExponentialHeightFog**: Atmospheric depth and mood
   - Subtle fog for visual depth
 
-**Lighting Quality**: 
+**Lighting Quality**:
+
 - Development/PIE: Fast lighting for iteration
 - Final: Will be baked for production (Task 7+)
 
 #### Navigation & Movement Testing
 
 **Collision Verification**:
+
 - Player cannot walk through walls ✅
 - Floor collision prevents falling ✅
 - Desk collision allows interaction ✅
 - Door collision blocks passage ✅
 
 **Movement Feel**:
+
 - Room scale appropriate for first-person navigation
 - Desk height realistic relative to character
 - Door positioned at logical exit height
 - Comfortable walking space around props
 
 **Character Movement**:
+
 - WASD movement: Responsive and smooth
 - Mouse look: Proper sensitivity and pitch clamping
 - Collision response: Natural sliding along walls
@@ -1268,13 +1285,394 @@ sequenceDiagram
 
 ## Main Menu System (Task 5)
 
-_Placeholder: to be populated when Task 5 is completed._
+### Overview
+
+Implemented an in-world main menu system that provides a seamless transition between menu navigation and gameplay. The system uses a dedicated menu camera, widget-based UI, and state management to handle different game modes (Main Menu, Gameplay, Paused).
+
+### Main Menu Architecture
+
+```mermaid
+flowchart TB
+    subgraph PlayerController["AFCPlayerController"]
+        GS[EFCGameState]
+        CM[EFCPlayerCameraMode]
+        IM[EFCInputMappingMode]
+        MW[MainMenuWidget]
+    end
+
+    subgraph Cameras["Camera System"]
+        MC[MenuCamera Actor]
+        GPC[Player Camera]
+    end
+
+    subgraph UI["User Interface"]
+        MM[WBP_MainMenu]
+        MB[WBP_MainMenuButton]
+    end
+
+    subgraph States["Game States"]
+        Menu[MainMenu]
+        Game[Gameplay]
+        Pause[Paused]
+        Load[Loading]
+    end
+
+    PlayerController -->|Controls| Cameras
+    PlayerController -->|Manages| UI
+    PlayerController -->|Transitions| States
+    UI -->|Buttons| PlayerController
+
+    style PlayerController fill:#4a90e2
+    style Cameras fill:#50c878
+    style UI fill:#f39c12
+    style States fill:#e74c3c
+```
+
+### AFCPlayerController Main Menu Integration
+
+- **Files**: `Source/FC/Core/FCPlayerController.h/.cpp`
+- **Purpose**: Central coordinator for menu state, camera transitions, input modes, and UI management.
+
+#### Key Enums
+
+```cpp
+UENUM(BlueprintType)
+enum class EFCPlayerCameraMode : uint8
+{
+    FirstPerson = 0,
+    TableView,
+    MainMenu,
+    SaveSlotView
+};
+
+UENUM(BlueprintType)
+enum class EFCInputMappingMode : uint8
+{
+    FirstPerson = 0,
+    TopDown,
+    Fight,
+    StaticScene
+};
+
+UENUM(BlueprintType)
+enum class EFCGameState : uint8
+{
+    MainMenu = 0,
+    Gameplay,
+    TableView,
+    Paused,
+    Loading
+};
+```
+
+#### Key Properties
+
+```cpp
+/** Reference to the MenuCamera actor in L_Office */
+UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera")
+TObjectPtr<ACameraActor> MenuCamera;
+
+/** Main menu widget class */
+UPROPERTY(EditDefaultsOnly, Category = "UI")
+TSubclassOf<UUserWidget> MainMenuWidgetClass;
+
+/** Current main menu widget instance */
+UPROPERTY()
+TObjectPtr<UUserWidget> MainMenuWidget;
+
+/** Current game state (MainMenu, Gameplay, etc.) */
+UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "State")
+EFCGameState CurrentGameState;
+
+/** Current camera mode */
+UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "State")
+EFCPlayerCameraMode CameraMode;
+```
+
+#### Key Methods
+
+```cpp
+/** Initialize the main menu state (called on level start) */
+UFUNCTION(BlueprintCallable, Category = "GameFlow")
+void InitializeMainMenu();
+
+/** Transition from main menu to gameplay */
+UFUNCTION(BlueprintCallable, Category = "GameFlow")
+void TransitionToGameplay();
+
+/** Return to main menu state (from gameplay) */
+UFUNCTION(BlueprintCallable, Category = "GameFlow")
+void ReturnToMainMenu();
+
+/** Main menu button callbacks */
+UFUNCTION(BlueprintCallable, Category = "UI")
+void OnNewLegacyClicked();
+
+UFUNCTION(BlueprintCallable, Category = "UI")
+void OnContinueClicked();
+
+UFUNCTION(BlueprintCallable, Category = "UI")
+void OnLoadSaveClicked();
+
+UFUNCTION(BlueprintCallable, Category = "UI")
+void OnOptionsClicked();
+
+UFUNCTION(BlueprintCallable, Category = "UI")
+void OnQuitClicked();
+```
+
+### Main Menu Flow Implementation
+
+#### InitializeMainMenu()
+
+Called when the level starts to set up the main menu state:
+
+1. Sets `CurrentGameState = EFCGameState::MainMenu`
+2. Clears all input mappings
+3. Sets input mode to `FInputModeUIOnly` with mouse cursor visible
+4. Switches camera to `MenuCamera` (no blend on initial load)
+5. Creates and displays `MainMenuWidget`
+
+#### TransitionToGameplay()
+
+Called when "New Legacy" button is clicked:
+
+1. Sets `CurrentGameState = EFCGameState::Gameplay`
+2. Removes main menu widget
+3. Blends camera to first-person mode (2.0s)
+4. After camera blend, restores first-person input mapping
+5. Sets input mode to `FInputModeGameOnly` with mouse cursor hidden
+
+#### ReturnToMainMenu()
+
+Called from door interaction to return to menu:
+
+1. Sets `CurrentGameState = EFCGameState::Loading`
+2. Fades camera to black (1.0s)
+3. Reloads `L_Office` level after fade completes
+4. Level reload triggers `InitializeMainMenu()` automatically
+
+### Widget System
+
+#### WBP_MainMenu
+
+- **Location**: `/Game/FC/UI/Menus/WBP_MainMenu`
+- **Purpose**: Main menu interface with buttons for game actions
+- **Buttons**: New Legacy, Continue, Load Save, Options, Quit
+- **Integration**: Button clicks call corresponding `AFCPlayerController` methods
+
+#### WBP_MainMenuButton
+
+- **Location**: `/Game/FC/UI/Menus/WBP_MainMenuButton`
+- **Purpose**: Reusable button widget for menu interactions
+- **Features**: Hover effects, click animations, text styling
+
+### Camera System
+
+#### MenuCamera
+
+- **Type**: `ACameraActor` placed in `L_Office` level
+- **Purpose**: Provides menu navigation view of the office
+- **Positioning**: Overlooks the office space for atmospheric menu presentation
+- **Integration**: Referenced by `AFCPlayerController.MenuCamera` property
+
+#### Camera Transitions
+
+- **Menu → Gameplay**: Smooth blend from MenuCamera to first-person camera (2.0s)
+- **Gameplay → Menu**: Fade to black (1.0s) then level reload
+- **Implementation**: Uses `PlayerCameraManager->StartCameraFade()` and `SetViewTargetWithBlend()`
+
+### Input Management
+
+#### Input Mapping Contexts
+
+- **IMC_FC_FirstPerson**: Movement, look, interact, pause actions
+- **IMC_FC_TopDown**: Placeholder for future top-down navigation
+- **IMC_FC_Fight**: Placeholder for combat sequences
+- **IMC_FC_StaticScene**: Placeholder for cutscenes/dialogue
+
+#### Input Mode Transitions
+
+- **Main Menu**: `FInputModeUIOnly` - mouse controls UI, no game input
+- **Gameplay**: `FInputModeGameOnly` - game controls active, mouse hidden
+- **Paused**: `FInputModeUIOnly` - UI controls, game paused
+
+### State Management
+
+The system maintains three key state variables:
+
+- `EFCGameState`: Overall game mode (MainMenu, Gameplay, Paused, Loading)
+- `EFCPlayerCameraMode`: Active camera (FirstPerson, TableView, MainMenu, SaveSlotView)
+- `EFCInputMappingMode`: Input context (FirstPerson, TopDown, Fight, StaticScene)
+
+### Integration with Interaction System
+
+The door interaction system integrates with main menu via `ReturnToMainMenu()`:
+
+1. Player interacts with door
+2. `BP_MenuDoor::OnInteract()` calls `AFCPlayerController::ReturnToMainMenu()`
+3. Screen fades to black
+4. Level reloads to reset state
+5. `InitializeMainMenu()` sets up fresh menu state
+
+### Logging
+
+- **Category**: `LogFallenCompassPlayerController`
+- **Events Logged**: State transitions, widget creation/destruction, camera changes, button clicks
+- **Debug Messages**: On-screen debug messages for state changes and button interactions
+
+### Design Rationale
+
+In-world menu design provides atmospheric immersion while maintaining clear separation between menu navigation and gameplay. Level reload ensures clean state transitions without complex save/load systems. Widget-based UI allows for flexible menu design and future expansion.
 
 ---
 
 ## Office Flow & Interactions (Task 6)
 
-_Placeholder: to be populated when Task 6 is completed._
+### Overview
+
+Implemented a scalable interaction system allowing players to interact with objects in the world (e.g., doors, desks) using the 'E' key. The system uses an interface-based architecture for extensibility and includes visual feedback via on-screen prompts.
+
+### Interaction System Architecture
+
+```mermaid
+flowchart TB
+    subgraph Character["AFCFirstPersonCharacter"]
+        IC[UFCInteractionComponent]
+    end
+
+    subgraph Interface["IFCInteractable"]
+        BP[BP_MenuDoor]
+        Future[Future Interactables]
+    end
+
+    subgraph UI["User Interface"]
+        WP[WBP_InteractionPrompt]
+    end
+
+    IC -->|Detects via Line Trace| BP
+    IC -->|Shows/Hides| WP
+    BP -->|Implements| IFCInteractable
+    IC -->|Calls| IFCInteractable
+
+    style IC fill:#4a90e2
+    style IFCInteractable fill:#50c878
+    style WP fill:#f39c12
+```
+
+### IFCInteractable Interface
+
+- **Files**: `Source/FC/Interaction/IFCInteractable.h/.cpp`
+- **Inheritance**: `UInterface`
+- **Purpose**: Defines the contract for all interactable objects, allowing polymorphic interaction handling.
+
+#### Key Methods
+
+```cpp
+UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Interaction")
+void OnInteract(AActor* Interactor);
+
+UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Interaction")
+FText GetInteractionPrompt() const;
+
+UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Interaction")
+bool CanInteract(const AActor* Interactor) const;
+
+UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Interaction")
+float GetInteractionRange() const;
+
+UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Interaction")
+int32 GetInteractionPriority() const;
+```
+
+#### Implementation Notes
+
+- All methods are blueprint-callable and implementable, allowing designers to customize interaction behavior.
+- `OnInteract` is called when the player presses 'E' while focused on the object.
+- `GetInteractionPrompt` returns the text to display (e.g., "Press E to Open Door").
+- `CanInteract` checks conditions (e.g., player has required items).
+- `GetInteractionRange` defines how close the player must be.
+- `GetInteractionPriority` allows prioritizing multiple overlapping interactables.
+
+### UFCInteractionComponent
+
+- **Files**: `Source/FC/Interaction/FCInteractionComponent.h/.cpp`
+- **Inheritance**: `UActorComponent`
+- **Purpose**: Handles detection of interactable objects and manages interaction prompts.
+
+#### Key Members
+
+```cpp
+UPROPERTY(EditAnywhere, Category = "Interaction")
+TSubclassOf<UUserWidget> InteractionPromptWidgetClass;
+
+UPROPERTY(EditAnywhere, Category = "Interaction")
+float InteractionTraceDistance = 500.0f;
+
+UPROPERTY(EditAnywhere, Category = "Interaction")
+float InteractionCheckFrequency = 0.1f;
+
+UPROPERTY(EditAnywhere, Category = "Interaction")
+bool bShowDebugTrace = false;
+
+TWeakObjectPtr<AActor> CurrentInteractable;
+UUserWidget* InteractionPromptWidget;
+```
+
+#### Key Methods
+
+```cpp
+void DetectInteractables();
+void UpdatePromptWidget();
+void Interact();
+```
+
+#### Detection Logic
+
+- Performs line trace from camera location forward using `ECC_Visibility` channel.
+- Checks if hit actor implements `IFCInteractable`.
+- Validates interaction range and `CanInteract` conditions.
+- Updates `CurrentInteractable` and shows/hides prompt widget accordingly.
+- Positions prompt widget at the interactable's screen location using `ProjectWorldLocationToScreen`.
+
+#### Integration
+
+- Attached to `AFCFirstPersonCharacter` in `BeginPlay`.
+- `Interact()` called via input binding when 'E' is pressed.
+- Rate-limited detection (every 0.1s) for performance.
+
+### AFCFirstPersonCharacter Updates
+
+- **Added**: `UFCInteractionComponent* InteractionComponent` property.
+- **Added**: `InteractAction` input binding in `SetupPlayerInputComponent`.
+- **Added**: `HandleInteract()` method routing to component.
+
+### AFCPlayerController Updates
+
+- **Modified**: `HandleInteractPressed()` now delegates to character's `InteractionComponent`.
+- **Added**: Null checks to prevent crashes when no interactable is focused.
+
+### Blueprint Implementation
+
+- **WBP_InteractionPrompt**: Widget with `SetInteractionPrompt(FText)` function to update displayed text.
+- **BP_MenuDoor**: Implements `IFCInteractable` with custom prompt ("Press E to Return to Menu") and `OnInteract` calling `ReturnToMainMenu()`.
+
+### Flow Example
+
+1. Player aims at door → `DetectInteractables()` finds `BP_MenuDoor`.
+2. Prompt widget appears at door's screen position with "Press E to Return to Menu".
+3. Player presses 'E' → `Interact()` calls `BP_MenuDoor::OnInteract()`.
+4. Door interaction triggers level reload to main menu state.
+
+### Logging
+
+- **Category**: `LogFCInteraction`
+- **Events Logged**: Hit detection, interface checks, interaction validation, prompt updates.
+- **Debug Visualization**: Optional debug lines/spheres for trace visualization.
+
+### Design Rationale
+
+Interface-based design allows easy addition of new interactables without modifying core logic. Component-based detection keeps character class clean. Screen-space positioning ensures prompts appear over objects regardless of camera angle.
 
 ---
 
@@ -1290,6 +1688,7 @@ All FC-specific categories use the prefix `LogFallenCompass*`:
 | `LogFallenCompassGameMode`         | `Log, All` | Pawn/controller registration, map startup                |
 | `LogFallenCompassPlayerController` | `Log, All` | Input handling, camera transitions, state dumps          |
 | `LogFallenCompassCharacter`        | `Log, All` | First-person character spawning, camera config, movement |
+| `LogFCInteraction`                 | `Log, All` | Interaction detection, prompt updates, interface calls   |
 
 ### Enabling Categories at Runtime
 
@@ -1300,6 +1699,7 @@ Log LogFallenCompassGameMode VeryVerbose
 Log LogFallenCompassPlayerController VeryVerbose
 Log LogFallenCompassGameInstance VeryVerbose
 Log LogFallenCompassCharacter VeryVerbose
+Log LogFCInteraction VeryVerbose
 ```
 
 ### Common Issues
@@ -1319,6 +1719,10 @@ Ensure these exist before PIE:
 - `/Game/FC/Input/IMC_FC_Default` (Input Mapping Context)
 - `/Game/FC/Input/IA_Interact` (Input Action)
 - `/Game/FC/Input/IA_Pause` (Input Action)
+- `/Game/FC/UI/Menus/WBP_MainMenu` (Main menu widget)
+- `/Game/FC/UI/Menus/WBP_MainMenuButton` (Menu button widget)
+- `/Game/FC/UI/WBP_InteractionPrompt` (Interaction prompt widget)
+- `/Game/FC/World/Levels/L_Office` (Office level with MenuCamera actor)
 - `/Game/Characters/Mannequins/Meshes/SKM_Manny_Simple` (Character mesh - UE5 default)
 - `/Game/Characters/Mannequins/Animations/ABP_Manny` (Animation blueprint - UE5 default)
 
@@ -1375,10 +1779,9 @@ w:\GameDev\FallenCompass\Engine\Build\BatchFiles\Build.bat FCEditor Win64 Develo
 
 ### Future Documentation Sections
 
-- Task 5: Main menu UMG widget, level transitions, button bindings
 - Task 6: Interaction system, table-view camera blending, pause menu flow
 - Task 7+: Polish, audio, save/load systems
 
 ---
 
-_Last updated: November 15, 2025 (Tasks 3.1-3.5 and 4.1-4.6 complete, Office level created)_
+_Last updated: November 15, 2025 (Tasks 3.1-3.5, 4.1-4.6, 5.5, and 6.5 complete; main menu system and interaction system fully documented)_

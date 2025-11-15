@@ -64,4 +64,8 @@ class FC_API UFCGameInstance : public UGameInstance
     /** Broadcast whenever global expedition context changes. */
     UPROPERTY(BlueprintAssignable, Category = "Events")
     FOnExpeditionContextChanged OnExpeditionContextChanged;
+
+    /** Returns the current game version string */
+    UFUNCTION(BlueprintPure, Category = "Version")
+    FString GetGameVersion() const;
 };

@@ -11,6 +11,7 @@
 #include "UObject/ConstructorHelpers.h"
 #include "UObject/SoftObjectPtr.h"
 #include "Animation/AnimInstance.h"
+#include "../Interaction/FCInteractionComponent.h"
 
 DEFINE_LOG_CATEGORY(LogFallenCompassCharacter);
 
@@ -38,6 +39,9 @@ AFCFirstPersonCharacter::AFCFirstPersonCharacter()
     FirstPersonCamera->SetupAttachment(GetCapsuleComponent());
     FirstPersonCamera->SetRelativeLocation(FVector(25.0f, 0.0f, 66.0f)); // Eye height
     FirstPersonCamera->bUsePawnControlRotation = true; // Camera follows controller rotation
+
+    // Create interaction component
+    InteractionComponent = CreateDefaultSubobject<UFCInteractionComponent>(TEXT("InteractionComponent"));
 
     // Configure mesh to use Manny simple
     USkeletalMeshComponent* MeshComp = GetMesh();
@@ -93,6 +97,17 @@ AFCFirstPersonCharacter::AFCFirstPersonCharacter()
     else
     {
         UE_LOG(LogFallenCompassCharacter, Warning, TEXT("Failed to load IA_Look"));
+    }
+
+    static ConstructorHelpers::FObjectFinder<UInputAction> InteractActionFinder(TEXT("/Game/FC/Input/IA_Interact"));
+    if (InteractActionFinder.Succeeded())
+    {
+        InteractAction = InteractActionFinder.Object;
+        UE_LOG(LogFallenCompassCharacter, Log, TEXT("Loaded IA_Interact"));
+    }
+    else
+    {
+        UE_LOG(LogFallenCompassCharacter, Warning, TEXT("Failed to load IA_Interact"));
     }
 }
 
@@ -174,6 +189,17 @@ void AFCFirstPersonCharacter::SetupPlayerInputComponent(UInputComponent* PlayerI
     {
         UE_LOG(LogFallenCompassCharacter, Warning, TEXT("LookAction not assigned"));
     }
+
+    // Bind interact action (E key)
+    if (InteractAction)
+    {
+        EnhancedInput->BindAction(InteractAction, ETriggerEvent::Started, this, &AFCFirstPersonCharacter::HandleInteract);
+        UE_LOG(LogFallenCompassCharacter, Log, TEXT("Bound IA_Interact to HandleInteract"));
+    }
+    else
+    {
+        UE_LOG(LogFallenCompassCharacter, Warning, TEXT("InteractAction not assigned"));
+    }
 }
 
 void AFCFirstPersonCharacter::HandleMove(const FInputActionValue& Value)
@@ -229,5 +255,13 @@ void AFCFirstPersonCharacter::ClampCameraPitch()
             ControlRotation.Pitch = ClampedPitch;
             Controller->SetControlRotation(ControlRotation);
         }
+    }
+}
+
+void AFCFirstPersonCharacter::HandleInteract()
+{
+    if (InteractionComponent)
+    {
+        InteractionComponent->Interact();
     }
 }

@@ -8,6 +8,7 @@
 
 class UCameraComponent;
 class UInputAction;
+class UFCInteractionComponent;
 struct FInputActionValue;
 
 DECLARE_LOG_CATEGORY_EXTERN(LogFallenCompassCharacter, Log, All);
@@ -31,6 +32,9 @@ public:
     /** Returns the first-person camera component */
     FORCEINLINE UCameraComponent* GetFirstPersonCamera() const { return FirstPersonCamera; }
 
+    /** Returns the interaction component */
+    FORCEINLINE UFCInteractionComponent* GetInteractionComponent() const { return InteractionComponent; }
+
     /** Get current camera look sensitivity multiplier */
     FORCEINLINE float GetLookSensitivity() const { return LookSensitivity; }
 
@@ -38,6 +42,10 @@ protected:
     /** First-person camera positioned at eye level */
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components", meta = (AllowPrivateAccess = "true"))
     TObjectPtr<UCameraComponent> FirstPersonCamera;
+
+    /** Interaction component for detecting and interacting with objects */
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components", meta = (AllowPrivateAccess = "true"))
+    TObjectPtr<UFCInteractionComponent> InteractionComponent;
 
     /** Camera look sensitivity multiplier (applied to mouse input in Task 3.3) */
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera", meta = (ClampMin = "0.1", ClampMax = "5.0"))
@@ -60,6 +68,10 @@ protected:
     UPROPERTY(EditDefaultsOnly, Category = "Input")
     TObjectPtr<UInputAction> LookAction;
 
+    /** Input action for interacting (E key) */
+    UPROPERTY(EditDefaultsOnly, Category = "Input")
+    TObjectPtr<UInputAction> InteractAction;
+
     /** Optional AnimBlueprint to use for this character. Use Editor defaults to assign `ABP_Unarmed`. */
     UPROPERTY(EditDefaultsOnly, Category = "Animation")
     TSoftClassPtr<UAnimInstance> DefaultAnimBlueprint;
@@ -70,6 +82,9 @@ protected:
 
     /** Handle look input (Mouse) with sensitivity and pitch clamping */
     void HandleLook(const FInputActionValue& Value);
+
+    /** Handle interact input (E key) */
+    void HandleInteract();
 
 private:
     /** Clamps camera pitch to configured min/max angles */
