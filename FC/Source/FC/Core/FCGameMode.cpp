@@ -1,31 +1,20 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "FCGameMode.h"
+#include "FCFirstPersonCharacter.h"
+#include "FCPlayerController.h"
 #include "Engine/Engine.h"
 #include "Engine/World.h"
-#include "FCPlayerController.h"
-#include "GameFramework/DefaultPawn.h"
-#include "GameFramework/PlayerController.h"
-#include "UObject/ConstructorHelpers.h"
 
 DEFINE_LOG_CATEGORY(LogFallenCompassGameMode);
 
 AFCGameMode::AFCGameMode()
 {
-    // Keep template defaults for PIE until AFCFirstPersonCharacter arrives (task 3.x).
-    static ConstructorHelpers::FClassFinder<APawn> DefaultPawnBPClass(TEXT("/Game/TopDown/Blueprints/BP_TopDownCharacter"));
-    if (DefaultPawnBPClass.Succeeded())
-    {
-        DefaultPawnClass = DefaultPawnBPClass.Class;
-    }
-    else
-    {
-        UE_LOG(LogFallenCompassGameMode, Warning, TEXT("Missing BP_TopDownCharacter asset. Falling back to ADefaultPawn."));
-        DefaultPawnClass = ADefaultPawn::StaticClass();
-    }
-	
-	PlayerControllerClass = AFCPlayerController::StaticClass();
-	UE_LOG(LogFallenCompassGameMode, Log, TEXT("Defaulting to AFCPlayerController C++ class."));
+    // Use AFCFirstPersonCharacter for Office level (Task 3.1)
+    DefaultPawnClass = AFCFirstPersonCharacter::StaticClass();
+    PlayerControllerClass = AFCPlayerController::StaticClass();
+
+    UE_LOG(LogFallenCompassGameMode, Log, TEXT("AFCGameMode configured with AFCFirstPersonCharacter and AFCPlayerController."));
 }
 
 void AFCGameMode::BeginPlay()
@@ -47,7 +36,7 @@ void AFCGameMode::BeginPlay()
         *ControllerName,
         *MapName);
 
-    UE_LOG(LogFallenCompassGameMode, Verbose, TEXT("TODO: Hook up AFCFirstPersonCharacter/AFCPlayerController and Office level once tasks 3.x & 4.x complete."));
+    UE_LOG(LogFallenCompassGameMode, Verbose, TEXT("Task 3.1 complete: AFCFirstPersonCharacter active. Next: Input mappings (3.2-3.3) and Office level (4.x)."));
 
     // TODO: Remove once proper UI system is in place.
     if (GEngine)

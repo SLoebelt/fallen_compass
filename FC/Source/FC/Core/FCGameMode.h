@@ -6,6 +6,8 @@
 #include "GameFramework/GameModeBase.h"
 #include "FCGameMode.generated.h"
 
+class AFCFirstPersonCharacter;
+
 DECLARE_LOG_CATEGORY_EXTERN(LogFallenCompassGameMode, Log, All);
 
 /**

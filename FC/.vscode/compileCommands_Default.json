@@ -16,6 +16,22 @@
 		"directory": "W:\\GameDev\\UE_5.7\\Engine\\Source"
 	},
 	{
+		"file": "W:\\GameDev\\FallenCompass\\FC\\Source\\FC\\Core\\FCFirstPersonCharacter.cpp",
+		"arguments": [
+			"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
+			"@W:\\GameDev\\FallenCompass\\FC\\.vscode\\compileCommands_Default\\FC.1.rsp"
+		],
+		"directory": "W:\\GameDev\\UE_5.7\\Engine\\Source"
+	},
+	{
+		"file": "W:\\GameDev\\FallenCompass\\FC\\Source\\FC\\Core\\FCFirstPersonCharacter.h",
+		"arguments": [
+			"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
+			"@W:\\GameDev\\FallenCompass\\FC\\.vscode\\compileCommands_Default\\FC.1.rsp"
+		],
+		"directory": "W:\\GameDev\\UE_5.7\\Engine\\Source"
+	},
+	{
 		"file": "W:\\GameDev\\FallenCompass\\FC\\Source\\FC\\FC.h",
 		"arguments": [
 			"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",

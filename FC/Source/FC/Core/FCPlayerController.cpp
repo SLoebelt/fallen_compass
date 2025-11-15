@@ -9,6 +9,8 @@
 #include "InputAction.h"
 #include "InputMappingContext.h"
 #include "UObject/ConstructorHelpers.h"
+#include "FCFirstPersonCharacter.h"
+#include "Camera/CameraComponent.h"
 
 DEFINE_LOG_CATEGORY(LogFallenCompassPlayerController);
 
@@ -17,15 +19,54 @@ AFCPlayerController::AFCPlayerController()
 	CameraMode = EFCPlayerCameraMode::FirstPerson;
 	bIsPauseMenuDisplayed = false;
 	bShowMouseCursor = false;
+	CurrentMappingMode = EFCInputMappingMode::FirstPerson;
 
-	static ConstructorHelpers::FObjectFinder<UInputMappingContext> MappingContextFinder(TEXT("/Game/FC/Input/IMC_FC_Default"));
-	if (MappingContextFinder.Succeeded())
+	// Load FirstPerson mapping context
+	static ConstructorHelpers::FObjectFinder<UInputMappingContext> FirstPersonContextFinder(TEXT("/Game/FC/Input/IMC_FC_FirstPerson"));
+	if (FirstPersonContextFinder.Succeeded())
 	{
-		DefaultMappingContext = MappingContextFinder.Object;
+		FirstPersonMappingContext = FirstPersonContextFinder.Object;
+		UE_LOG(LogFallenCompassPlayerController, Log, TEXT("Loaded IMC_FC_FirstPerson"));
 	}
 	else
 	{
-		UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("Failed to load IMC_FC_Default mapping context."));
+		UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("Failed to load IMC_FC_FirstPerson"));
+	}
+
+	// Load TopDown mapping context
+	static ConstructorHelpers::FObjectFinder<UInputMappingContext> TopDownContextFinder(TEXT("/Game/FC/Input/IMC_FC_TopDown"));
+	if (TopDownContextFinder.Succeeded())
+	{
+		TopDownMappingContext = TopDownContextFinder.Object;
+		UE_LOG(LogFallenCompassPlayerController, Log, TEXT("Loaded IMC_FC_TopDown"));
+	}
+	else
+	{
+		UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("Failed to load IMC_FC_TopDown"));
+	}
+
+	// Load Fight mapping context
+	static ConstructorHelpers::FObjectFinder<UInputMappingContext> FightContextFinder(TEXT("/Game/FC/Input/IMC_FC_Fight"));
+	if (FightContextFinder.Succeeded())
+	{
+		FightMappingContext = FightContextFinder.Object;
+		UE_LOG(LogFallenCompassPlayerController, Log, TEXT("Loaded IMC_FC_Fight"));
+	}
+	else
+	{
+		UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("Failed to load IMC_FC_Fight"));
+	}
+
+	// Load StaticScene mapping context
+	static ConstructorHelpers::FObjectFinder<UInputMappingContext> StaticSceneContextFinder(TEXT("/Game/FC/Input/IMC_FC_StaticScene"));
+	if (StaticSceneContextFinder.Succeeded())
+	{
+		StaticSceneMappingContext = StaticSceneContextFinder.Object;
+		UE_LOG(LogFallenCompassPlayerController, Log, TEXT("Loaded IMC_FC_StaticScene"));
+	}
+	else
+	{
+		UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("Failed to load IMC_FC_StaticScene"));
 	}
 
 	static ConstructorHelpers::FObjectFinder<UInputAction> InteractActionFinder(TEXT("/Game/FC/Input/IA_Interact"));
@@ -64,20 +105,8 @@ void AFCPlayerController::SetupInputComponent()
 {
 	Super::SetupInputComponent();
 
-	if (ULocalPlayer* LocalPlayer = GetLocalPlayer())
-	{
-		if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(LocalPlayer))
-		{
-			if (DefaultMappingContext)
-			{
-				Subsystem->AddMappingContext(DefaultMappingContext, DefaultMappingPriority);
-			}
-			else
-			{
-				UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("DefaultMappingContext is null on %s."), *GetName());
-			}
-		}
-	}
+	// Apply initial mapping context based on CurrentMappingMode
+	SetInputMappingMode(CurrentMappingMode);
 
 	UEnhancedInputComponent* EnhancedInput = Cast<UEnhancedInputComponent>(InputComponent);
 	if (!EnhancedInput)
@@ -111,12 +140,40 @@ void AFCPlayerController::HandleInteractPressed()
 
 	if (CameraMode == EFCPlayerCameraMode::FirstPerson)
 	{
-		UE_LOG(LogFallenCompassPlayerController, Log, TEXT("TODO: Trace forward and interact with focused actor."));
-		if (GEngine)
+		// Perform forward line trace to detect interactables
+		AFCFirstPersonCharacter* FPCharacter = Cast<AFCFirstPersonCharacter>(GetPawn());
+		if (FPCharacter)
 		{
-			GEngine->AddOnScreenDebugMessage(-1, 3.f, FColor::Yellow, TEXT("Interact: Trace forward and interact with focused actor"));
+			UCameraComponent* CameraComp = FPCharacter->GetFirstPersonCamera();
+			if (CameraComp)
+			{
+				FVector Start = CameraComp->GetComponentLocation();
+				FVector End = Start + (CameraComp->GetForwardVector() * 1000.0f); // Trace 1000 units forward
+
+				FHitResult HitResult;
+				FCollisionQueryParams QueryParams;
+				QueryParams.AddIgnoredActor(GetPawn()); // Ignore the player character
+
+				if (GetWorld()->LineTraceSingleByChannel(HitResult, Start, End, ECC_Visibility, QueryParams))
+				{
+					UE_LOG(LogFallenCompassPlayerController, Log, TEXT("Interact: Hit actor '%s' at distance %.1f units"),
+						*HitResult.GetActor()->GetName(), HitResult.Distance);
+					if (GEngine)
+					{
+						GEngine->AddOnScreenDebugMessage(-1, 3.f, FColor::Green,
+							FString::Printf(TEXT("Interact: Hit %s (%.1f units)"), *HitResult.GetActor()->GetName(), HitResult.Distance));
+					}
+				}
+				else
+				{
+					UE_LOG(LogFallenCompassPlayerController, Log, TEXT("Interact: No interactable found"));
+					if (GEngine)
+					{
+						GEngine->AddOnScreenDebugMessage(-1, 3.f, FColor::Red, TEXT("Interact: No hit"));
+					}
+				}
+			}
 		}
-		EnterTableViewPlaceholder();
 	}
 	else
 	{
@@ -218,5 +275,65 @@ void AFCPlayerController::LogStateChange(const FString& Context) const
 	{
 		const FString DebugMsg = FString::Printf(TEXT("%s | CameraMode=%s | PauseMenu=%s"), *Context, *ModeLabel, bIsPauseMenuDisplayed ? TEXT("Shown") : TEXT("Hidden"));
 		GEngine->AddOnScreenDebugMessage(-1, 3.f, FColor::White, DebugMsg);
+	}
+}
+
+void AFCPlayerController::SetInputMappingMode(EFCInputMappingMode NewMode)
+{
+	ULocalPlayer* LocalPlayer = GetLocalPlayer();
+	if (!LocalPlayer)
+	{
+		UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("SetInputMappingMode: No LocalPlayer found"));
+		return;
+	}
+
+	UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(LocalPlayer);
+	if (!Subsystem)
+	{
+		UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("SetInputMappingMode: EnhancedInputSubsystem not found"));
+		return;
+	}
+
+	// Determine which context to use
+	UInputMappingContext* ContextToApply = nullptr;
+	FString ModeName;
+
+	switch (NewMode)
+	{
+		case EFCInputMappingMode::FirstPerson:
+			ContextToApply = FirstPersonMappingContext;
+			ModeName = TEXT("FirstPerson");
+			break;
+		case EFCInputMappingMode::TopDown:
+			ContextToApply = TopDownMappingContext;
+			ModeName = TEXT("TopDown");
+			break;
+		case EFCInputMappingMode::Fight:
+			ContextToApply = FightMappingContext;
+			ModeName = TEXT("Fight");
+			break;
+		case EFCInputMappingMode::StaticScene:
+			ContextToApply = StaticSceneMappingContext;
+			ModeName = TEXT("StaticScene");
+			break;
+	}
+
+	if (!ContextToApply)
+	{
+		UE_LOG(LogFallenCompassPlayerController, Error, TEXT("SetInputMappingMode: %s context is null!"), *ModeName);
+		return;
+	}
+
+	// Clear all existing mappings and apply new one
+	Subsystem->ClearAllMappings();
+	Subsystem->AddMappingContext(ContextToApply, DefaultMappingPriority);
+
+	CurrentMappingMode = NewMode;
+
+	UE_LOG(LogFallenCompassPlayerController, Log, TEXT("Input mapping switched to: %s"), *ModeName);
+	if (GEngine)
+	{
+		GEngine->AddOnScreenDebugMessage(-1, 3.f, FColor::Cyan,
+			FString::Printf(TEXT("Input Mode: %s"), *ModeName));
 	}
 }

@@ -87,44 +87,43 @@
 
 ### 3.0 Implement first-person character pawn with input mappings (movement, look, interact, ESC)
 
-- [ ] **3.1 Create first-person character class**
+- [x] **3.1 Create first-person character class**
 
-  - [ ] Create `AFCFirstPersonCharacter` derived from `ACharacter`.
-  - [ ] Add a camera component as a child of the character (for first-person view).
-  - [ ] Optionally add a basic mesh/arms or placeholder component (not required in Week 1).
+  - [x] Create `AFCFirstPersonCharacter` derived from `ACharacter`.
+  - [x] Add a camera component as a child of the character (for first-person view).
+  - [x] Optionally add a basic mesh/arms or placeholder component (not required in Week 1).
 
-- [ ] **3.2 Configure input mappings**
+- [x] **3.2 Configure input mappings**
 
-  - [ ] In Project Settings → Input, configure:
-    - [ ] Axis mappings:
-      - [ ] `MoveForward` (W = +1, S = -1).
-      - [ ] `MoveRight` (D = +1, A = -1).
-      - [ ] `Turn` (Mouse X).
-      - [ ] `LookUp` (Mouse Y).
-    - [ ] Action mappings:
-      - [ ] `Interact` (e.g. E key).
-      - [ ] `Pause` (ESC key).
-  - [ ] Save and verify no Input mapping conflicts.
+  - [x] In Project Settings → Input, configure:
+    - [x] Axis mappings:
+      - [x] `MoveForward` (W = +1, S = -1).
+      - [x] `MoveRight` (D = +1, A = -1).
+      - [x] `Look` (Mouse 2dAxis).
+    - [x] Action mappings:
+      - [x] `Interact` (e.g. E key).
+      - [x] `Pause` (ESC key).
+  - [x] Save and verify no Input mapping conflicts.
 
-- [ ] **3.3 Implement movement & look in character**
+- [x] **3.3 Implement movement & look in character**
 
-  - [ ] In `AFCFirstPersonCharacter`, bind Axis and Action mappings in `SetupPlayerInputComponent`.
-  - [ ] Implement:
-    - [ ] Forward/backward movement for `MoveForward`.
-    - [ ] Right/left movement for `MoveRight`.
-    - [ ] Yaw rotation for `Turn`.
-    - [ ] Pitch rotation for `LookUp`.
-  - [ ] Ensure the camera rotates with the character and feels like a standard FPS.
+  - [x] In `AFCFirstPersonCharacter`, bind Axis and Action mappings in `SetupPlayerInputComponent`.
+  - [x] Implement:
+    - [x] Forward/backward movement for `MoveForward`.
+    - [x] Right/left movement for `MoveRight`.
+    - [x] Yaw rotation for `Turn`.
+    - [x] Pitch rotation for `LookUp`.
+  - [x] Ensure the camera rotates with the character and feels like a standard FPS.
 
-- [ ] **3.4 Connect character to GameMode**
+- [x] **3.4 Connect character to GameMode**
 
-  - [ ] Set `AFCFirstPersonCharacter` as the **Default Pawn Class** in `AFCGameMode`.
-  - [ ] Launch PIE and confirm that the player spawns as `AFCFirstPersonCharacter`.
+  - [x] Set `AFCFirstPersonCharacter` as the **Default Pawn Class** in `AFCGameMode`.
+  - [x] Launch PIE and confirm that the player spawns as `AFCFirstPersonCharacter`.
 
-- [ ] **3.5 Expose hooks for interaction and ESC**
-  - [ ] In `AFCFirstPersonCharacter` or `AFCPlayerController`:
-    - [ ] Bind `Interact` action to a function that will later call interactables (e.g. trace forward).
-    - [ ] Bind `Pause` action (ESC) to a function that will delegate pause/menu handling (eventually to controller/UI).
+- [x] **3.5 Expose hooks for interaction and ESC**
+  - [x] In `AFCFirstPersonCharacter` or `AFCPlayerController`:
+    - [x] Bind `Interact` action to a function that will later call interactables (e.g. trace forward).
+    - [x] Bind `Pause` action (ESC) to a function that will delegate pause/menu handling (eventually to controller/UI).
 
 ---
 
