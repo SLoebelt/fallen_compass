@@ -69,6 +69,8 @@ FC/
 ├── Source/FC/Interaction
 │   ├── IFCInteractable.h/cpp
 │   └── FCInteractionComponent.h/cpp
+├── Source/FC/SaveGame
+│   └── FCSaveGame.h/cpp
 ├── Content/FC/
 │   ├── Input/
 │   │   ├── IMC_FC_Default
@@ -1515,6 +1517,166 @@ The door interaction system integrates with main menu via `ReturnToMainMenu()`:
 4. Level reloads to reset state
 5. `InitializeMainMenu()` sets up fresh menu state
 
+### Save/Load System Foundation
+
+#### UFCSaveGame Class
+
+- **Files**: `Source/FC/SaveGame/FCSaveGame.h/.cpp`
+- **Inheritance**: `USaveGame`
+- **Purpose**: Data structure for serializing game state to disk
+
+##### Key Properties
+
+```cpp
+/** Save slot name */
+UPROPERTY(VisibleAnywhere, Category = "Meta")
+FString SaveSlotName;
+
+/** Timestamp when the save was created */
+UPROPERTY(VisibleAnywhere, Category = "Meta")
+FDateTime Timestamp;
+
+/** Current level name */
+UPROPERTY(VisibleAnywhere, Category = "Level")
+FString CurrentLevelName;
+
+/** Player location and rotation */
+UPROPERTY(VisibleAnywhere, Category = "Player")
+FVector PlayerLocation;
+FRotator PlayerRotation;
+
+/** Expedition data placeholder */
+UPROPERTY(VisibleAnywhere, Category = "Expedition")
+FString CurrentExpeditionId;
+
+/** Game version for compatibility */
+UPROPERTY(VisibleAnywhere, Category = "Meta")
+FString GameVersion;
+```
+
+#### UFCGameInstance Save/Load Methods
+
+##### Key Methods
+
+```cpp
+/** Save current game state to specified slot */
+UFUNCTION(BlueprintCallable, Category = "SaveGame")
+bool SaveGame(const FString& SlotName);
+
+/** Load game state from specified slot (async) */
+UFUNCTION(BlueprintCallable, Category = "SaveGame")
+void LoadGameAsync(const FString& SlotName);
+
+/** Get list of available save slots */
+UFUNCTION(BlueprintCallable, Category = "SaveGame")
+TArray<FString> GetAvailableSaveSlots();
+
+/** Get the most recent save slot name */
+UFUNCTION(BlueprintPure, Category = "SaveGame")
+FString GetMostRecentSave();
+```
+
+##### Save Process
+
+1. Creates `UFCSaveGame` instance
+2. Populates with current game state (player position, level, expedition data)
+3. Serializes to disk using `UGameplayStatics::SaveGameToSlot()`
+4. Marks session as saved
+
+##### Load Process
+
+1. Checks if save slot exists
+2. Loads `UFCSaveGame` from disk
+3. Applies data to `UFCGameInstance` (expedition state, etc.)
+4. Caches save data in `PendingLoadData` for position restoration
+5. Compares current level with target level
+6. If same level: restores player position immediately via `RestorePlayerPosition()`
+7. If different level: triggers level load, position restored in `BeginPlay()`
+8. Broadcasts load completion via `OnGameLoaded` delegate
+
+##### Player Position Restoration
+
+```cpp
+void UFCGameInstance::RestorePlayerPosition()
+{
+    // Get player controller and character
+    // Restore location and rotation from PendingLoadData
+    // Update controller rotation for proper camera orientation
+    // Clear pending data
+}
+```
+
+Called automatically after level loads to restore player to saved position. Handles both same-level and cross-level loads.
+
+##### Slot Naming Convention
+
+- **Auto Saves**: `AutoSave_001`, `AutoSave_002`, `AutoSave_003` (rotating)
+- **Quick Save**: `QuickSave` (single slot, overwritable)
+- **Manual Saves**: `Manual_001`, `Manual_002`, etc. (player-created)
+
+### Dev Quick Save/Load System
+
+#### Overview
+
+Development quick save/load functionality for rapid testing and iteration during gameplay.
+
+#### Implementation
+
+- **Files**: `Source/FC/Core/FCPlayerController.h/.cpp`
+- **Input Actions**: `IA_QuickSave` (F6), `IA_QuickLoad` (F9)
+
+##### Key Methods
+
+```cpp
+/** Dev quick save (F6) */
+UFUNCTION(BlueprintCallable, Category = "SaveGame")
+void DevQuickSave();
+
+/** Dev quick load (F9) */
+UFUNCTION(BlueprintCallable, Category = "SaveGame")
+void DevQuickLoad();
+```
+
+##### Functionality
+
+- **F6 (Quick Save)**: Saves current state to "QuickSave" slot
+  - Saves player position and rotation
+  - Saves current level name
+  - Saves expedition data
+  - Shows green success message on screen
+  
+- **F9 (Quick Load)**: Loads from "QuickSave" slot
+  - Checks if save exists
+  - Loads saved state
+  - Restores player to exact saved position
+  - Shows cyan loading message on screen
+  - Shows yellow warning if no save found
+
+##### Integration
+
+Input actions loaded in constructor and bound in `SetupInputComponent()`:
+
+```cpp
+// Constructor
+static ConstructorHelpers::FObjectFinder<UInputAction> QuickSaveActionFinder(
+    TEXT("/Game/FC/Input/IA_QuickSave"));
+static ConstructorHelpers::FObjectFinder<UInputAction> QuickLoadActionFinder(
+    TEXT("/Game/FC/Input/IA_QuickLoad"));
+
+// SetupInputComponent
+EnhancedInput->BindAction(QuickSaveAction, ETriggerEvent::Started, 
+    this, &AFCPlayerController::HandleQuickSavePressed);
+EnhancedInput->BindAction(QuickLoadAction, ETriggerEvent::Started, 
+    this, &AFCPlayerController::HandleQuickLoadPressed);
+```
+
+##### On-Screen Feedback
+
+- **Save Success**: Green message "Quick Save successful"
+- **Save Failed**: Red message "Quick Save failed"
+- **Loading**: Cyan message "Loading Quick Save..."
+- **No Save**: Yellow message "No Quick Save found"
+
 ### Logging
 
 - **Category**: `LogFallenCompassPlayerController`
@@ -1719,6 +1881,8 @@ Ensure these exist before PIE:
 - `/Game/FC/Input/IMC_FC_Default` (Input Mapping Context)
 - `/Game/FC/Input/IA_Interact` (Input Action)
 - `/Game/FC/Input/IA_Pause` (Input Action)
+- `/Game/FC/Input/IA_QuickSave` (Input Action - F6)
+- `/Game/FC/Input/IA_QuickLoad` (Input Action - F9)
 - `/Game/FC/UI/Menus/WBP_MainMenu` (Main menu widget)
 - `/Game/FC/UI/Menus/WBP_MainMenuButton` (Menu button widget)
 - `/Game/FC/UI/WBP_InteractionPrompt` (Interaction prompt widget)
@@ -1784,4 +1948,4 @@ w:\GameDev\FallenCompass\Engine\Build\BatchFiles\Build.bat FCEditor Win64 Develo
 
 ---
 
-_Last updated: November 15, 2025 (Tasks 3.1-3.5, 4.1-4.6, 5.5, and 6.5 complete; main menu system and interaction system fully documented)_
+_Last updated: November 15, 2025 (Tasks 3.1-3.5, 4.1-4.6, 5.5, 5.6, and 6.5 complete; main menu system, save/load foundation with quick save/load, and interaction system fully documented)_

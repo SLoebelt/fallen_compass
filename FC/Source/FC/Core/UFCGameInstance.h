@@ -5,6 +5,8 @@
 #include "Engine/GameInstance.h"
 #include "UFCGameInstance.generated.h"
 
+class UFCSaveGame;
+
 /**
  * UFCGameInstance centralizes long-lived expedition context per GDD §3.1.
  * Fields are placeholders for Week 1; they become real once meta-systems land.
@@ -68,4 +70,34 @@ class FC_API UFCGameInstance : public UGameInstance
     /** Returns the current game version string */
     UFUNCTION(BlueprintPure, Category = "Version")
     FString GetGameVersion() const;
+
+    /** Save current game state to specified slot */
+    UFUNCTION(BlueprintCallable, Category = "SaveGame")
+    bool SaveGame(const FString& SlotName);
+
+    /** Load game state from specified slot (async) */
+    UFUNCTION(BlueprintCallable, Category = "SaveGame")
+    void LoadGameAsync(const FString& SlotName);
+
+    /** Get list of available save slots with metadata */
+    UFUNCTION(BlueprintCallable, Category = "SaveGame")
+    TArray<FString> GetAvailableSaveSlots();
+
+    /** Get the most recent save slot name */
+    UFUNCTION(BlueprintPure, Category = "SaveGame")
+    FString GetMostRecentSave();
+
+    /** Delegate for when async load completes */
+    DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnGameLoaded, bool, bSuccess);
+    UPROPERTY(BlueprintAssignable, Category = "SaveGame")
+    FOnGameLoaded OnGameLoaded;
+
+    /** Restore player position from pending load data (called after level loads) */
+    UFUNCTION(BlueprintCallable, Category = "SaveGame")
+    void RestorePlayerPosition();
+
+private:
+    /** Cached save data for restoring player position after level load */
+    UPROPERTY()
+    TObjectPtr<UFCSaveGame> PendingLoadData;
 };

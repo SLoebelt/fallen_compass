@@ -95,6 +95,14 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "UI")
 	void OnQuitClicked();
 
+	/** Dev quick save (F5) */
+	UFUNCTION(BlueprintCallable, Category = "SaveGame")
+	void DevQuickSave();
+
+	/** Dev quick load (F9) */
+	UFUNCTION(BlueprintCallable, Category = "SaveGame")
+	void DevQuickLoad();
+
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "State")
 	EFCPlayerCameraMode CameraMode;
@@ -147,8 +155,16 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
 	TObjectPtr<UInputAction> PauseAction;
 
+	UPROPERTY(EditDefaultsOnly, Category = "Input")
+	TObjectPtr<UInputAction> QuickSaveAction;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Input")
+	TObjectPtr<UInputAction> QuickLoadAction;
+
 	void HandleInteractPressed();
 	void HandlePausePressed();
+	void HandleQuickSavePressed();
+	void HandleQuickLoadPressed();
 
 	void EnterTableViewPlaceholder();
 	void ExitTableViewPlaceholder();

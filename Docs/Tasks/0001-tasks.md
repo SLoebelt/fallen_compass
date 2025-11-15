@@ -248,22 +248,22 @@
     - [x] Menu state reinitialized (camera, widget, input mode)
     - [x] No gameplay state carries over
 
-- [ ] **5.6 Implement basic Save/Load system foundation**
+- [x] **5.6 Implement basic Save/Load system foundation**
 
-  - [ ] Create `UFCSaveGame` class derived from `USaveGame`:
-    - [ ] Add properties: `SaveSlotName`, `Timestamp`, `CurrentLevelName`
-    - [ ] Add properties: `PlayerLocation`, `PlayerRotation`
-    - [ ] Add placeholder for expedition data (Week 2+)
-  - [ ] Implement save/load manager in `UFCGameInstance`:
-    - [ ] `SaveGame(const FString& SlotName)` - serialize current state
-    - [ ] `LoadGameAsync(const FString& SlotName)` - async load with callback
-    - [ ] `GetAvailableSaveSlots()` - scan and return save metadata
-    - [ ] `GetMostRecentSave()` - return latest auto/quick save
-  - [ ] Implement slot naming convention:
-    - [ ] `AutoSave_001`, `AutoSave_002`, `AutoSave_003` (rotating)
-    - [ ] `QuickSave` (single slot)
-    - [ ] `Manual_001`, `Manual_002`, etc. (player saves)
-  - [ ] Test: Can create and load save games, data persists correctly
+  - [x] Create `UFCSaveGame` class derived from `USaveGame`:
+    - [x] Add properties: `SaveSlotName`, `Timestamp`, `CurrentLevelName`
+    - [x] Add properties: `PlayerLocation`, `PlayerRotation`
+    - [x] Add placeholder for expedition data (Week 2+)
+  - [x] Implement save/load manager in `UFCGameInstance`:
+    - [x] `SaveGame(const FString& SlotName)` - serialize current state
+    - [x] `LoadGameAsync(const FString& SlotName)` - async load with callback
+    - [x] `GetAvailableSaveSlots()` - scan and return save metadata
+    - [x] `GetMostRecentSave()` - return latest auto/quick save
+  - [x] Implement slot naming convention:
+    - [x] `AutoSave_001`, `AutoSave_002`, `AutoSave_003` (rotating)
+    - [x] `QuickSave` (single slot)
+    - [x] `Manual_001`, `Manual_002`, etc. (player saves)
+  - [x] Test: Can create and load save games, data persists correctly
 
 - [ ] **5.7 Create Save Slot Selector Widget (WBP_SaveSlotSelector)**
 

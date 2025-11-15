@@ -16,6 +16,7 @@
 #include "Blueprint/UserWidget.h"
 #include "Kismet/KismetSystemLibrary.h"
 #include "../Interaction/FCInteractionComponent.h"
+#include "UFCGameInstance.h"
 
 DEFINE_LOG_CATEGORY(LogFallenCompassPlayerController);
 
@@ -94,6 +95,28 @@ AFCPlayerController::AFCPlayerController()
 	{
 		UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("Failed to load IA_Pause."));
 	}
+
+	static ConstructorHelpers::FObjectFinder<UInputAction> QuickSaveActionFinder(TEXT("/Game/FC/Input/IA_QuickSave"));
+	if (QuickSaveActionFinder.Succeeded())
+	{
+		QuickSaveAction = QuickSaveActionFinder.Object;
+		UE_LOG(LogFallenCompassPlayerController, Log, TEXT("Loaded IA_QuickSave"));
+	}
+	else
+	{
+		UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("Failed to load IA_QuickSave."));
+	}
+
+	static ConstructorHelpers::FObjectFinder<UInputAction> QuickLoadActionFinder(TEXT("/Game/FC/Input/IA_QuickLoad"));
+	if (QuickLoadActionFinder.Succeeded())
+	{
+		QuickLoadAction = QuickLoadActionFinder.Object;
+		UE_LOG(LogFallenCompassPlayerController, Log, TEXT("Loaded IA_QuickLoad"));
+	}
+	else
+	{
+		UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("Failed to load IA_QuickLoad."));
+	}
 }
 
 void AFCPlayerController::BeginPlay()
@@ -104,6 +127,13 @@ void AFCPlayerController::BeginPlay()
 	if (GEngine)
 	{
 		GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Green, TEXT("FC controller active"));
+	}
+
+	// Check if we need to restore player position after loading
+	UFCGameInstance* GameInstance = Cast<UFCGameInstance>(GetGameInstance());
+	if (GameInstance)
+	{
+		GameInstance->RestorePlayerPosition();
 	}
 }
 
@@ -137,6 +167,18 @@ void AFCPlayerController::SetupInputComponent()
 	else
 	{
 		UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("PauseAction not assigned on %s."), *GetName());
+	}
+
+	if (QuickSaveAction)
+	{
+		EnhancedInput->BindAction(QuickSaveAction, ETriggerEvent::Started, this, &AFCPlayerController::HandleQuickSavePressed);
+		UE_LOG(LogFallenCompassPlayerController, Log, TEXT("QuickSaveAction bound (F6)"));
+	}
+
+	if (QuickLoadAction)
+	{
+		EnhancedInput->BindAction(QuickLoadAction, ETriggerEvent::Started, this, &AFCPlayerController::HandleQuickLoadPressed);
+		UE_LOG(LogFallenCompassPlayerController, Log, TEXT("QuickLoadAction bound (F9)"));
 	}
 }
 
@@ -549,4 +591,74 @@ void AFCPlayerController::OnQuitClicked()
 	// TODO: Optional auto-save before quit (Task 5.10)
 
 	UKismetSystemLibrary::QuitGame(this, this, EQuitPreference::Quit, false);
+}
+
+void AFCPlayerController::DevQuickSave()
+{
+	UE_LOG(LogFallenCompassPlayerController, Log, TEXT("DevQuickSave: Saving to QuickSave slot"));
+
+	UFCGameInstance* GameInstance = Cast<UFCGameInstance>(GetGameInstance());
+	if (!GameInstance)
+	{
+		UE_LOG(LogFallenCompassPlayerController, Error, TEXT("DevQuickSave: Failed to get GameInstance"));
+		return;
+	}
+
+	bool bSuccess = GameInstance->SaveGame(TEXT("QuickSave"));
+	if (bSuccess)
+	{
+		if (GEngine)
+		{
+			GEngine->AddOnScreenDebugMessage(-1, 3.f, FColor::Green, TEXT("Quick Save successful"));
+		}
+		UE_LOG(LogFallenCompassPlayerController, Log, TEXT("DevQuickSave: Save successful"));
+	}
+	else
+	{
+		if (GEngine)
+		{
+			GEngine->AddOnScreenDebugMessage(-1, 3.f, FColor::Red, TEXT("Quick Save failed"));
+		}
+		UE_LOG(LogFallenCompassPlayerController, Error, TEXT("DevQuickSave: Save failed"));
+	}
+}
+
+void AFCPlayerController::DevQuickLoad()
+{
+	UE_LOG(LogFallenCompassPlayerController, Log, TEXT("DevQuickLoad: Loading from QuickSave slot"));
+
+	UFCGameInstance* GameInstance = Cast<UFCGameInstance>(GetGameInstance());
+	if (!GameInstance)
+	{
+		UE_LOG(LogFallenCompassPlayerController, Error, TEXT("DevQuickLoad: Failed to get GameInstance"));
+		return;
+	}
+
+	// Check if QuickSave exists
+	if (!UGameplayStatics::DoesSaveGameExist(TEXT("QuickSave"), 0))
+	{
+		if (GEngine)
+		{
+			GEngine->AddOnScreenDebugMessage(-1, 3.f, FColor::Yellow, TEXT("No Quick Save found"));
+		}
+		UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("DevQuickLoad: QuickSave slot does not exist"));
+		return;
+	}
+
+	if (GEngine)
+	{
+		GEngine->AddOnScreenDebugMessage(-1, 3.f, FColor::Cyan, TEXT("Loading Quick Save..."));
+	}
+
+	GameInstance->LoadGameAsync(TEXT("QuickSave"));
+}
+
+void AFCPlayerController::HandleQuickSavePressed()
+{
+	DevQuickSave();
+}
+
+void AFCPlayerController::HandleQuickLoadPressed()
+{
+	DevQuickLoad();
 }
