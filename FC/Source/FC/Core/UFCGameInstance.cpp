@@ -169,9 +169,8 @@ void UFCGameInstance::LoadGameAsync(const FString& SlotName)
     }
     else
     {
-        // Same level, restore player position immediately
-        UE_LOG(LogTemp, Log, TEXT("Same level, restoring player position"));
-        RestorePlayerPosition();
+        // Same level - position will be restored by OnSaveGameLoaded callback after gameplay transition
+        UE_LOG(LogTemp, Log, TEXT("Same level (%s), position will be restored after gameplay transition"), *CurrentLevelName);
     }
 
     UE_LOG(LogTemp, Log, TEXT("Successfully loaded game from slot: %s"), *SlotName);

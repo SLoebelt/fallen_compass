@@ -545,26 +545,174 @@ void AFCPlayerController::OnNewLegacyClicked()
 
 void AFCPlayerController::OnContinueClicked()
 {
-	UE_LOG(LogFallenCompassPlayerController, Log, TEXT("OnContinueClicked: Continue not yet implemented"));
+	UE_LOG(LogFallenCompassPlayerController, Log, TEXT("OnContinueClicked: Loading most recent save"));
 
-	if (GEngine)
+	// Get the game instance
+	UFCGameInstance* GameInstance = Cast<UFCGameInstance>(GetGameInstance());
+	if (!GameInstance)
 	{
-		GEngine->AddOnScreenDebugMessage(-1, 3.f, FColor::Yellow, TEXT("Continue - Not yet implemented (Task 5.8)"));
+		UE_LOG(LogFallenCompassPlayerController, Error, TEXT("OnContinueClicked: Failed to get GameInstance"));
+		return;
 	}
 
-	// TODO: Load most recent save (Task 5.8)
+	// Get the most recent save
+	FString MostRecentSave = GameInstance->GetMostRecentSave();
+	if (MostRecentSave.IsEmpty())
+	{
+		UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("OnContinueClicked: No saves available"));
+		if (GEngine)
+		{
+			GEngine->AddOnScreenDebugMessage(-1, 3.f, FColor::Red, TEXT("No saves available to continue"));
+		}
+		return;
+	}
+
+	// Bind to load complete callback to transition to gameplay
+	if (!GameInstance->OnGameLoaded.IsBound())
+	{
+		GameInstance->OnGameLoaded.AddDynamic(this, &AFCPlayerController::OnSaveGameLoaded);
+	}
+
+	// Load the most recent save
+	UE_LOG(LogFallenCompassPlayerController, Log, TEXT("OnContinueClicked: Loading save '%s'"), *MostRecentSave);
+	if (GEngine)
+	{
+		GEngine->AddOnScreenDebugMessage(-1, 3.f, FColor::Cyan, FString::Printf(TEXT("Loading save: %s"), *MostRecentSave));
+	}
+
+	GameInstance->LoadGameAsync(MostRecentSave);
 }
 
 void AFCPlayerController::OnLoadSaveClicked()
 {
-	UE_LOG(LogFallenCompassPlayerController, Log, TEXT("OnLoadSaveClicked: Load save not yet implemented"));
+	UE_LOG(LogFallenCompassPlayerController, Log, TEXT("OnLoadSaveClicked: Opening save slot selector"));
 
-	if (GEngine)
+	// Check if we have the save slot selector widget class
+	if (!SaveSlotSelectorWidgetClass)
 	{
-		GEngine->AddOnScreenDebugMessage(-1, 3.f, FColor::Yellow, TEXT("Load Save Game - Not yet implemented (Task 5.7)"));
+		UE_LOG(LogFallenCompassPlayerController, Error, TEXT("OnLoadSaveClicked: SaveSlotSelectorWidgetClass is not set"));
+		if (GEngine)
+		{
+			GEngine->AddOnScreenDebugMessage(-1, 3.f, FColor::Red, TEXT("SaveSlotSelectorWidgetClass not configured"));
+		}
+		return;
 	}
 
-	// TODO: Show save slot selector (Task 5.7)
+	// Hide the main menu widget
+	if (MainMenuWidget)
+	{
+		MainMenuWidget->SetVisibility(ESlateVisibility::Hidden);
+	}
+
+	// Create and show the save slot selector widget
+	if (!SaveSlotSelectorWidget)
+	{
+		SaveSlotSelectorWidget = CreateWidget<UUserWidget>(this, SaveSlotSelectorWidgetClass);
+		if (!SaveSlotSelectorWidget)
+		{
+			UE_LOG(LogFallenCompassPlayerController, Error, TEXT("OnLoadSaveClicked: Failed to create SaveSlotSelectorWidget"));
+			return;
+		}
+	}
+
+	SaveSlotSelectorWidget->AddToViewport();
+	SaveSlotSelectorWidget->SetVisibility(ESlateVisibility::Visible);
+
+	UE_LOG(LogFallenCompassPlayerController, Log, TEXT("OnLoadSaveClicked: Save slot selector opened"));
+	if (GEngine)
+	{
+		GEngine->AddOnScreenDebugMessage(-1, 3.f, FColor::Green, TEXT("Opening save slot selector..."));
+	}
+}
+
+void AFCPlayerController::CloseSaveSlotSelector()
+{
+	UE_LOG(LogFallenCompassPlayerController, Log, TEXT("CloseSaveSlotSelector: Returning to main menu"));
+
+	// Hide and remove the save slot selector widget
+	if (SaveSlotSelectorWidget)
+	{
+		SaveSlotSelectorWidget->SetVisibility(ESlateVisibility::Hidden);
+		SaveSlotSelectorWidget->RemoveFromParent();
+	}
+
+	// Show the main menu widget
+	if (MainMenuWidget)
+	{
+		MainMenuWidget->SetVisibility(ESlateVisibility::Visible);
+	}
+
+	UE_LOG(LogFallenCompassPlayerController, Log, TEXT("CloseSaveSlotSelector: Main menu restored"));
+}
+
+void AFCPlayerController::LoadSaveSlot(const FString& SlotName)
+{
+	UE_LOG(LogFallenCompassPlayerController, Log, TEXT("LoadSaveSlot: Loading slot '%s'"), *SlotName);
+
+	// Get the game instance
+	UFCGameInstance* GameInstance = Cast<UFCGameInstance>(GetGameInstance());
+	if (!GameInstance)
+	{
+		UE_LOG(LogFallenCompassPlayerController, Error, TEXT("LoadSaveSlot: Failed to get GameInstance"));
+		return;
+	}
+
+	// Bind to load complete callback to transition to gameplay
+	if (!GameInstance->OnGameLoaded.IsBound())
+	{
+		GameInstance->OnGameLoaded.AddDynamic(this, &AFCPlayerController::OnSaveGameLoaded);
+	}
+
+	// Load the save
+	if (GEngine)
+	{
+		GEngine->AddOnScreenDebugMessage(-1, 3.f, FColor::Cyan, FString::Printf(TEXT("Loading save: %s"), *SlotName));
+	}
+
+	GameInstance->LoadGameAsync(SlotName);
+}
+
+void AFCPlayerController::OnSaveGameLoaded(bool bSuccess)
+{
+	UE_LOG(LogFallenCompassPlayerController, Log, TEXT("OnSaveGameLoaded: Success=%d"), bSuccess);
+
+	if (!bSuccess)
+	{
+		UE_LOG(LogFallenCompassPlayerController, Error, TEXT("OnSaveGameLoaded: Load failed"));
+		if (GEngine)
+		{
+			GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("Failed to load save game"));
+		}
+		return;
+	}
+
+	// Transition to gameplay after successful load
+	UE_LOG(LogFallenCompassPlayerController, Log, TEXT("OnSaveGameLoaded: Transitioning to gameplay"));
+	if (GEngine)
+	{
+		GEngine->AddOnScreenDebugMessage(-1, 3.f, FColor::Green, TEXT("Save loaded successfully"));
+	}
+
+	// Close any open menus
+	if (SaveSlotSelectorWidget && SaveSlotSelectorWidget->IsInViewport())
+	{
+		SaveSlotSelectorWidget->RemoveFromParent();
+	}
+
+	// Transition to gameplay (removes menu, switches camera and input)
+	TransitionToGameplay();
+
+	// Restore player position after camera transition completes
+	FTimerHandle PositionRestoreTimer;
+	GetWorldTimerManager().SetTimer(PositionRestoreTimer, [this]()
+	{
+		UFCGameInstance* GameInstance = Cast<UFCGameInstance>(GetGameInstance());
+		if (GameInstance)
+		{
+			GameInstance->RestorePlayerPosition();
+			UE_LOG(LogFallenCompassPlayerController, Log, TEXT("OnSaveGameLoaded: Player position restored after transition"));
+		}
+	}, 2.1f, false); // Wait for camera blend to complete (2.0s) + small buffer
 }
 
 void AFCPlayerController::OnOptionsClicked()

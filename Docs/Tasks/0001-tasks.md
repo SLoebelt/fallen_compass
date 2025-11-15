@@ -265,38 +265,53 @@
     - [x] `Manual_001`, `Manual_002`, etc. (player saves)
   - [x] Test: Can create and load save games, data persists correctly
 
-- [ ] **5.7 Create Save Slot Selector Widget (WBP_SaveSlotSelector)**
+- [x] **5.7 Create Save Slot Selector Widget (WBP_SaveSlotSelector)**
 
-  - [ ] Create UMG widget `WBP_SaveSlotSelector` at `/Game/FC/UI/Menus/`
-  - [ ] Add map/parchment background texture
-  - [ ] Add ScrollBox for save slot list
-  - [ ] Create `WBP_SaveSlotItem` widget template:
-    - [ ] Display: Slot name, timestamp, location, expedition progress
-    - [ ] Click detection for selection
-    - [ ] Hover state highlighting
-  - [ ] Add "Back" button to return to main menu
-  - [ ] Populate list with `GetAvailableSaveSlots()` results
-  - [ ] Hook selection to `LoadGameAsync()`
+  - [x] Create UMG widget `WBP_SaveSlotSelector` at `/Game/FC/UI/Menus/SaveMenu/`
+  - [x] Add map/parchment background texture
+  - [x] Add ScrollBox for save slot list
+  - [x] Create `WBP_SaveSlotItem` widget template:
+    - [x] Display: Slot name, timestamp, location, expedition progress
+    - [x] Click detection for selection
+    - [x] Hover state highlighting
+  - [x] Add "Back" button to return to main menu
+  - [x] Populate list with `GetAvailableSaveSlots()` results
+  - [x] Hook selection to `LoadGameAsync()`
 
-- [ ] **5.8 Hook up Continue and Load Save Game buttons**
+- [x] **5.8 Hook up Continue and Load Save Game buttons**
 
-  - [ ] Implement `OnContinueClicked()`:
-    - [ ] Get most recent save from GameInstance
-    - [ ] If no saves exist, disable button (grayed out)
-    - [ ] If save exists, call `LoadGameAsync()` with that slot
-  - [ ] Implement `OnLoadSaveClicked()`:
-    - [ ] Hide `WBP_MainMenu`
-    - [ ] Show `WBP_SaveSlotSelector`
+  - [x] Implement `OnContinueClicked()`:
+    - [x] Get most recent save from GameInstance
+    - [x] If no saves exist, disable button (grayed out)
+    - [x] If save exists, call `LoadGameAsync()` with that slot
+  - [x] Implement `OnLoadSaveClicked()`:
+    - [x] Hide `WBP_MainMenu`
+    - [x] Show `WBP_SaveSlotSelector`
     - [ ] Optional: Pan camera to map area on desk
-  - [ ] Implement async loading flow:
-    - [ ] Show loading screen widget during level stream
-    - [ ] Restore player state after level loads
-    - [ ] Transition to gameplay state at saved location
-  - [ ] Test flow:
-    - [ ] Create manual save in office
-    - [ ] Return to menu via door
-    - [ ] Click "Continue" → loads into saved position
-    - [ ] Verify: Player location, rotation, level all correct
+  - [x] Implement `LoadSaveSlot()`:
+    - [x] Blueprint-callable function for save slot selection
+    - [x] Binds to OnGameLoaded delegate
+    - [x] Calls LoadGameAsync with selected slot
+  - [x] Implement `OnSaveGameLoaded()` callback:
+    - [x] Triggered when save finishes loading
+    - [x] Closes save slot selector if open
+    - [x] Transitions to gameplay state
+    - [x] Restores player position after camera transition (2.1s delay)
+  - [x] Implement async loading flow:
+    - [x] Show loading screen widget during level stream
+    - [x] Restore player state after level loads
+    - [x] Transition to gameplay state at saved location
+  - [x] Implement `CloseSaveSlotSelector()`:
+    - [x] Hide save slot selector widget
+    - [x] Show main menu widget
+  - [x] Test flow:
+    - [x] Create manual save in office
+    - [x] Return to menu via door
+    - [x] Click "Continue" → loads into saved position
+    - [x] Verify: Player location, rotation, level all correct
+    - [x] Click "Load Save" → opens save slot selector
+    - [x] Click save slot → loads into saved position
+    - [x] Verify: All UI transitions work correctly
 
 - [ ] **5.9 Add atmospheric details and polish**
 

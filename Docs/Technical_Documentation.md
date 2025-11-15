@@ -1421,6 +1421,18 @@ void OnOptionsClicked();
 
 UFUNCTION(BlueprintCallable, Category = "UI")
 void OnQuitClicked();
+
+/** Close save slot selector and return to main menu */
+UFUNCTION(BlueprintCallable, Category = "UI")
+void CloseSaveSlotSelector();
+
+/** Load a save slot (called from save slot selector widget) */
+UFUNCTION(BlueprintCallable, Category = "UI")
+void LoadSaveSlot(const FString& SlotName);
+
+/** Callback when save game finishes loading */
+UFUNCTION()
+void OnSaveGameLoaded(bool bSuccess);
 ```
 
 ### Main Menu Flow Implementation
@@ -1468,6 +1480,38 @@ Called from door interaction to return to menu:
 - **Location**: `/Game/FC/UI/Menus/WBP_MainMenuButton`
 - **Purpose**: Reusable button widget for menu interactions
 - **Features**: Hover effects, click animations, text styling
+
+#### WBP_SaveSlotSelector
+
+- **Location**: `/Game/FC/UI/Menus/SaveMenu/WBP_SaveSlotSelector`
+- **Purpose**: Save slot selection screen for loading saved games
+- **Components**:
+  - Map/parchment background image
+  - ScrollBox for save slot list
+  - Back button to return to main menu
+- **Functions**:
+  - `PopulateSaveSlots()`: Calls `GameInstance->GetAvailableSaveSlots()` and creates slot item widgets
+  - `OnSlotClicked(SlotName)`: Handles slot selection, calls `PlayerController->LoadSaveSlot(SlotName)`
+  - `OnBackClicked()`: Returns to main menu via `PlayerController->CloseSaveSlotSelector()`
+
+#### WBP_SaveSlotItem
+
+- **Location**: `/Game/FC/UI/Menus/SaveMenu/WBP_SaveSlotItem`
+- **Purpose**: Reusable widget template for individual save slot entries
+- **Components**:
+  - Border with hover state (changes color on hover)
+  - Thumbnail image (96x96)
+  - Slot name text (warm parchment color #F4E3C6)
+  - Save date text (dimmer #C9B8A0)
+- **Functions**:
+  - `SetSaveSlotData(SlotName, SaveDate, Thumbnail)`: Populates the widget with save data
+  - `OnClicked`: Event dispatcher for slot selection
+  - Hover/Unhover: Visual feedback with border color change
+- **Styling**:
+  - Default border color: RGBA(0.02, 0.02, 0.02, 0.7)
+  - Hover border color: RGBA(0.15, 0.08, 0.03, 0.9)
+  - Padding: 10 all around
+  - Corner radius: 4-6
 
 ### Camera System
 
@@ -1644,7 +1688,6 @@ void DevQuickLoad();
   - Saves current level name
   - Saves expedition data
   - Shows green success message on screen
-  
 - **F9 (Quick Load)**: Loads from "QuickSave" slot
   - Checks if save exists
   - Loads saved state
@@ -1664,9 +1707,9 @@ static ConstructorHelpers::FObjectFinder<UInputAction> QuickLoadActionFinder(
     TEXT("/Game/FC/Input/IA_QuickLoad"));
 
 // SetupInputComponent
-EnhancedInput->BindAction(QuickSaveAction, ETriggerEvent::Started, 
+EnhancedInput->BindAction(QuickSaveAction, ETriggerEvent::Started,
     this, &AFCPlayerController::HandleQuickSavePressed);
-EnhancedInput->BindAction(QuickLoadAction, ETriggerEvent::Started, 
+EnhancedInput->BindAction(QuickLoadAction, ETriggerEvent::Started,
     this, &AFCPlayerController::HandleQuickLoadPressed);
 ```
 
@@ -1677,15 +1720,203 @@ EnhancedInput->BindAction(QuickLoadAction, ETriggerEvent::Started,
 - **Loading**: Cyan message "Loading Quick Save..."
 - **No Save**: Yellow message "No Quick Save found"
 
+### Main Menu Integration with Save System (Task 5.8)
+
+#### Continue Button Implementation
+
+**Location**: `AFCPlayerController::OnContinueClicked()`
+
+**Functionality**:
+1. Calls `UFCGameInstance::GetMostRecentSave()` to find latest save
+2. If no saves exist, displays error message and returns
+3. If save exists, calls `LoadGameAsync()` with the most recent slot name
+4. Player is automatically restored to saved position after level loads
+
+**Blueprint Requirements**:
+- Button should be disabled/grayed out when no saves are available
+- Can check via `GetMostRecentSave().IsEmpty()` in Blueprint
+
+**User Flow**:
+1. Player clicks "Continue" on main menu
+2. System loads most recent save (AutoSave or QuickSave)
+3. Level loads (if different from current)
+4. Player spawns at saved position with saved rotation
+5. Gameplay state fully restored
+
+#### Load Save Button Implementation
+
+**Location**: `AFCPlayerController::OnLoadSaveClicked()`
+
+**Functionality**:
+1. Validates `SaveSlotSelectorWidgetClass` is configured
+2. Hides the main menu widget
+3. Creates `WBP_SaveSlotSelector` widget if not already created
+4. Adds widget to viewport and makes visible
+5. Player can browse all available save slots
+
+**Blueprint Requirements**:
+- Configure `SaveSlotSelectorWidgetClass` property to reference `/Game/FC/UI/Menus/SaveMenu/WBP_SaveSlotSelector`
+- Save slot selector widget should call `LoadGameAsync()` when slot is clicked
+- Save slot selector "Back" button should call `CloseSaveSlotSelector()`
+
+**Widget Communication**:
+```cpp
+// In WBP_SaveSlotSelector Blueprint:
+// - OnSlotClicked(SlotName) → Cast to PlayerController → LoadSaveSlot(SlotName)
+// - OnBackClicked() → Cast to PlayerController → CloseSaveSlotSelector()
+```
+
+#### Load Save Slot
+
+**Location**: `AFCPlayerController::LoadSaveSlot(const FString& SlotName)`
+
+**Functionality**:
+1. Called from save slot selector widget when player clicks a slot
+2. Binds to `OnGameLoaded` delegate for transition callback
+3. Calls `UFCGameInstance::LoadGameAsync()` with selected slot
+4. Automatically transitions to gameplay when load completes via `OnSaveGameLoaded()`
+
+#### On Save Game Loaded Callback
+
+**Location**: `AFCPlayerController::OnSaveGameLoaded(bool bSuccess)`
+
+**Functionality**:
+1. Callback bound to `UFCGameInstance::OnGameLoaded` delegate
+2. Displays success/failure message on screen
+3. Closes any open menus (save slot selector)
+4. Calls `TransitionToGameplay()` to switch from menu to game state
+5. Waits 2.1 seconds (camera blend time + buffer) then calls `RestorePlayerPosition()`
+6. Player position restored when character is fully spawned and ready
+
+**Load Flow**:
+1. User clicks save slot in selector (or clicks Continue button)
+2. Widget calls `LoadSaveSlot(SlotName)` on player controller (or OnContinueClicked binds and calls LoadGameAsync)
+3. Player controller binds to `OnGameLoaded` delegate and triggers async load
+4. GameInstance loads save data and caches it in `PendingLoadData`
+5. If same level: broadcasts success immediately; if different level: triggers level load
+6. GameInstance broadcasts `OnGameLoaded` delegate
+7. `OnSaveGameLoaded()` callback receives success notification
+8. Transitions to gameplay (removes menu, blends camera over 2s, switches input)
+9. After 2.1s delay, `RestorePlayerPosition()` applies cached position/rotation
+10. Player appears at saved location in gameplay state with correct camera orientation
+
+**Timing Critical Details**:
+- Position restoration delayed by 2.1s to ensure camera blend completes (2.0s blend + 0.1s buffer)
+- Character must be fully spawned before position can be restored
+- Same-level loads don't trigger immediate position restore (waits for callback flow)
+- Cross-level loads restore position in BeginPlay after level finishes loading
+
+#### Close Save Slot Selector
+
+**Location**: `AFCPlayerController::CloseSaveSlotSelector()`
+
+**Functionality**:
+1. Hides save slot selector widget
+2. Removes it from parent viewport
+3. Shows main menu widget again
+4. Player returns to main menu state
+
+**Integration Notes**:
+- No camera changes during save slot viewing (remains on MenuCamera)
+- All save/load operations use async loading for smooth transitions
+- Proper error handling for missing widget classes or failed loads
+- On-screen feedback for all operations
+- Position restoration timing ensures character is spawned and ready
+- Delegate binding prevents multiple callbacks for repeated loads
+
+**Testing Verification**:
+- ✅ Continue button loads most recent save and restores position
+- ✅ Load Save button opens save slot selector
+- ✅ Clicking save slot loads and restores position correctly
+- ✅ Back button returns to main menu
+- ✅ Quick save (F6) and quick load (F9) work from gameplay
+- ✅ All UI transitions smooth and functional
+- ✅ Player rotation/camera orientation correctly restored
+
+#### Implementation Details
+
+**Key Code Sections**:
+
+`AFCPlayerController::LoadSaveSlot()`:
+```cpp
+void AFCPlayerController::LoadSaveSlot(const FString& SlotName)
+{
+    UFCGameInstance* GameInstance = Cast<UFCGameInstance>(GetGameInstance());
+    
+    // Bind to load complete callback
+    if (!GameInstance->OnGameLoaded.IsBound())
+    {
+        GameInstance->OnGameLoaded.AddDynamic(this, &AFCPlayerController::OnSaveGameLoaded);
+    }
+    
+    GameInstance->LoadGameAsync(SlotName);
+}
+```
+
+`AFCPlayerController::OnSaveGameLoaded()`:
+```cpp
+void AFCPlayerController::OnSaveGameLoaded(bool bSuccess)
+{
+    if (!bSuccess) return;
+    
+    // Close any open menus
+    if (SaveSlotSelectorWidget && SaveSlotSelectorWidget->IsInViewport())
+    {
+        SaveSlotSelectorWidget->RemoveFromParent();
+    }
+    
+    // Transition to gameplay
+    TransitionToGameplay();
+    
+    // Restore position after camera transition completes
+    FTimerHandle PositionRestoreTimer;
+    GetWorldTimerManager().SetTimer(PositionRestoreTimer, [this]()
+    {
+        UFCGameInstance* GameInstance = Cast<UFCGameInstance>(GetGameInstance());
+        if (GameInstance)
+        {
+            GameInstance->RestorePlayerPosition();
+        }
+    }, 2.1f, false); // Wait for 2.0s camera blend + 0.1s buffer
+}
+```
+
+`UFCGameInstance::LoadGameAsync()` - Same Level Load:
+```cpp
+if (CurrentLevelName != TargetLevelName && !TargetLevelName.IsEmpty())
+{
+    // Different level - trigger level load
+    UGameplayStatics::OpenLevel(GetWorld(), FName(*TargetLevelName));
+}
+else
+{
+    // Same level - position will be restored by callback after gameplay transition
+    // Don't call RestorePlayerPosition() here - character may not be spawned yet
+}
+
+OnGameLoaded.Broadcast(true);
+```
+
+**Critical Timing Fix**:
+- Previously: Attempted to restore position immediately when same level, but character not spawned in menu state
+- Solution: Delay position restoration by 2.1s in `OnSaveGameLoaded()` callback after `TransitionToGameplay()` completes
+- Result: Character is fully spawned and camera blend complete before position applied
+- ✅ Back button returns to main menu
+- ✅ Quick save (F6) and quick load (F9) work from gameplay
+- ✅ All UI transitions smooth and functional
+- ✅ Player rotation/camera orientation correctly restored
+- Proper error handling for missing widget classes or failed loads
+- On-screen feedback for all operations
+
 ### Logging
 
 - **Category**: `LogFallenCompassPlayerController`
-- **Events Logged**: State transitions, widget creation/destruction, camera changes, button clicks
-- **Debug Messages**: On-screen debug messages for state changes and button interactions
+- **Events Logged**: State transitions, widget creation/destruction, camera changes, button clicks, save/load operations
+- **Debug Messages**: On-screen debug messages for state changes, button interactions, save/load status
 
 ### Design Rationale
 
-In-world menu design provides atmospheric immersion while maintaining clear separation between menu navigation and gameplay. Level reload ensures clean state transitions without complex save/load systems. Widget-based UI allows for flexible menu design and future expansion.
+In-world menu design provides atmospheric immersion while maintaining clear separation between menu navigation and gameplay. Level reload ensures clean state transitions without complex save/load systems. Widget-based UI allows for flexible menu design and future expansion. The save system integrates seamlessly with the main menu, providing familiar Continue/Load options while maintaining the immersive atmosphere.
 
 ---
 
@@ -1885,6 +2116,8 @@ Ensure these exist before PIE:
 - `/Game/FC/Input/IA_QuickLoad` (Input Action - F9)
 - `/Game/FC/UI/Menus/WBP_MainMenu` (Main menu widget)
 - `/Game/FC/UI/Menus/WBP_MainMenuButton` (Menu button widget)
+- `/Game/FC/UI/Menus/SaveMenu/WBP_SaveSlotSelector` (Save slot selector widget)
+- `/Game/FC/UI/Menus/SaveMenu/WBP_SaveSlotItem` (Save slot item widget)
 - `/Game/FC/UI/WBP_InteractionPrompt` (Interaction prompt widget)
 - `/Game/FC/World/Levels/L_Office` (Office level with MenuCamera actor)
 - `/Game/Characters/Mannequins/Meshes/SKM_Manny_Simple` (Character mesh - UE5 default)
@@ -1948,4 +2181,4 @@ w:\GameDev\FallenCompass\Engine\Build\BatchFiles\Build.bat FCEditor Win64 Develo
 
 ---
 
-_Last updated: November 15, 2025 (Tasks 3.1-3.5, 4.1-4.6, 5.5, 5.6, and 6.5 complete; main menu system, save/load foundation with quick save/load, and interaction system fully documented)_
+_Last updated: November 16, 2025 (Tasks 3.1-3.5, 4.1-4.6, 5.5-5.8, and 6.5 complete; main menu system with full save/load integration, interaction system fully documented and tested)_
