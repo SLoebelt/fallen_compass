@@ -51,6 +51,14 @@ class FC_API UFCGameInstance : public UGameInstance
     UPROPERTY(EditDefaultsOnly, Category = "UI")
     TSoftClassPtr<class UFCScreenTransitionWidget> TransitionWidgetClass;
 
+    /** Widget class for main menu (configured in Blueprint, used by UIManager) */
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "UI")
+    TSubclassOf<UUserWidget> MainMenuWidgetClass;
+    
+    /** Widget class for save slot selector (configured in Blueprint, used by UIManager) */
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "UI")
+    TSubclassOf<UUserWidget> SaveSlotSelectorWidgetClass;
+
     /** Active expedition identifier; persists across level loads. */
     UPROPERTY(BlueprintReadOnly, Category = "Expedition")
     FString CurrentExpeditionId;

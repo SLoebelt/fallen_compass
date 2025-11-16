@@ -7,6 +7,7 @@
 #include "FCFirstPersonCharacter.h"
 #include "FCTransitionManager.h"
 #include "Core/FCLevelManager.h"
+#include "Core/FCUIManager.h"
 
 void UFCGameInstance::Init()
 {
@@ -15,6 +16,19 @@ void UFCGameInstance::Init()
     UE_LOG(LogTemp, Log, TEXT("UFCGameInstance Init | StartupMap=%s OfficeMap=%s"),
         *StartupMap.ToString(),
         *OfficeMap.ToString());
+
+    // Configure UIManager subsystem with widget classes
+    UFCUIManager* UIManager = GetSubsystem<UFCUIManager>();
+    if (UIManager)
+    {
+        UIManager->MainMenuWidgetClass = MainMenuWidgetClass;
+        UIManager->SaveSlotSelectorWidgetClass = SaveSlotSelectorWidgetClass;
+        UE_LOG(LogTemp, Log, TEXT("UFCGameInstance: UIManager configured with widget classes"));
+    }
+    else
+    {
+        UE_LOG(LogTemp, Warning, TEXT("UFCGameInstance: Failed to get UIManager subsystem"));
+    }
 
     // Future hook: load persistent profile data before menus spawn.
 }
