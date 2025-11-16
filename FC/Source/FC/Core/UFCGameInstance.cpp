@@ -295,6 +295,12 @@ void UFCGameInstance::RestorePlayerPosition()
 
     UE_LOG(LogTemp, Log, TEXT("RestorePlayerPosition: Restored to %s"), *PendingLoadData->PlayerLocation.ToString());
 
+    // Set PlayerController to gameplay state with proper input mode
+    // This is a save game restore, so we're loading INTO gameplay
+    PC->TransitionToGameplay();
+    
+    UE_LOG(LogTemp, Log, TEXT("RestorePlayerPosition: Set gameplay state and input mode"));
+
     // Update level manager with current level (after position restoration)
     UFCLevelManager* LevelMgr = GetSubsystem<UFCLevelManager>();
     if (LevelMgr)

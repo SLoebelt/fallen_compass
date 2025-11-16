@@ -100,6 +100,10 @@ class FC_API UFCGameInstance : public UGameInstance
     UFUNCTION(BlueprintCallable, Category = "SaveGame")
     void RestorePlayerPosition();
 
+    /** Check if we're currently restoring from a save game */
+    UFUNCTION(BlueprintPure, Category = "SaveGame")
+    bool IsRestoringSaveGame() const { return PendingLoadData != nullptr; }
+
 private:
     /** Cached save data for restoring player position after level load */
     UPROPERTY()

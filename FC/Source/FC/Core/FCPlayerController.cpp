@@ -18,6 +18,7 @@
 #include "../Interaction/FCInteractionComponent.h"
 #include "UFCGameInstance.h"
 #include "FCTransitionManager.h"
+#include "Core/FCLevelManager.h"
 
 DEFINE_LOG_CATEGORY(LogFallenCompassPlayerController);
 
@@ -136,31 +137,13 @@ void AFCPlayerController::BeginPlay()
 	{
 		GameInstance->RestorePlayerPosition();
 		
-		// Check current level - if not office/main menu, set up gameplay input
-		FString CurrentLevelName = GetWorld()->GetMapName();
-		if (CurrentLevelName.StartsWith("UEDPIE_0_"))
-		{
-			CurrentLevelName = CurrentLevelName.RightChop(9);
-		}
+		// Note: L_Office serves as BOTH menu and gameplay location
+		// Input mode will be set by InitializeMainMenu() or TransitionToGameplay()
+		// Don't set input mode here to avoid race conditions
 		
-		// If we're not in office or main menu level, assume we loaded into gameplay
-		if (!CurrentLevelName.Contains("Office") && !CurrentLevelName.Contains("MainMenu"))
-		{
-			UE_LOG(LogFallenCompassPlayerController, Log, TEXT("BeginPlay: Loaded into gameplay level (%s), setting up gameplay input"), *CurrentLevelName);
-			
-			// Set to gameplay state
-			CurrentGameState = EFCGameState::Gameplay;
-			
-			// Set up gameplay input
-			SetInputMappingMode(EFCInputMappingMode::FirstPerson);
-			FInputModeGameOnly InputMode;
-			SetInputMode(InputMode);
-			bShowMouseCursor = false;
-		}
+		UE_LOG(LogFallenCompassPlayerController, Log, TEXT("BeginPlay: Controller ready, input mode will be set by game state transitions"));
 	}
-}
-
-void AFCPlayerController::SetupInputComponent()
+}void AFCPlayerController::SetupInputComponent()
 {
 	Super::SetupInputComponent();
 
@@ -857,7 +840,7 @@ void AFCPlayerController::FadeScreenOut(float Duration, bool bShowLoading)
 	}
 
 	TransitionMgr->BeginFadeOut(Duration, bShowLoading);
-	UE_LOG(LogFallenCompassPlayerController, Log, TEXT("FadeScreenOut: Initiated fade (Duration: %.2fs, Loading: %s)"), 
+	UE_LOG(LogFallenCompassPlayerController, Log, TEXT("FadeScreenOut: Initiated fade (Duration: %.2fs, Loading: %s)"),
 		Duration, bShowLoading ? TEXT("Yes") : TEXT("No"));
 }
 
