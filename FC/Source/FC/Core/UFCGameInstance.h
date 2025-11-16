@@ -47,6 +47,10 @@ class FC_API UFCGameInstance : public UGameInstance
     UPROPERTY(EditDefaultsOnly, Category = "Expedition")
     TSoftObjectPtr<UDataTable> ExpeditionDefinitions;
 
+    /** Widget class for screen transitions (fades, loading screens) */
+    UPROPERTY(EditDefaultsOnly, Category = "UI")
+    TSoftClassPtr<class UFCScreenTransitionWidget> TransitionWidgetClass;
+
     /** Active expedition identifier; persists across level loads. */
     UPROPERTY(BlueprintReadOnly, Category = "Expedition")
     FString CurrentExpeditionId;
@@ -100,4 +104,10 @@ private:
     /** Cached save data for restoring player position after level load */
     UPROPERTY()
     TObjectPtr<UFCSaveGame> PendingLoadData;
+
+    /** Pending level name for deferred load after fade */
+    FName PendingLevelLoad;
+
+    /** Timer handle for level load delay */
+    FTimerHandle LevelLoadTimerHandle;
 };

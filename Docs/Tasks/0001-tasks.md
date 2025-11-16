@@ -1,6 +1,7 @@
 ## Relevant Files
 
 - `/Docs/UE_NamingConventions.md` - Unreal Engine naming convention document and desired folder structure.
+- `/Docs/UE_CodeConventions.md` - Unreal Engine MUST FOLLOW coding conventions.
 - `/Docs/Fallen_Compass_GDD_v0.2.md` - Game Design Document
 - `/Docs/Fallen_Compass_DRM.md` - Development Roadmap
 
@@ -313,27 +314,151 @@
     - [x] Click save slot → loads into saved position
     - [x] Verify: All UI transitions work correctly
 
-- [ ] **5.9 Add atmospheric details and polish**
+- [x] **5.9 Add atmospheric details and polish**
 
-  - [ ] Add ambient effects to menu camera view:
-    - [ ] Particle system: Dust motes in light shafts (`P_DustMotes`)
-    - [ ] Animated material: Candle flicker emissive pulse
-    - [ ] Window lighting: Subtle animated caustics
-  - [ ] Add audio:
-    - [ ] Ambient loop: Clock ticking, distant wind, paper rustle (`A_Office_Ambience`)
-    - [ ] Button click sound effects (`S_ButtonClick`)
-    - [ ] Menu transition whoosh (`S_MenuTransition`)
-    - [ ] Door open sound (`S_DoorOpen`)
-  - [ ] Camera enhancements:
-    - [ ] Add subtle camera shake or slow rotation for "breathing"
-    - [ ] Depth of field focusing on desk area
-  - [ ] Widget polish:
-    - [ ] Smooth fade-in on menu appear (1s delay after level load)
-    - [ ] Font selection (period-appropriate serif)
-    - [ ] Drop shadows for text readability
-  - [ ] Test: Menu feels atmospheric but UI remains readable
+  - [x] Add ambient effects to menu camera view:
+    - [x] Particle system: Dust via Niagara System (`NS_Dust`)
+    - [x] Animated material: Candle flicker emissive pulse
+    - [x] Dust decals on wall and floor (`BP_DustDecal`)
+  - [x] Add audio:
+    - [x] Ambient loop: Sound cue with Rain sounds (`Cue_Rain`)
+    - ~~Button click sound effects (`S_ButtonClick`)~~ - Deferred to polish phase
+    - ~~Menu transition whoosh (`S_MenuTransition`)~~ - Deferred to polish phase
+    - ~~Door open sound (`S_DoorOpen`)~~ - Deferred to polish phase
+  - ~~Camera enhancements~~ - Deferred to polish phase
+    - ~~Depth of field focusing on desk area~~
+  - ~~Widget polish~~ - Will be handled by Task 5.11 and 5.12
+    - ~~Smooth fade-in on menu appear (1s delay after level load)~~
+    - ~~Font selection (period-appropriate serif)~~
+    - ~~Drop shadows for text readability~~
+  - [x] Test: Menu feels atmospheric but UI remains readable
+  - **Status**: Atmospheric effects exceed expectations for current dev phase
 
-- [ ] **5.10 Implement Quit button and verify all flows**
+- [x] **5.10 Implement modular screen transition system**
+
+  - [x] Create `UFCScreenTransitionWidget` UMG widget:
+    - [x] Full-screen black overlay with configurable opacity animation
+    - [x] Optional loading spinner/indicator (animated texture or throbber)
+    - [x] Fade in/out functions with configurable duration
+    - [x] Event dispatcher for transition complete callbacks
+  - [x] Implement `UFCTransitionManager` subsystem (UGameInstanceSubsystem):
+    - [x] `BeginFadeOut(float Duration, bool bShowLoadingIndicator)` - Start fade to black
+    - [x] `BeginFadeIn(float Duration)` - Start fade from black to clear
+    - [x] `OnFadeOutComplete` delegate - Triggered when fade out finishes
+    - [x] `OnFadeInComplete` delegate - Triggered when fade in finishes
+    - [x] Manages single persistent `UFCScreenTransitionWidget` instance
+  - [x] Add helper functions to `AFCPlayerController`:
+    - [x] `FadeScreenOut(float Duration = 1.0f, bool bShowLoading = false)`
+    - [x] `FadeScreenIn(float Duration = 1.0f)`
+    - [x] Both delegate to transition manager for actual work
+  - [x] Test modular system:
+    - [x] Can trigger fade from any context (controller, game mode, etc.)
+    - [x] Multiple rapid calls don't break fade state
+    - [x] Callbacks fire reliably
+    - [x] Loading indicator appears/disappears correctly
+
+- [x] **5.11 Implement smart load transitions based on level context**
+
+  - [x] Add level tracking to `UFCTransitionManager`:
+    - [x] Add `FName CurrentLevelName` property to track loaded level
+    - [x] Add `IsSameLevelLoad(FName TargetLevelName)` to check if load is within same level
+    - [x] Add `UpdateCurrentLevel(FName NewLevelName)` to update tracking after loads
+  - [x] Modify `UFCGameInstance::LoadGameAsync()` for smart transitions:
+    - [x] Strip UEDPIE prefix from level names for comparison
+    - [x] Check if `TargetLevelName == CurrentLevelName` via transition manager
+    - [x] **Same Level (Office → Office)**:
+      - [x] Use existing smooth camera blend (no fade)
+      - [x] Existing 2.1s delayed position restoration
+      - [x] No loading screen (instant transition)
+    - [x] **Cross Level (Office → Future Level)**:
+      - [x] Call `TransitionMgr->BeginFadeOut(1.0f, true)` with loading indicator
+      - [x] Store `PendingLevelLoad` in game instance
+      - [x] Use timer (1.2s delay) to trigger `UGameplayStatics::OpenLevel()`
+      - [x] New level's `BeginPlay` detects gameplay level and sets up input
+  - [x] Fix cross-level input restoration:
+    - [x] Modified `AFCPlayerController::BeginPlay()` to detect non-office/non-menu levels
+    - [x] Automatically sets `CurrentGameState = Gameplay`
+    - [x] Applies `FirstPerson` input mapping context
+    - [x] Sets `FInputModeGameOnly`, hides cursor
+  - [x] Test same-level load:
+    - [x] Save in office, load from menu
+    - [x] Camera smoothly blends from MenuCamera to FirstPerson ✅
+    - [x] Position/rotation restored after 2.1s ✅
+    - [x] No jarring cuts or loading screens ✅
+  - [x] Test cross-level load:
+    - [x] Save in office, continue to test level
+    - [x] Fade to black with loading indicator ✅
+    - [x] Level loads in background ✅
+    - [x] Fade in reveals new level ✅
+    - [x] Player has full controls (move/look) ✅
+  - **Status**: Smart transitions fully functional
+
+- [ ] **5.12 Implement persistent fade-in on all level loads (DEFERRED - See 5.14)**
+
+  - [ ] ~~Create `UFCMenuFadeController` component~~
+  - [ ] ~~Delayed fade-in logic~~
+  - **Status**: Deferred to Task 5.14 due to widget lifecycle complexity
+
+- [ ] **5.13 Polish menu transitions and camera work**
+
+  - [ ] ~~Add smooth camera pan when opening save slot selector~~
+  - [ ] ~~Implement camera zoom/focus on selected menu area~~
+  - **Status**: Awaiting Task 5.14 completion for consistent transition polish
+
+- [ ] **5.14 Implement persistent fade-in on all level loads** ⚠️ **BACKLOG ITEM**
+
+  - [ ] **Problem**: Widget lifecycle prevents persistent black screen across level loads
+    - [ ] Widget owned by PlayerController (destroyed during `OpenLevel`)
+    - [ ] Subsystem persists but can't maintain widget reference
+    - [ ] Widget recreation after level load happens too late (level already visible)
+  - [ ] **Requirements**:
+    - [ ] Screen should be black before level becomes visible
+    - [ ] Fade in should start after level fully loaded and player positioned
+    - [ ] Should work for PIE start, cross-level loads, and game start
+  - [ ] **Potential Solutions**:
+    - [ ] Option A: Widget parented to GameInstance or persistent HUD
+    - [ ] Option B: Use engine's post-load callback system
+    - [ ] Option C: Level streaming with preview to start fade before switch
+    - [ ] Option D: Custom loading screen plugin with persistent layer
+  - [ ] **Implementation** (TBD after architecture review):
+    - [ ] Research UE5.7 persistent UI patterns
+    - [ ] Design widget ownership model that survives level transitions
+    - [ ] Implement pre-load fade trigger system
+    - [ ] Test across all transition scenarios (PIE, cross-level, same-level)
+  - **Status**: Deferred pending architectural design - requires widget persistence solution
+
+- [ ] **5.15 Implement delayed menu fade-in on level start**
+
+  - [ ] Create `UFCMenuFadeController` component:
+    - [ ] Attached to `WBP_MainMenu` or controlled by player controller
+    - [ ] Manages menu visibility state during initial load
+    - [ ] Configurable delay duration (default 1.5s)
+  - [ ] Refactor `InitializeMainMenu()`:
+    - [ ] Spawn `WBP_MainMenu` widget but set initial opacity to 0
+    - [ ] Add widget to viewport (invisible)
+    - [ ] Start timer for fade-in delay (1.5-2.0 seconds)
+    - [ ] After delay: Animate menu opacity 0 → 1 over 1 second
+    - [ ] Use UMG animation or manual lerp in Tick
+  - [ ] Implement `WBP_MainMenu` fade animation:
+    - [ ] Add UMG animation track "FadeIn"
+    - [ ] Animates root panel opacity 0 → 1 over 1s
+    - [ ] Triggered by controller after delay timer
+  - [ ] Alternative: Use `UFCTransitionManager`:
+    - [ ] Create specialized `FadeInWidget(UUserWidget* Widget, float Delay, float Duration)`
+    - [ ] More consistent with existing transition system
+    - [ ] Reusable for any widget fade-in needs
+  - [ ] Test menu fade-in:
+    - [ ] Launch game → Office level loads
+    - [ ] MenuCamera is active, scene visible
+    - [ ] 1.5-2s delay, then menu smoothly fades in
+    - [ ] No abrupt UI pop-in
+    - [ ] Player can interact after fade completes
+  - [ ] Ensure no interference with load transitions:
+    - [ ] Loading a save shouldn't trigger menu fade-in
+    - [ ] Only trigger on fresh level load (game start or door return)
+    - [ ] State flag to distinguish fresh load vs. save load
+
+- [ ] **5.13 Implement Quit button and verify all flows**
   - [ ] Implement `OnQuitClicked()`:
     - [ ] Call `UKismetSystemLibrary::QuitGame()`
     - [ ] Ensure clean shutdown (save auto-save if needed)

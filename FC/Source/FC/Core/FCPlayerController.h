@@ -111,6 +111,29 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "SaveGame")
 	void DevQuickLoad();
 
+	/** Timer-safe restore input after camera blend completes */
+	UFUNCTION()
+	void RestoreInputAfterBlend();
+
+	/** Timer-safe deferred call to restore player position after level load */
+	UFUNCTION()
+	void RestorePlayerPositionDeferred();
+
+	/** Fade screen to black with optional loading indicator */
+	UFUNCTION(BlueprintCallable, Category = "Transition")
+	void FadeScreenOut(float Duration = 1.0f, bool bShowLoading = false);
+
+	/** Fade screen from black to clear */
+	UFUNCTION(BlueprintCallable, Category = "Transition")
+	void FadeScreenIn(float Duration = 1.0f);
+
+	// Debug/Testing console commands
+	UFUNCTION(Exec, Category = "Debug")
+	void TestFadeOut();
+
+	UFUNCTION(Exec, Category = "Debug")
+	void TestFadeIn();
+
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "State")
 	EFCPlayerCameraMode CameraMode;

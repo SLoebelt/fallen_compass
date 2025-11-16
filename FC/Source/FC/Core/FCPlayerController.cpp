@@ -17,6 +17,7 @@
 #include "Kismet/KismetSystemLibrary.h"
 #include "../Interaction/FCInteractionComponent.h"
 #include "UFCGameInstance.h"
+#include "FCTransitionManager.h"
 
 DEFINE_LOG_CATEGORY(LogFallenCompassPlayerController);
 
@@ -134,6 +135,28 @@ void AFCPlayerController::BeginPlay()
 	if (GameInstance)
 	{
 		GameInstance->RestorePlayerPosition();
+		
+		// Check current level - if not office/main menu, set up gameplay input
+		FString CurrentLevelName = GetWorld()->GetMapName();
+		if (CurrentLevelName.StartsWith("UEDPIE_0_"))
+		{
+			CurrentLevelName = CurrentLevelName.RightChop(9);
+		}
+		
+		// If we're not in office or main menu level, assume we loaded into gameplay
+		if (!CurrentLevelName.Contains("Office") && !CurrentLevelName.Contains("MainMenu"))
+		{
+			UE_LOG(LogFallenCompassPlayerController, Log, TEXT("BeginPlay: Loaded into gameplay level (%s), setting up gameplay input"), *CurrentLevelName);
+			
+			// Set to gameplay state
+			CurrentGameState = EFCGameState::Gameplay;
+			
+			// Set up gameplay input
+			SetInputMappingMode(EFCInputMappingMode::FirstPerson);
+			FInputModeGameOnly InputMode;
+			SetInputMode(InputMode);
+			bShowMouseCursor = false;
+		}
 	}
 }
 
@@ -492,20 +515,10 @@ void AFCPlayerController::TransitionToGameplay()
 	// Blend camera to first-person
 	SetCameraModeLocal(EFCPlayerCameraMode::FirstPerson, 2.0f);
 
-	// Delay input restoration until after camera blend
+	// Delay input restoration until after camera blend — use a UObject timer delegate so it's safe if controller is destroyed during level load
 	FTimerHandle InputRestoreTimer;
-	GetWorldTimerManager().SetTimer(InputRestoreTimer, [this]()
-	{
-		// Restore first-person input
-		SetInputMappingMode(EFCInputMappingMode::FirstPerson);
-
-		// Set input mode to game only
-		FInputModeGameOnly InputMode;
-		SetInputMode(InputMode);
-		bShowMouseCursor = false;
-
-		UE_LOG(LogFallenCompassPlayerController, Log, TEXT("TransitionToGameplay: Input restored"));
-	}, 2.0f, false); // Wait for camera blend to complete
+	FTimerDelegate InputRestoreDel = FTimerDelegate::CreateUObject(this, &AFCPlayerController::RestoreInputAfterBlend);
+	GetWorldTimerManager().SetTimer(InputRestoreTimer, InputRestoreDel, 2.0f, false); // Wait for camera blend to complete
 
 	LogStateChange(TEXT("Transitioning to Gameplay"));
 }
@@ -702,17 +715,10 @@ void AFCPlayerController::OnSaveGameLoaded(bool bSuccess)
 	// Transition to gameplay (removes menu, switches camera and input)
 	TransitionToGameplay();
 
-	// Restore player position after camera transition completes
+	// Restore player position after camera transition completes — use UObject timer delegate for safety
 	FTimerHandle PositionRestoreTimer;
-	GetWorldTimerManager().SetTimer(PositionRestoreTimer, [this]()
-	{
-		UFCGameInstance* GameInstance = Cast<UFCGameInstance>(GetGameInstance());
-		if (GameInstance)
-		{
-			GameInstance->RestorePlayerPosition();
-			UE_LOG(LogFallenCompassPlayerController, Log, TEXT("OnSaveGameLoaded: Player position restored after transition"));
-		}
-	}, 2.1f, false); // Wait for camera blend to complete (2.0s) + small buffer
+	FTimerDelegate PositionRestoreDel = FTimerDelegate::CreateUObject(this, &AFCPlayerController::RestorePlayerPositionDeferred);
+	GetWorldTimerManager().SetTimer(PositionRestoreTimer, PositionRestoreDel, 2.1f, false); // Wait for camera blend to complete (2.0s) + small buffer
 }
 
 void AFCPlayerController::OnOptionsClicked()
@@ -801,6 +807,29 @@ void AFCPlayerController::DevQuickLoad()
 	GameInstance->LoadGameAsync(TEXT("QuickSave"));
 }
 
+void AFCPlayerController::RestoreInputAfterBlend()
+{
+	// Restore first-person input
+	SetInputMappingMode(EFCInputMappingMode::FirstPerson);
+
+	// Set input mode to game only
+	FInputModeGameOnly InputMode;
+	SetInputMode(InputMode);
+	bShowMouseCursor = false;
+
+	UE_LOG(LogFallenCompassPlayerController, Log, TEXT("RestoreInputAfterBlend: Input restored after camera blend"));
+}
+
+void AFCPlayerController::RestorePlayerPositionDeferred()
+{
+	UFCGameInstance* GameInstance = Cast<UFCGameInstance>(GetGameInstance());
+	if (GameInstance)
+	{
+		GameInstance->RestorePlayerPosition();
+		UE_LOG(LogFallenCompassPlayerController, Log, TEXT("RestorePlayerPositionDeferred: Player position restored after transition"));
+	}
+}
+
 void AFCPlayerController::HandleQuickSavePressed()
 {
 	DevQuickSave();
@@ -809,4 +838,57 @@ void AFCPlayerController::HandleQuickSavePressed()
 void AFCPlayerController::HandleQuickLoadPressed()
 {
 	DevQuickLoad();
+}
+
+void AFCPlayerController::FadeScreenOut(float Duration, bool bShowLoading)
+{
+	UFCGameInstance* GameInstance = Cast<UFCGameInstance>(GetGameInstance());
+	if (!GameInstance)
+	{
+		UE_LOG(LogFallenCompassPlayerController, Error, TEXT("FadeScreenOut: Failed to get GameInstance"));
+		return;
+	}
+
+	UFCTransitionManager* TransitionMgr = GameInstance->GetSubsystem<UFCTransitionManager>();
+	if (!TransitionMgr)
+	{
+		UE_LOG(LogFallenCompassPlayerController, Error, TEXT("FadeScreenOut: Failed to get TransitionManager subsystem"));
+		return;
+	}
+
+	TransitionMgr->BeginFadeOut(Duration, bShowLoading);
+	UE_LOG(LogFallenCompassPlayerController, Log, TEXT("FadeScreenOut: Initiated fade (Duration: %.2fs, Loading: %s)"), 
+		Duration, bShowLoading ? TEXT("Yes") : TEXT("No"));
+}
+
+void AFCPlayerController::FadeScreenIn(float Duration)
+{
+	UFCGameInstance* GameInstance = Cast<UFCGameInstance>(GetGameInstance());
+	if (!GameInstance)
+	{
+		UE_LOG(LogFallenCompassPlayerController, Error, TEXT("FadeScreenIn: Failed to get GameInstance"));
+		return;
+	}
+
+	UFCTransitionManager* TransitionMgr = GameInstance->GetSubsystem<UFCTransitionManager>();
+	if (!TransitionMgr)
+	{
+		UE_LOG(LogFallenCompassPlayerController, Error, TEXT("FadeScreenIn: Failed to get TransitionManager subsystem"));
+		return;
+	}
+
+	TransitionMgr->BeginFadeIn(Duration);
+	UE_LOG(LogFallenCompassPlayerController, Log, TEXT("FadeScreenIn: Initiated fade (Duration: %.2fs)"), Duration);
+}
+
+void AFCPlayerController::TestFadeOut()
+{
+	UE_LOG(LogFallenCompassPlayerController, Log, TEXT("TestFadeOut: Console command executed"));
+	FadeScreenOut(1.5f, true);
+}
+
+void AFCPlayerController::TestFadeIn()
+{
+	UE_LOG(LogFallenCompassPlayerController, Log, TEXT("TestFadeIn: Console command executed"));
+	FadeScreenIn(1.0f);
 }

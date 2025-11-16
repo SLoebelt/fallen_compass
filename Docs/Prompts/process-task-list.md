@@ -7,6 +7,7 @@ Guidelines for managing task lists in markdown files to track progress on comple
 Following files MUST be respected and taken in consideration:
 
 - `/Docs/UE_NamingConventions.md` – Unreal Engine naming standards and folder expectations.
+- `/Docs/UE_CodeConventions.md` – Unreal Engine MUST FOLLOW coding conventions.
 - `/Docs/Fallen_Compass_GDD_v0.2.md` - Game Design Document
 - `/Docs/Fallen_Compass_DRM.md` - Development Roadmap
 

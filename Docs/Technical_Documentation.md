@@ -1727,16 +1727,19 @@ EnhancedInput->BindAction(QuickLoadAction, ETriggerEvent::Started,
 **Location**: `AFCPlayerController::OnContinueClicked()`
 
 **Functionality**:
+
 1. Calls `UFCGameInstance::GetMostRecentSave()` to find latest save
 2. If no saves exist, displays error message and returns
 3. If save exists, calls `LoadGameAsync()` with the most recent slot name
 4. Player is automatically restored to saved position after level loads
 
 **Blueprint Requirements**:
+
 - Button should be disabled/grayed out when no saves are available
 - Can check via `GetMostRecentSave().IsEmpty()` in Blueprint
 
 **User Flow**:
+
 1. Player clicks "Continue" on main menu
 2. System loads most recent save (AutoSave or QuickSave)
 3. Level loads (if different from current)
@@ -1748,6 +1751,7 @@ EnhancedInput->BindAction(QuickLoadAction, ETriggerEvent::Started,
 **Location**: `AFCPlayerController::OnLoadSaveClicked()`
 
 **Functionality**:
+
 1. Validates `SaveSlotSelectorWidgetClass` is configured
 2. Hides the main menu widget
 3. Creates `WBP_SaveSlotSelector` widget if not already created
@@ -1755,11 +1759,13 @@ EnhancedInput->BindAction(QuickLoadAction, ETriggerEvent::Started,
 5. Player can browse all available save slots
 
 **Blueprint Requirements**:
+
 - Configure `SaveSlotSelectorWidgetClass` property to reference `/Game/FC/UI/Menus/SaveMenu/WBP_SaveSlotSelector`
 - Save slot selector widget should call `LoadGameAsync()` when slot is clicked
 - Save slot selector "Back" button should call `CloseSaveSlotSelector()`
 
 **Widget Communication**:
+
 ```cpp
 // In WBP_SaveSlotSelector Blueprint:
 // - OnSlotClicked(SlotName) → Cast to PlayerController → LoadSaveSlot(SlotName)
@@ -1771,6 +1777,7 @@ EnhancedInput->BindAction(QuickLoadAction, ETriggerEvent::Started,
 **Location**: `AFCPlayerController::LoadSaveSlot(const FString& SlotName)`
 
 **Functionality**:
+
 1. Called from save slot selector widget when player clicks a slot
 2. Binds to `OnGameLoaded` delegate for transition callback
 3. Calls `UFCGameInstance::LoadGameAsync()` with selected slot
@@ -1781,6 +1788,7 @@ EnhancedInput->BindAction(QuickLoadAction, ETriggerEvent::Started,
 **Location**: `AFCPlayerController::OnSaveGameLoaded(bool bSuccess)`
 
 **Functionality**:
+
 1. Callback bound to `UFCGameInstance::OnGameLoaded` delegate
 2. Displays success/failure message on screen
 3. Closes any open menus (save slot selector)
@@ -1789,6 +1797,7 @@ EnhancedInput->BindAction(QuickLoadAction, ETriggerEvent::Started,
 6. Player position restored when character is fully spawned and ready
 
 **Load Flow**:
+
 1. User clicks save slot in selector (or clicks Continue button)
 2. Widget calls `LoadSaveSlot(SlotName)` on player controller (or OnContinueClicked binds and calls LoadGameAsync)
 3. Player controller binds to `OnGameLoaded` delegate and triggers async load
@@ -1801,6 +1810,7 @@ EnhancedInput->BindAction(QuickLoadAction, ETriggerEvent::Started,
 10. Player appears at saved location in gameplay state with correct camera orientation
 
 **Timing Critical Details**:
+
 - Position restoration delayed by 2.1s to ensure camera blend completes (2.0s blend + 0.1s buffer)
 - Character must be fully spawned before position can be restored
 - Same-level loads don't trigger immediate position restore (waits for callback flow)
@@ -1811,12 +1821,14 @@ EnhancedInput->BindAction(QuickLoadAction, ETriggerEvent::Started,
 **Location**: `AFCPlayerController::CloseSaveSlotSelector()`
 
 **Functionality**:
+
 1. Hides save slot selector widget
 2. Removes it from parent viewport
 3. Shows main menu widget again
 4. Player returns to main menu state
 
 **Integration Notes**:
+
 - No camera changes during save slot viewing (remains on MenuCamera)
 - All save/load operations use async loading for smooth transitions
 - Proper error handling for missing widget classes or failed loads
@@ -1825,6 +1837,7 @@ EnhancedInput->BindAction(QuickLoadAction, ETriggerEvent::Started,
 - Delegate binding prevents multiple callbacks for repeated loads
 
 **Testing Verification**:
+
 - ✅ Continue button loads most recent save and restores position
 - ✅ Load Save button opens save slot selector
 - ✅ Clicking save slot loads and restores position correctly
@@ -1838,36 +1851,38 @@ EnhancedInput->BindAction(QuickLoadAction, ETriggerEvent::Started,
 **Key Code Sections**:
 
 `AFCPlayerController::LoadSaveSlot()`:
+
 ```cpp
 void AFCPlayerController::LoadSaveSlot(const FString& SlotName)
 {
     UFCGameInstance* GameInstance = Cast<UFCGameInstance>(GetGameInstance());
-    
+
     // Bind to load complete callback
     if (!GameInstance->OnGameLoaded.IsBound())
     {
         GameInstance->OnGameLoaded.AddDynamic(this, &AFCPlayerController::OnSaveGameLoaded);
     }
-    
+
     GameInstance->LoadGameAsync(SlotName);
 }
 ```
 
 `AFCPlayerController::OnSaveGameLoaded()`:
+
 ```cpp
 void AFCPlayerController::OnSaveGameLoaded(bool bSuccess)
 {
     if (!bSuccess) return;
-    
+
     // Close any open menus
     if (SaveSlotSelectorWidget && SaveSlotSelectorWidget->IsInViewport())
     {
         SaveSlotSelectorWidget->RemoveFromParent();
     }
-    
+
     // Transition to gameplay
     TransitionToGameplay();
-    
+
     // Restore position after camera transition completes
     FTimerHandle PositionRestoreTimer;
     GetWorldTimerManager().SetTimer(PositionRestoreTimer, [this]()
@@ -1882,6 +1897,7 @@ void AFCPlayerController::OnSaveGameLoaded(bool bSuccess)
 ```
 
 `UFCGameInstance::LoadGameAsync()` - Same Level Load:
+
 ```cpp
 if (CurrentLevelName != TargetLevelName && !TargetLevelName.IsEmpty())
 {
@@ -1898,6 +1914,7 @@ OnGameLoaded.Broadcast(true);
 ```
 
 **Critical Timing Fix**:
+
 - Previously: Attempted to restore position immediately when same level, but character not spawned in menu state
 - Solution: Delay position restoration by 2.1s in `OnSaveGameLoaded()` callback after `TransitionToGameplay()` completes
 - Result: Character is fully spawned and camera blend complete before position applied

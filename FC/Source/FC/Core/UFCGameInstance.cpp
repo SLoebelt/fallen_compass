@@ -5,6 +5,7 @@
 #include "SaveGame/FCSaveGame.h"
 #include "FCPlayerController.h"
 #include "FCFirstPersonCharacter.h"
+#include "FCTransitionManager.h"
 
 void UFCGameInstance::Init()
 {
@@ -162,15 +163,50 @@ void UFCGameInstance::LoadGameAsync(const FString& SlotName)
         TargetLevelName = TargetLevelName.RightChop(9);
     }
 
-    if (CurrentLevelName != TargetLevelName && !TargetLevelName.IsEmpty())
+    // Get transition manager for smart transitions
+    UFCTransitionManager* TransitionMgr = GetSubsystem<UFCTransitionManager>();
+    FName TargetLevelFName = FName(*TargetLevelName);
+    bool bIsSameLevel = (CurrentLevelName == TargetLevelName);
+
+    if (!bIsSameLevel && !TargetLevelName.IsEmpty())
     {
-        UE_LOG(LogTemp, Log, TEXT("Loading different level: %s"), *TargetLevelName);
-        UGameplayStatics::OpenLevel(GetWorld(), FName(*TargetLevelName));
+        // Cross-level load - use fade transition
+        UE_LOG(LogTemp, Log, TEXT("Loading different level: %s (cross-level fade transition)"), *TargetLevelName);
+        
+        if (TransitionMgr)
+        {
+            // Fade out with loading indicator
+            TransitionMgr->BeginFadeOut(1.0f, true);
+            
+            // Store target level for deferred load
+            PendingLevelLoad = TargetLevelFName;
+            
+            // Use timer to load level after fade completes (1.2s gives time for 1.0s fade)
+            GetWorld()->GetTimerManager().SetTimer(
+                LevelLoadTimerHandle,
+                [this, TargetLevelFName]()
+                {
+                    UGameplayStatics::OpenLevel(GetWorld(), TargetLevelFName);
+                },
+                1.2f,
+                false
+            );
+        }
+        else
+        {
+            // Fallback: immediate load
+            UGameplayStatics::OpenLevel(GetWorld(), TargetLevelFName);
+        }
     }
     else
     {
-        // Same level - position will be restored by OnSaveGameLoaded callback after gameplay transition
-        UE_LOG(LogTemp, Log, TEXT("Same level (%s), position will be restored after gameplay transition"), *CurrentLevelName);
+        // Same level - position will be restored with smooth camera blend
+        UE_LOG(LogTemp, Log, TEXT("Same level (%s), position will be restored with camera blend"), *CurrentLevelName);
+        
+        if (TransitionMgr)
+        {
+            TransitionMgr->UpdateCurrentLevel(FName(*CurrentLevelName));
+        }
     }
 
     UE_LOG(LogTemp, Log, TEXT("Successfully loaded game from slot: %s"), *SlotName);
@@ -264,6 +300,18 @@ void UFCGameInstance::RestorePlayerPosition()
     PC->SetControlRotation(PendingLoadData->PlayerRotation);
 
     UE_LOG(LogTemp, Log, TEXT("RestorePlayerPosition: Restored to %s"), *PendingLoadData->PlayerLocation.ToString());
+
+    // Update transition manager with current level
+    UFCTransitionManager* TransitionMgr = GetSubsystem<UFCTransitionManager>();
+    if (TransitionMgr)
+    {
+        FString CurrentLevelName = GetWorld()->GetMapName();
+        if (CurrentLevelName.StartsWith("UEDPIE_0_"))
+        {
+            CurrentLevelName = CurrentLevelName.RightChop(9);
+        }
+        TransitionMgr->UpdateCurrentLevel(FName(*CurrentLevelName));
+    }
 
     // Clear pending data
     PendingLoadData = nullptr;
