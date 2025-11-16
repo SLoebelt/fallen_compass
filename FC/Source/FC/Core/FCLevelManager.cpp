@@ -1,6 +1,33 @@
 // Copyright (c) 2024 @ Steffen Loebelt. All Rights Reserved.
 
 #include "Core/FCLevelManager.h"
+#include "Engine/World.h"
+
+DEFINE_LOG_CATEGORY(LogFCLevelManager);
+
+void UFCLevelManager::Initialize(FSubsystemCollectionBase& Collection)
+{
+	Super::Initialize(Collection);
+
+	// Get current world
+	UWorld* World = GetWorld();
+	if (!World || !World->IsGameWorld())
+	{
+		UE_LOG(LogFCLevelManager, Warning, TEXT("Initialize called without valid game world"));
+		return;
+	}
+
+	// Get raw level name from world
+	FString RawMapName = World->GetMapName();
+	
+	// Normalize and detect type
+	CurrentLevelName = NormalizeLevelName(FName(*RawMapName));
+	CurrentLevelType = DetermineLevelType(CurrentLevelName);
+
+	UE_LOG(LogFCLevelManager, Log, TEXT("Initialized: Level=%s, Type=%s"), 
+		*CurrentLevelName.ToString(), 
+		*UEnum::GetValueAsString(CurrentLevelType));
+}
 
 void UFCLevelManager::UpdateCurrentLevel(const FName& NewLevelName)
 {

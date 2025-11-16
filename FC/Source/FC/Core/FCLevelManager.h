@@ -6,6 +6,8 @@
 #include "Subsystems/GameInstanceSubsystem.h"
 #include "FCLevelManager.generated.h"
 
+DECLARE_LOG_CATEGORY_EXTERN(LogFCLevelManager, Log, All);
+
 /**
  * EFCLevelType
  * 
@@ -46,6 +48,9 @@ class FC_API UFCLevelManager : public UGameInstanceSubsystem
 	GENERATED_BODY()
 
 public:
+	// Subsystem lifecycle
+	virtual void Initialize(FSubsystemCollectionBase& Collection) override;
+
 	/** Get the current level name (normalized, no PIE prefix) */
 	UFUNCTION(BlueprintCallable, Category = "FC|Level")
 	FName GetCurrentLevelName() const { return CurrentLevelName; }
