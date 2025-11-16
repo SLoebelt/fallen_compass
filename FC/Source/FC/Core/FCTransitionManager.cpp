@@ -73,23 +73,9 @@ void UFCTransitionManager::CreateTransitionWidget()
 		return;
 	}
 
-	// Get first local player controller for widget creation context
-	UWorld* World = GetWorld();
-	if (!World)
-	{
-		UE_LOG(LogFCTransitions, Error, TEXT("FCTransitionManager: No valid World context"));
-		return;
-	}
-
-	APlayerController* PlayerController = World->GetFirstPlayerController();
-	if (!PlayerController)
-	{
-		UE_LOG(LogFCTransitions, Error, TEXT("FCTransitionManager: No valid PlayerController"));
-		return;
-	}
-
-	// Create widget instance
-	TransitionWidget = CreateWidget<UFCScreenTransitionWidget>(PlayerController, WidgetClass);
+	// Create widget instance with GameInstance as outer for persistence across level loads
+	// Using GameInstance instead of PlayerController ensures widget survives controller destruction
+	TransitionWidget = CreateWidget<UFCScreenTransitionWidget>(GetGameInstance(), WidgetClass);
 	if (!TransitionWidget)
 	{
 		UE_LOG(LogFCTransitions, Error, TEXT("FCTransitionManager: Failed to create TransitionWidget"));
