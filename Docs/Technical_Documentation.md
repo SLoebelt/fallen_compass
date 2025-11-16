@@ -25,6 +25,9 @@
 flowchart TB
     subgraph Engine["Unreal Engine 5.7"]
         GI[UFCGameInstance]
+        LM[UFCLevelManager<br/>Subsystem]
+        UM[UFCUIManager<br/>Subsystem]
+        TM[UFCTransitionManager<br/>Subsystem]
         GM[AFCGameMode]
         PC[AFCPlayerController]
         Pawn[AFCFirstPersonCharacter]
@@ -36,14 +39,27 @@ flowchart TB
         Levels[Maps]
     end
 
+    GI -->|owns subsystem| LM
+    GI -->|owns subsystem| UM
+    GI -->|owns subsystem| TM
+    LM -->|normalizes level names| GI
+    LM -->|detects level types| PC
+    UM -->|manages widgets| UI
+    UM -->|handles button callbacks| PC
+    TM -->|persistent transitions| UI
+    TM -->|fade in/out| Levels
     GI -->|spawns per map| GM
     GM -->|creates| PC
     PC -->|possesses| Pawn
     PC -->|loads| Input
-    PC -->|shows/hides| UI
+    PC -->|calls| UM
+    PC -->|calls| TM
     Pawn -->|moves in| Levels
 
     style GI fill:#4a90e2
+    style LM fill:#9b59b6
+    style UM fill:#e91e63
+    style TM fill:#3498db
     style GM fill:#50c878
     style PC fill:#f39c12
     style Pawn fill:#e74c3c
@@ -62,6 +78,10 @@ flowchart TB
 FC/
 ├── Source/FC/Core
 │   ├── UFCGameInstance.h/cpp
+│   ├── UFCLevelManager.h/cpp (Game Instance Subsystem)
+│   ├── UFCUIManager.h/cpp (Game Instance Subsystem)
+│   ├── UFCTransitionManager.h/cpp (Game Instance Subsystem)
+│   ├── UFCScreenTransitionWidget.h/cpp (UUserWidget)
 │   ├── FCGameMode.h/cpp
 │   ├── FCPlayerController.h/cpp
 │   ├── FCFirstPersonCharacter.h/cpp
@@ -92,6 +112,8 @@ FC/
 Established the foundational runtime classes that every downstream system depends on:
 
 - `UFCGameInstance` (2.1) – global lifecycle and session state owner
+- `UFCLevelManager` (2.1.5) – level name normalization and type detection subsystem
+- `UFCUIManager` (2.1.6) – centralized UI widget lifecycle management and button callback handling
 - `AFCGameMode` (2.2) – map-specific authority, pawn/controller registration, logging
 - `AFCPlayerController` (2.3) – player input handling, camera state, pause/interact scaffolding
 
@@ -101,12 +123,15 @@ Established the foundational runtime classes that every downstream system depend
 sequenceDiagram
     participant Engine
     participant GameInstance as UFCGameInstance
+    participant LevelManager as UFCLevelManager
     participant GameMode as AFCGameMode
     participant Controller as AFCPlayerController
     participant Pawn as DefaultPawn/Character
 
     Engine->>GameInstance: Init()
     GameInstance->>GameInstance: Log startup, init placeholders
+    GameInstance->>LevelManager: Initialize() (Subsystem)
+    LevelManager->>LevelManager: Normalize level name, detect type
     Engine->>GameMode: Constructor
     GameMode->>GameMode: Set DefaultPawnClass, PlayerControllerClass
     Engine->>GameMode: BeginPlay()
@@ -114,7 +139,7 @@ sequenceDiagram
     Engine->>Controller: Constructor
     Controller->>Controller: Load Enhanced Input assets
     Engine->>Controller: BeginPlay()
-    Controller->>Controller: Register mapping context
+    Controller->>Controller: Check GameInstance for pending load
     Controller->>Controller: LogStateChange("ready")
     Engine->>Controller: SetupInputComponent()
     Controller->>Controller: Bind IA_Interact, IA_Pause
@@ -162,6 +187,745 @@ FOnExpeditionCompleted OnExpeditionCompleted;
 #### Design Rationale
 
 Keeping systemic state in one place avoids circular dependencies once Tasks 5–6 introduce Main Menu ↔ Office transitions. Future save/load systems will hook directly into the GameInstance delegates.
+
+---
+
+### UFCLevelManager (2.1.5)
+
+- **Files**: `Source/FC/Core/FCLevelManager.h/.cpp`
+- **Inheritance**: `UGameInstanceSubsystem`
+- **Registration**: Automatic (subsystem registered via UE module system)
+- **Purpose**: Centralized level name normalization and type detection to eliminate duplicate string matching and PIE prefix handling across the codebase.
+
+#### Key Members
+
+```cpp
+/** Enum defining all level types in the game */
+UENUM(BlueprintType)
+enum class EFCLevelType : uint8
+{
+    Unknown = 0,
+    MainMenu,
+    Office,      // Serves as both menu and gameplay location
+    Overworld,
+    Camp,
+    Combat,
+    POI,
+    Village
+};
+
+/** Current normalized level name (PIE prefixes stripped) */
+UPROPERTY(VisibleAnywhere, Category = "Level")
+FName CurrentLevelName;
+
+/** Current level type based on name pattern matching */
+UPROPERTY(VisibleAnywhere, Category = "Level")
+EFCLevelType CurrentLevelType;
+```
+
+#### Public API
+
+```cpp
+/** Get the current level name (normalized, PIE prefix stripped) */
+UFUNCTION(BlueprintPure, Category = "Level")
+FName GetCurrentLevelName() const { return CurrentLevelName; }
+
+/** Get the current level type */
+UFUNCTION(BlueprintPure, Category = "Level")
+EFCLevelType GetCurrentLevelType() const { return CurrentLevelType; }
+
+/** Check if current level is a menu level (MainMenu) */
+UFUNCTION(BlueprintPure, Category = "Level")
+bool IsMenuLevel() const;
+
+/** Check if current level is a gameplay level (Office, Overworld, etc.) */
+UFUNCTION(BlueprintPure, Category = "Level")
+bool IsGameplayLevel() const;
+
+/** Update current level tracking (called on level transitions) */
+void UpdateCurrentLevel(const FName& NewLevelName);
+
+/** Normalize a level name (strip PIE prefix) */
+FName NormalizeLevelName(const FName& LevelName) const;
+```
+
+#### Level Type Detection
+
+Level types are determined using pattern matching on the normalized level name:
+
+```cpp
+EFCLevelType UFCLevelManager::DetermineLevelType(const FName& LevelName) const
+{
+    const FString LevelStr = LevelName.ToString();
+
+    // Exact match for main menu
+    if (LevelStr.Equals(TEXT("L_MainMenu"), ESearchCase::IgnoreCase))
+    {
+        return EFCLevelType::MainMenu;
+    }
+
+    // Substring matching for other level types
+    if (LevelStr.Contains(TEXT("Office"))) return EFCLevelType::Office;
+    if (LevelStr.Contains(TEXT("Overworld"))) return EFCLevelType::Overworld;
+    if (LevelStr.Contains(TEXT("Camp"))) return EFCLevelType::Camp;
+    if (LevelStr.Contains(TEXT("Combat"))) return EFCLevelType::Combat;
+    if (LevelStr.Contains(TEXT("POI"))) return EFCLevelType::POI;
+    if (LevelStr.Contains(TEXT("Village"))) return EFCLevelType::Village;
+
+    return EFCLevelType::Unknown;
+}
+```
+
+#### PIE Prefix Normalization
+
+The subsystem automatically strips Play-In-Editor prefixes (e.g., `UEDPIE_0_`, `UEDPIE_1_`, etc.) from level names:
+
+```cpp
+FName UFCLevelManager::NormalizeLevelName(const FName& LevelName) const
+{
+    FString LevelStr = LevelName.ToString();
+
+    // Strip PIE prefix pattern: UEDPIE_N_ where N is any number
+    if (LevelStr.StartsWith(TEXT("UEDPIE_"), ESearchCase::IgnoreCase))
+    {
+        int32 UnderscorePos = -1;
+        if (LevelStr.FindChar('_', UnderscorePos))
+        {
+            int32 SecondUnderscorePos = -1;
+            if (LevelStr.FindChar('_', SecondUnderscorePos) && SecondUnderscorePos > UnderscorePos)
+            {
+                LevelStr = LevelStr.RightChop(SecondUnderscorePos + 1);
+            }
+        }
+    }
+
+    return FName(*LevelStr.TrimStartAndEnd());
+}
+```
+
+#### Lifecycle
+
+```cpp
+void UFCLevelManager::Initialize(FSubsystemCollectionBase& Collection)
+{
+    Super::Initialize(Collection);
+
+    UWorld* World = GetWorld();
+    if (!World)
+    {
+        UE_LOG(LogFCLevelManager, Error, TEXT("Initialize: World is null!"));
+        return;
+    }
+
+    const FName RawLevelName = FName(*World->GetMapName());
+    CurrentLevelName = NormalizeLevelName(RawLevelName);
+    CurrentLevelType = DetermineLevelType(CurrentLevelName);
+
+    UE_LOG(LogFCLevelManager, Log, TEXT("Initialized: Level=%s, Type=%s"),
+        *CurrentLevelName.ToString(),
+        *UEnum::GetValueAsString(CurrentLevelType));
+}
+```
+
+#### Integration Points
+
+**UFCGameInstance** uses UFCLevelManager for:
+
+- Save/load operations: Normalizing level names when comparing saved vs current level
+- State tracking: Determining if we're restoring from save (cross-level vs same-level)
+
+**AFCPlayerController** uses UFCLevelManager for:
+
+- BeginPlay simplified: No longer performs string matching for level detection
+- Input mode setup: Delegated to state transition methods (InitializeMainMenu/TransitionToGameplay)
+
+#### Logging
+
+All level operations are logged via `LogFCLevelManager`:
+
+```cpp
+DEFINE_LOG_CATEGORY(LogFCLevelManager);
+
+// Example log output:
+// LogFCLevelManager: Initialized: Level=L_Office, Type=EFCLevelType::Office
+// LogFCLevelManager: UpdateCurrentLevel: Level=L_Overworld, Type=EFCLevelType::Overworld
+```
+
+#### Design Rationale
+
+**Eliminates Code Duplication**: Before UFCLevelManager, PIE prefix stripping was duplicated in:
+
+- UFCGameInstance::LoadGameAsync() (2 instances)
+- AFCPlayerController::BeginPlay() (1 instance)
+
+Now all level name handling goes through a single subsystem with proper logging and validation.
+
+**Architectural Insight - L_Office Dual Purpose**: L_Office serves as both the menu location (where player starts and interacts with expedition board) AND a gameplay location (first-person exploration). This unique design means level type detection alone cannot determine input mode—explicit state transitions handle that instead.
+
+---
+
+### UFCUIManager (2.1.6)
+
+- **Files**: `Source/FC/Core/FCUIManager.h/.cpp`
+- **Inheritance**: `UGameInstanceSubsystem`
+- **Registration**: Automatic (subsystem registered via UE module system)
+- **Purpose**: Centralized UI widget lifecycle management to eliminate Blueprint coupling from PlayerController and ensure consistent widget creation/destruction patterns.
+
+#### Key Members
+
+```cpp
+/** Widget class references (configured by UFCGameInstance at Init) */
+UPROPERTY(BlueprintReadOnly, Category = "UI")
+TSubclassOf<UUserWidget> MainMenuWidgetClass;
+
+UPROPERTY(BlueprintReadOnly, Category = "UI")
+TSubclassOf<UUserWidget> SaveSlotSelectorWidgetClass;
+
+/** Cached widget instances (created on first show, reused thereafter) */
+UPROPERTY()
+TObjectPtr<UUserWidget> MainMenuWidget;
+
+UPROPERTY()
+TObjectPtr<UUserWidget> SaveSlotSelectorWidget;
+```
+
+#### Public API - Widget Lifecycle
+
+```cpp
+/** Show the main menu (lazy-creates widget if needed, adds to viewport) */
+UFUNCTION(BlueprintCallable, Category = "UI")
+void ShowMainMenu();
+
+/** Hide the main menu (removes from viewport, keeps cached for reuse) */
+UFUNCTION(BlueprintCallable, Category = "UI")
+void HideMainMenu();
+
+/** Show the save slot selector (lazy-creates widget, adds to viewport) */
+UFUNCTION(BlueprintCallable, Category = "UI")
+void ShowSaveSlotSelector();
+
+/** Hide the save slot selector (removes from viewport) */
+UFUNCTION(BlueprintCallable, Category = "UI")
+void HideSaveSlotSelector();
+```
+
+#### Public API - Button Callbacks
+
+These methods are called by Blueprint widgets (WBP_MainMenu, WBP_SaveSlotSelector) via OnClicked events:
+
+```cpp
+/** Handle "New Legacy" button - transitions to gameplay */
+UFUNCTION(BlueprintCallable, Category = "UI")
+void HandleNewLegacyClicked();
+
+/** Handle "Continue" button - loads most recent save */
+UFUNCTION(BlueprintCallable, Category = "UI")
+void HandleContinueClicked();
+
+/** Handle "Load Save" button - opens save slot selector */
+UFUNCTION(BlueprintCallable, Category = "UI")
+void HandleLoadSaveClicked();
+
+/** Handle "Options" button - placeholder for future options menu */
+UFUNCTION(BlueprintCallable, Category = "UI")
+void HandleOptionsClicked();
+
+/** Handle "Quit" button - quits the game */
+UFUNCTION(BlueprintCallable, Category = "UI")
+void HandleQuitClicked();
+
+/** Handle "Back" button in save selector - returns to main menu */
+UFUNCTION(BlueprintCallable, Category = "UI")
+void HandleBackFromSaveSelector();
+
+/** Handle save slot selection - loads the selected save */
+UFUNCTION(BlueprintCallable, Category = "UI")
+void HandleSaveSlotSelected(const FString& SlotName);
+```
+
+#### Widget Lifecycle Implementation
+
+All widget lifecycle methods follow a consistent pattern:
+
+1. **ShowMainMenu()**:
+
+   - Checks if `MainMenuWidgetClass` is configured
+   - Lazy-creates `MainMenuWidget` on first call (cached for reuse)
+   - Adds widget to viewport with `AddToViewport()`
+   - Logs all operations for debugging
+   - Error handling for null widget class or creation failure
+
+2. **HideMainMenu()**:
+
+   - Checks if `MainMenuWidget` exists and is in viewport
+   - Removes from viewport with `RemoveFromParent()`
+   - Keeps widget cached (does NOT destroy) for performance
+   - Logs hide operation
+
+3. **ShowSaveSlotSelector()** and **HideSaveSlotSelector()** follow the same pattern
+
+```cpp
+void UFCUIManager::ShowMainMenu()
+{
+    if (!MainMenuWidgetClass)
+    {
+        UE_LOG(LogFCUIManager, Error, TEXT("ShowMainMenu: MainMenuWidgetClass is not set"));
+        return;
+    }
+
+    if (!MainMenuWidget)
+    {
+        MainMenuWidget = CreateWidget<UUserWidget>(GetWorld(), MainMenuWidgetClass);
+        if (!MainMenuWidget)
+        {
+            UE_LOG(LogFCUIManager, Error, TEXT("ShowMainMenu: Failed to create MainMenuWidget"));
+            return;
+        }
+        UE_LOG(LogFCUIManager, Log, TEXT("ShowMainMenu: Created MainMenuWidget"));
+    }
+
+    if (!MainMenuWidget->IsInViewport())
+    {
+        MainMenuWidget->AddToViewport();
+        UE_LOG(LogFCUIManager, Log, TEXT("ShowMainMenu: Added MainMenuWidget to viewport"));
+    }
+}
+```
+
+#### Button Callback Implementation
+
+Button callbacks bridge UI events to game logic:
+
+```cpp
+void UFCUIManager::HandleNewLegacyClicked()
+{
+    UE_LOG(LogFCUIManager, Log, TEXT("HandleNewLegacyClicked: Starting new legacy"));
+
+    // Get player controller and transition to gameplay
+    if (APlayerController* PC = GetWorld()->GetFirstPlayerController())
+    {
+        if (AFCPlayerController* FCPC = Cast<AFCPlayerController>(PC))
+        {
+            FCPC->TransitionToGameplay();
+            HideMainMenu();
+        }
+    }
+}
+
+void UFCUIManager::HandleContinueClicked()
+{
+    UE_LOG(LogFCUIManager, Log, TEXT("HandleContinueClicked: Loading most recent save"));
+
+    // Get game instance and load most recent save
+    UFCGameInstance* GI = GetGameInstance<UFCGameInstance>();
+    if (!GI)
+    {
+        UE_LOG(LogFCUIManager, Error, TEXT("HandleContinueClicked: Failed to get GameInstance"));
+        return;
+    }
+
+    FString MostRecentSave = GI->GetMostRecentSave();
+    if (MostRecentSave.IsEmpty())
+    {
+        UE_LOG(LogFCUIManager, Warning, TEXT("HandleContinueClicked: No saves available"));
+        return;
+    }
+
+    HideMainMenu();
+    GI->LoadGameAsync(MostRecentSave);
+}
+
+void UFCUIManager::HandleLoadSaveClicked()
+{
+    UE_LOG(LogFCUIManager, Log, TEXT("HandleLoadSaveClicked: Opening save slot selector"));
+    HideMainMenu();
+    ShowSaveSlotSelector();
+}
+
+void UFCUIManager::HandleSaveSlotSelected(const FString& SlotName)
+{
+    UE_LOG(LogFCUIManager, Log, TEXT("HandleSaveSlotSelected: Loading slot '%s'"), *SlotName);
+
+    UFCGameInstance* GI = GetGameInstance<UFCGameInstance>();
+    if (GI)
+    {
+        HideSaveSlotSelector();
+        GI->LoadGameAsync(SlotName);
+    }
+}
+```
+
+#### Configuration Pattern
+
+UFCUIManager is configured by UFCGameInstance during initialization:
+
+```cpp
+// In UFCGameInstance::Init()
+UFCUIManager* UIManager = GetSubsystem<UFCUIManager>();
+if (UIManager)
+{
+    UIManager->MainMenuWidgetClass = MainMenuWidgetClass;
+    UIManager->SaveSlotSelectorWidgetClass = SaveSlotSelectorWidgetClass;
+    UE_LOG(LogTemp, Log, TEXT("UFCGameInstance: UIManager configured"));
+}
+```
+
+Widget class references are exposed in **BP_FC_GameInstance**:
+
+- `MainMenuWidgetClass` → Set to `/Game/FC/UI/Menus/WBP_MainMenu`
+- `SaveSlotSelectorWidgetClass` → Set to `/Game/FC/UI/Menus/SaveMenu/WBP_SaveSlotSelector`
+
+#### Blueprint Integration
+
+**WBP_MainMenu** button OnClicked events are wired to UIManager:
+
+1. Get Game Instance
+2. Get Subsystem (UI Manager) → UFCUIManager
+3. Call appropriate Handle method (HandleNewLegacyClicked, HandleContinueClicked, etc.)
+
+**WBP_SaveSlotSelector** follows the same pattern:
+
+- Back button → HandleBackFromSaveSelector()
+- Save slot item clicks → HandleSaveSlotSelected(SlotName)
+
+#### PlayerController Integration
+
+AFCPlayerController no longer manages widgets directly. It calls UIManager for all UI operations:
+
+```cpp
+// In AFCPlayerController::InitializeMainMenu()
+UFCGameInstance* GI = Cast<UFCGameInstance>(GetGameInstance());
+if (GI)
+{
+    UFCUIManager* UIManager = GI->GetSubsystem<UFCUIManager>();
+    if (UIManager)
+    {
+        UIManager->ShowMainMenu();
+    }
+}
+
+// In AFCPlayerController::TransitionToGameplay()
+UFCUIManager* UIManager = GI->GetSubsystem<UFCUIManager>();
+if (UIManager)
+{
+    UIManager->HideMainMenu();
+}
+```
+
+#### Logging
+
+All UI operations are logged via `LogFCUIManager`:
+
+```cpp
+DEFINE_LOG_CATEGORY(LogFCUIManager);
+
+// Example log output:
+// LogFCUIManager: ShowMainMenu: Created MainMenuWidget
+// LogFCUIManager: ShowMainMenu: Added MainMenuWidget to viewport
+// LogFCUIManager: HandleNewLegacyClicked: Starting new legacy
+// LogFCUIManager: HideMainMenu: Removed MainMenuWidget from viewport
+```
+
+#### Design Rationale
+
+**Eliminates Blueprint Coupling**: Before UFCUIManager, AFCPlayerController had:
+
+- Widget class properties (MainMenuWidgetClass, SaveSlotSelectorWidgetClass)
+- Widget instance properties (MainMenuWidget, SaveSlotSelectorWidget)
+- Widget lifecycle code (creation, show/hide, destruction)
+- Button callback methods (OnNewLegacyClicked, OnContinueClicked, etc.)
+
+This created tight coupling between C++ and Blueprint, making it difficult to change UI without modifying PlayerController.
+
+**Centralized Widget Management**: All widget creation follows the same pattern:
+
+1. Lazy creation (widgets created on first show, not at startup)
+2. Caching (widgets reused across multiple show/hide cycles)
+3. Proper cleanup (widgets properly removed from viewport, not destroyed unless necessary)
+4. Comprehensive logging (every widget operation logged for debugging)
+
+**Blueprint Becomes Pure UI**: With UIManager handling all logic, Blueprints only need to:
+
+1. Define visual layout
+2. Wire button OnClicked events to UIManager methods
+3. No C++ coupling beyond calling subsystem methods
+
+**Architectural Benefit**: PlayerController can now focus on player state and input, while UIManager handles all UI concerns. This separation makes both classes simpler and more maintainable.
+
+---
+
+### UFCTransitionManager (2.1.7)
+
+- **Files**: `Source/FC/Core/FCTransitionManager.h/.cpp`
+- **Inheritance**: `UGameInstanceSubsystem`
+- **Registration**: Automatic (subsystem registered via UE module system)
+- **Purpose**: Manages screen transitions (fade in/out, loading spinners) with a persistent widget that survives level changes.
+
+#### Key Members
+
+```cpp
+/** Widget class for screen transitions (configured by UFCGameInstance) */
+UPROPERTY(BlueprintReadOnly, Category = "Transitions")
+TSubclassOf<UFCScreenTransitionWidget> TransitionWidgetClass;
+
+/** Persistent transition widget instance (survives level loads) */
+UPROPERTY()
+TObjectPtr<UFCScreenTransitionWidget> TransitionWidget;
+
+/** Current level name (normalized, PIE prefix stripped) */
+FName CurrentLevelName;
+
+/** Whether a fade is currently in progress */
+bool bCurrentlyFading;
+```
+
+#### Public API - Transition Control
+
+```cpp
+/** Begin a fade to black transition */
+UFUNCTION(BlueprintCallable, Category = "Transitions")
+void BeginFadeOut(float Duration = 1.0f);
+
+/** Begin a fade from black transition */
+UFUNCTION(BlueprintCallable, Category = "Transitions")
+void BeginFadeIn(float Duration = 1.5f);
+
+/** Check if currently fading */
+UFUNCTION(BlueprintCallable, Category = "Transitions")
+bool IsFading() const { return bCurrentlyFading; }
+
+/** Check if screen is currently black (opacity >= 95%) */
+UFUNCTION(BlueprintCallable, Category = "Transitions")
+bool IsBlack() const;
+
+/** Update current level name (called after level transitions) */
+void UpdateCurrentLevel(const FName& NewLevelName);
+
+/** Check if target level is the same as current level */
+bool IsSameLevelLoad(const FName& TargetLevelName) const;
+```
+
+#### Persistent Widget Architecture
+
+**Critical Design Decision - Widget Lifetime Across Level Changes**:
+
+The transition widget must persist across level changes to provide seamless fade-in/out effects. This requires special handling because `UGameplayStatics::OpenLevel()` destroys the current PlayerController and all widgets parented to it.
+
+**Solution - GameInstance as Widget Outer + Viewport Content API**:
+
+```cpp
+void UFCTransitionManager::Initialize(FSubsystemCollectionBase& Collection)
+{
+    Super::Initialize(Collection);
+
+    // Create widget with GameInstance as outer (NOT PlayerController)
+    // This ensures widget survives level transitions
+    TransitionWidget = CreateWidget<UFCScreenTransitionWidget>(
+        GetGameInstance(),
+        TransitionWidgetClass
+    );
+
+    if (!TransitionWidget)
+    {
+        UE_LOG(LogFCTransitions, Error, TEXT("Failed to create TransitionWidget"));
+        return;
+    }
+
+    // Use AddViewportWidgetContent instead of AddToViewport
+    // This adds widget to GameViewportClient directly, not to player's viewport
+    UGameViewportClient* ViewportClient = GetGameInstance()->GetGameViewportClient();
+    if (ViewportClient)
+    {
+        ViewportClient->AddViewportWidgetContent(
+            TransitionWidget->TakeWidget(),
+            10000  // High Z-order ensures widget is always on top
+        );
+
+        UE_LOG(LogFCTransitions, Log, TEXT("TransitionWidget added to viewport"));
+    }
+}
+```
+
+**Why This Works**:
+
+1. **GameInstance as Outer**: `GetGameInstance()` outlives level transitions, so widget isn't garbage collected
+2. **AddViewportWidgetContent**: Adds widget to `UGameViewportClient` instead of `ULocalPlayer` viewport, ensuring it's not tied to PlayerController lifecycle
+3. **High Z-Order**: 10000 ensures transition widget always renders on top of all other UI
+
+**Benefits**:
+
+- ✅ Widget persists across `OpenLevel` calls
+- ✅ Can fade out before level change, fade in after
+- ✅ Foundation for Task 5.14 (persistent fade-in on all level loads)
+- ✅ Enables future persistent HUD elements (Week 7+ requirements)
+
+#### Initialize to Black on Startup
+
+**Problem**: Screen should start fully black on game startup, then fade in.
+
+**Solution - Nested Timer with ViewportClient NULL Check**:
+
+```cpp
+void UFCTransitionManager::Initialize(FSubsystemCollectionBase& Collection)
+{
+    // ... widget creation code ...
+
+    // Wait for ViewportClient to be ready
+    FTimerHandle InitTimer;
+    GetWorld()->GetTimerManager().SetTimer(InitTimer, [this]()
+    {
+        UGameViewportClient* ViewportClient = GetGameInstance()->GetGameViewportClient();
+        if (!ViewportClient)
+        {
+            UE_LOG(LogFCTransitions, Warning, TEXT("ViewportClient still NULL after 100ms"));
+            return;
+        }
+
+        ViewportClient->AddViewportWidgetContent(
+            TransitionWidget->TakeWidget(),
+            10000
+        );
+
+        // Initialize to fully black
+        TransitionWidget->InitializeToBlack();
+
+        // Start fade-in after short delay
+        FTimerHandle FadeInTimer;
+        GetWorld()->GetTimerManager().SetTimer(FadeInTimer, [this]()
+        {
+            BeginFadeIn(1.5f);
+        }, 0.2f, false);
+
+    }, 0.1f, false);  // 100ms delay for ViewportClient initialization
+}
+```
+
+**Timing Breakdown**:
+
+- **T+0ms**: Subsystem initializes, widget created
+- **T+100ms**: Timer callback checks ViewportClient, adds widget to viewport
+- **T+100ms**: Widget initialized to black (opacity = 1.0)
+- **T+300ms**: Fade-in begins (1.5s duration)
+- **T+1800ms**: Screen fully visible
+
+**Root Cause of NULL ViewportClient**: During engine startup, `UGameViewportClient` may not be fully initialized when subsystems are created. The 100ms delay ensures it's ready.
+
+#### Automatic Fade-In on Level Loads
+
+**Implementation - Quick Load Fix**:
+
+After implementing persistent widgets, discovered that quick loads (F9) from other levels left screen black with loading spinner. This occurred because:
+
+1. Fade-out completes (opacity = 1.0, `bCurrentlyFading = false`)
+2. Level loads (widget persists, stays black)
+3. `IsFading()` returns false (fade completed)
+4. No fade-in triggered (condition failed)
+
+**Solution - IsBlack() Method**:
+
+```cpp
+// UFCScreenTransitionWidget.h
+bool IsBlack() const { return CurrentOpacity >= 0.95f; }
+
+// UFCTransitionManager.cpp
+bool UFCTransitionManager::IsBlack() const
+{
+    return TransitionWidget && TransitionWidget->IsBlack();
+}
+```
+
+**Integration with Save Load System**:
+
+```cpp
+// UFCGameInstance::OnPostLoadMapWithWorld()
+void UFCGameInstance::OnPostLoadMapWithWorld(UWorld* LoadedWorld)
+{
+    Super::OnPostLoadMapWithWorld(LoadedWorld);
+
+    if (PendingLoadData)
+    {
+        UFCTransitionManager* TransitionMgr = GetSubsystem<UFCTransitionManager>();
+        if (TransitionMgr && TransitionMgr->IsBlack())
+        {
+            // Longer delay when loading saves to allow camera blend
+            float Delay = 0.5f;
+
+            FTimerHandle FadeInTimer;
+            GetWorld()->GetTimerManager().SetTimer(FadeInTimer, [TransitionMgr]()
+            {
+                TransitionMgr->BeginFadeIn(1.5f);
+            }, Delay, false);
+        }
+
+        RestorePlayerPosition();
+        PendingLoadData = nullptr;
+    }
+}
+```
+
+**Delay Rationale**:
+
+- **Standard fade-in**: 0.2s delay (game start)
+- **Save load fade-in**: 0.5s delay (allows time for player position restore and camera blend to start)
+- Prevents camera flicker during save loads (documented as low-priority polish issue)
+
+#### Level Tracking Integration
+
+TransitionManager works with UFCLevelManager for level change detection:
+
+```cpp
+bool UFCTransitionManager::IsSameLevelLoad(const FName& TargetLevelName) const
+{
+    UFCLevelManager* LevelMgr = GetGameInstance()->GetSubsystem<UFCLevelManager>();
+    if (LevelMgr)
+    {
+        return LevelMgr->GetCurrentLevelName() == TargetLevelName;
+    }
+    return CurrentLevelName == TargetLevelName;
+}
+```
+
+#### Logging
+
+All transition operations are logged via `LogFCTransitions`:
+
+```cpp
+DEFINE_LOG_CATEGORY(LogFCTransitions);
+
+// Example log output:
+// LogFCTransitions: TransitionWidget added to viewport
+// LogFCTransitions: Widget initialized to black (opacity=1.0)
+// LogFCTransitions: BeginFadeIn: Starting fade from black (1.5s)
+// LogFCTransitions: BeginFadeOut: Starting fade to black (1.0s)
+// LogFCTransitions: IsSameLevelLoad: Current=L_Office, Target=L_Office → true
+```
+
+#### Design Rationale
+
+**Persistent Transitions Unblock Future Features**:
+
+- Task 5.14: Persistent fade-in on all level loads ✅
+- Week 7+: Persistent HUD showing time/resources across level changes
+- Week 8: Expedition report overlay spanning multiple level transitions
+- Week 21: Reputation/Finance persistent UI elements
+
+**GameInstance Ownership Pattern**: Aligns with UE best practices for persistent UI:
+
+- Widgets that survive level changes should be owned by GameInstance
+- Widgets tied to specific gameplay should be owned by PlayerController
+- Avoids complex widget recreation logic on every level load
+
+**Separation of Concerns**:
+
+- `UFCTransitionManager`: Handles when/how to transition (fade timing, level detection)
+- `UFCScreenTransitionWidget`: Handles what to display (opacity, spinner, animations)
+- Clean API boundary between subsystem and widget
+
+**Testing Insights**:
+
+- `IsInViewport()` unreliable with `AddViewportWidgetContent()` (use opacity checks instead)
+- ViewportClient can be NULL during early initialization (requires timer delay)
+- `IsFading()` alone insufficient for level load detection (need `IsBlack()` for opacity check)
 
 ---
 
@@ -327,6 +1091,28 @@ void AFCPlayerController::HandlePausePressed()
 
 - `bShowMouseCursor` forced `false` (FPS focus); trivially swappable once UI needs cursor.
 - All state transitions logged via `LogStateChange()` for debugging.
+
+#### BeginPlay Lifecycle Simplification
+
+**Pre-Refactoring**: BeginPlay() contained complex logic to detect level type and set up input modes:
+
+- Manual PIE prefix stripping (StartsWith, RightChop)
+- String matching (Contains("Office"), Contains("MainMenu"))
+- Conditional gameplay input setup based on level name
+- Attempted to determine input mode from level type
+
+**Post-Refactoring (Priority 1A.5)**:
+
+- BeginPlay() simplified to only call `RestorePlayerPosition()` (from GameInstance if pending load)
+- **No level type detection** - removed all string matching
+- **No input mode setup** - delegated to state transition methods
+- Input mode now set by:
+  - `InitializeMainMenu()` → Sets `FInputModeUIOnly` with mouse cursor
+  - `TransitionToGameplay()` → Sets `FInputModeGameOnly` without mouse cursor
+
+**Rationale**: PlayerController is destroyed and recreated on level transitions, making it unsuitable for tracking "save load vs fresh start" state. GameInstance (persistent across levels) orchestrates the proper state setup by calling the appropriate transition method.
+
+**L_Office Dual Purpose**: L_Office serves as both menu location AND gameplay location. Level type alone cannot determine input mode—explicit state transitions (InitializeMainMenu/TransitionToGameplay) handle input mode setup based on game state, not level name.
 
 ---
 
@@ -1292,6 +2078,7 @@ sequenceDiagram
 Implemented an **in-world main menu system** within the L_Office level that provides a seamless transition between menu navigation and gameplay. The system uses a dedicated MenuCamera actor, widget-based UI, and state management to handle different game modes (Main Menu, Gameplay, Paused).
 
 **Key Architecture Decision**: There is **no separate main menu level** (no L_MainMenu). Instead, the L_Office level serves dual purposes:
+
 1. **Main Menu State**: Player views the office through a static MenuCamera while interacting with the main menu UI
 2. **Gameplay State**: Player controls first-person character with full movement and interaction
 
@@ -1572,6 +2359,7 @@ The door interaction system integrates with main menu via `ReturnToMainMenu()`:
 6. Player sees menu UI with MenuCamera view of the same office
 
 **Architectural Note**: Both the main menu and gameplay occur in the same L_Office level. The distinction is purely state-based:
+
 - **MainMenu State**: Static MenuCamera view + UI controls + mouse cursor
 - **Gameplay State**: First-person character control + interaction system + hidden cursor
 
@@ -1649,24 +2437,49 @@ FString GetMostRecentSave();
 2. Loads `UFCSaveGame` from disk
 3. Applies data to `UFCGameInstance` (expedition state, etc.)
 4. Caches save data in `PendingLoadData` for position restoration
-5. Compares current level with target level
-6. If same level: restores player position immediately via `RestorePlayerPosition()`
-7. If different level: triggers level load, position restored in `BeginPlay()`
-8. Broadcasts load completion via `OnGameLoaded` delegate
+5. Uses `UFCLevelManager->GetCurrentLevelName()` to get normalized current level name (PIE prefix stripped)
+6. Uses `UFCLevelManager->NormalizeLevelName()` to normalize saved level name for comparison
+7. Compares current level with target level
+8. If same level: restores player position immediately via `RestorePlayerPosition()`
+9. If different level: triggers level load via `UGameplayStatics::OpenLevel()`, position restored after level loads
+10. Broadcasts load completion via `OnGameLoaded` delegate
+
+**UFCLevelManager Integration**: All level name handling goes through the LevelManager subsystem to eliminate duplicate PIE prefix stripping and ensure consistent level name normalization across save/load operations.
 
 ##### Player Position Restoration
 
 ```cpp
 void UFCGameInstance::RestorePlayerPosition()
 {
+    // Validate PendingLoadData exists
     // Get player controller and character
     // Restore location and rotation from PendingLoadData
     // Update controller rotation for proper camera orientation
+
+    // Set gameplay state and input mode
+    AFCPlayerController* PC = Cast<AFCPlayerController>(World->GetFirstPlayerController());
+    if (PC)
+    {
+        PC->TransitionToGameplay();  // Automatically sets gameplay state and input mode
+        UE_LOG(LogFCGameInstance, Log, TEXT("RestorePlayerPosition: Gameplay state set via TransitionToGameplay"));
+    }
+
     // Clear pending data
 }
 ```
 
 Called automatically after level loads to restore player to saved position. Handles both same-level and cross-level loads.
+
+**State Management**: RestorePlayerPosition() now calls `AFCPlayerController::TransitionToGameplay()` to properly set gameplay state and input mode. This ensures consistent state setup whether loading from same level or cross-level, eliminating race conditions where input mode might not be set correctly.
+
+##### State Tracking Helper
+
+```cpp
+/** Check if we're currently restoring from a save game */
+bool IsRestoringSaveGame() const { return PendingLoadData != nullptr; }
+```
+
+This helper allows other systems (like PlayerController) to check if the game is in the process of restoring from save, enabling proper orchestration of state setup across level transitions.
 
 ##### Slot Naming Convention
 
