@@ -33,6 +33,10 @@ void UFCLevelManager::UpdateCurrentLevel(const FName& NewLevelName)
 {
 	CurrentLevelName = NormalizeLevelName(NewLevelName);
 	CurrentLevelType = DetermineLevelType(CurrentLevelName);
+	
+	UE_LOG(LogFCLevelManager, Log, TEXT("UpdateCurrentLevel: Level=%s, Type=%s"), 
+		*CurrentLevelName.ToString(), 
+		*UEnum::GetValueAsString(CurrentLevelType));
 }
 
 FName UFCLevelManager::NormalizeLevelName(const FName& RawLevelName) const

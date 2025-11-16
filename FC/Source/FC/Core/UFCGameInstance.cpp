@@ -6,6 +6,7 @@
 #include "FCPlayerController.h"
 #include "FCFirstPersonCharacter.h"
 #include "FCTransitionManager.h"
+#include "Core/FCLevelManager.h"
 
 void UFCGameInstance::Init()
 {
@@ -150,28 +151,26 @@ void UFCGameInstance::LoadGameAsync(const FString& SlotName)
     // Cache the save data for position restoration after level load
     PendingLoadData = LoadGameInstance;
 
-    // Load level if different from current
-    FString CurrentLevelName = GetWorld()->GetMapName();
-    if (CurrentLevelName.StartsWith("UEDPIE_0_")) // PIE prefix
-    {
-        CurrentLevelName = CurrentLevelName.RightChop(9); // Remove UEDPIE_0_
-    }
-
-    FString TargetLevelName = LoadGameInstance->CurrentLevelName;
-    if (TargetLevelName.StartsWith("UEDPIE_0_"))
-    {
-        TargetLevelName = TargetLevelName.RightChop(9);
-    }
-
-    // Get transition manager for smart transitions
+    // Get level manager and transition manager
+    UFCLevelManager* LevelMgr = GetSubsystem<UFCLevelManager>();
     UFCTransitionManager* TransitionMgr = GetSubsystem<UFCTransitionManager>();
-    FName TargetLevelFName = FName(*TargetLevelName);
-    bool bIsSameLevel = (CurrentLevelName == TargetLevelName);
+    
+    if (!LevelMgr)
+    {
+        UE_LOG(LogTemp, Error, TEXT("LoadGameAsync: LevelManager subsystem not found"));
+        OnGameLoaded.Broadcast(false);
+        return;
+    }
 
-    if (!bIsSameLevel && !TargetLevelName.IsEmpty())
+    // Use LevelManager to normalize level names and check if same level
+    FName CurrentLevelName = LevelMgr->GetCurrentLevelName();
+    FName TargetLevelFName = LevelMgr->NormalizeLevelName(FName(*LoadGameInstance->CurrentLevelName));
+    bool bIsSameLevel = (CurrentLevelName == TargetLevelFName);
+
+    if (!bIsSameLevel && !TargetLevelFName.IsNone())
     {
         // Cross-level load - use fade transition
-        UE_LOG(LogTemp, Log, TEXT("Loading different level: %s (cross-level fade transition)"), *TargetLevelName);
+        UE_LOG(LogTemp, Log, TEXT("Loading different level: %s (cross-level fade transition)"), *TargetLevelFName.ToString());
         
         if (TransitionMgr)
         {
@@ -201,12 +200,7 @@ void UFCGameInstance::LoadGameAsync(const FString& SlotName)
     else
     {
         // Same level - position will be restored with smooth camera blend
-        UE_LOG(LogTemp, Log, TEXT("Same level (%s), position will be restored with camera blend"), *CurrentLevelName);
-        
-        if (TransitionMgr)
-        {
-            TransitionMgr->UpdateCurrentLevel(FName(*CurrentLevelName));
-        }
+        UE_LOG(LogTemp, Log, TEXT("Same level (%s), position will be restored with camera blend"), *CurrentLevelName.ToString());
     }
 
     UE_LOG(LogTemp, Log, TEXT("Successfully loaded game from slot: %s"), *SlotName);
@@ -301,16 +295,12 @@ void UFCGameInstance::RestorePlayerPosition()
 
     UE_LOG(LogTemp, Log, TEXT("RestorePlayerPosition: Restored to %s"), *PendingLoadData->PlayerLocation.ToString());
 
-    // Update transition manager with current level
-    UFCTransitionManager* TransitionMgr = GetSubsystem<UFCTransitionManager>();
-    if (TransitionMgr)
+    // Update level manager with current level (after position restoration)
+    UFCLevelManager* LevelMgr = GetSubsystem<UFCLevelManager>();
+    if (LevelMgr)
     {
-        FString CurrentLevelName = GetWorld()->GetMapName();
-        if (CurrentLevelName.StartsWith("UEDPIE_0_"))
-        {
-            CurrentLevelName = CurrentLevelName.RightChop(9);
-        }
-        TransitionMgr->UpdateCurrentLevel(FName(*CurrentLevelName));
+        FString RawMapName = GetWorld()->GetMapName();
+        LevelMgr->UpdateCurrentLevel(FName(*RawMapName));
     }
 
     // Clear pending data
