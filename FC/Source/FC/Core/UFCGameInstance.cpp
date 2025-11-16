@@ -199,8 +199,9 @@ void UFCGameInstance::LoadGameAsync(const FString& SlotName)
     }
     else
     {
-        // Same level - position will be restored with smooth camera blend
-        UE_LOG(LogTemp, Log, TEXT("Same level (%s), position will be restored with camera blend"), *CurrentLevelName.ToString());
+        // Same level - restore position immediately
+        UE_LOG(LogTemp, Log, TEXT("Same level (%s), restoring player position immediately"), *CurrentLevelName.ToString());
+        RestorePlayerPosition();
     }
 
     UE_LOG(LogTemp, Log, TEXT("Successfully loaded game from slot: %s"), *SlotName);
