@@ -79,29 +79,7 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "GameFlow")
 	void ReturnToMainMenu();
 
-	/** Main menu button callbacks */
-	UFUNCTION(BlueprintCallable, Category = "UI")
-	void OnNewLegacyClicked();
 
-	UFUNCTION(BlueprintCallable, Category = "UI")
-	void OnContinueClicked();
-
-	UFUNCTION(BlueprintCallable, Category = "UI")
-	void OnLoadSaveClicked();
-
-	UFUNCTION(BlueprintCallable, Category = "UI")
-	void OnOptionsClicked();
-
-	UFUNCTION(BlueprintCallable, Category = "UI")
-	void OnQuitClicked();
-
-	/** Close save slot selector and return to main menu */
-	UFUNCTION(BlueprintCallable, Category = "UI")
-	void CloseSaveSlotSelector();
-
-	/** Load a save slot (called from save slot selector widget) */
-	UFUNCTION(BlueprintCallable, Category = "UI")
-	void LoadSaveSlot(const FString& SlotName);
 
 	/** Dev quick save (F5) */
 	UFUNCTION(BlueprintCallable, Category = "SaveGame")
@@ -149,21 +127,7 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera")
 	TObjectPtr<class ACameraActor> MenuCamera;
 
-	/** Main menu widget class */
-	UPROPERTY(EditDefaultsOnly, Category = "UI")
-	TSubclassOf<class UUserWidget> MainMenuWidgetClass;
 
-	/** Current main menu widget instance */
-	UPROPERTY()
-	TObjectPtr<class UUserWidget> MainMenuWidget;
-
-	/** Save slot selector widget class */
-	UPROPERTY(EditDefaultsOnly, Category = "UI")
-	TSubclassOf<class UUserWidget> SaveSlotSelectorWidgetClass;
-
-	/** Current save slot selector widget instance */
-	UPROPERTY()
-	TObjectPtr<class UUserWidget> SaveSlotSelectorWidget;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
 	int32 DefaultMappingPriority = 0;
@@ -199,10 +163,6 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
 	TObjectPtr<UInputAction> QuickLoadAction;
-
-	/** Callback when save game finishes loading */
-	UFUNCTION()
-	void OnSaveGameLoaded(bool bSuccess);
 
 	void HandleInteractPressed();
 	void HandlePausePressed();

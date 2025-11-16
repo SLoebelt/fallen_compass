@@ -6,6 +6,8 @@
 #include "FCPlayerController.h"
 #include "FCFirstPersonCharacter.h"
 #include "FCTransitionManager.h"
+#include "Core/FCLevelManager.h"
+#include "Core/FCUIManager.h"
 
 void UFCGameInstance::Init()
 {
@@ -14,6 +16,22 @@ void UFCGameInstance::Init()
     UE_LOG(LogTemp, Log, TEXT("UFCGameInstance Init | StartupMap=%s OfficeMap=%s"),
         *StartupMap.ToString(),
         *OfficeMap.ToString());
+
+    // Configure UIManager subsystem with widget classes
+    UFCUIManager* UIManager = GetSubsystem<UFCUIManager>();
+    if (UIManager)
+    {
+        UIManager->MainMenuWidgetClass = MainMenuWidgetClass;
+        UIManager->SaveSlotSelectorWidgetClass = SaveSlotSelectorWidgetClass;
+        UE_LOG(LogTemp, Log, TEXT("UFCGameInstance: UIManager configured with widget classes"));
+    }
+    else
+    {
+        UE_LOG(LogTemp, Warning, TEXT("UFCGameInstance: Failed to get UIManager subsystem"));
+    }
+
+    // Bind to world context change for handling level load completion
+    FCoreUObjectDelegates::PostLoadMapWithWorld.AddUObject(this, &UFCGameInstance::OnPostLoadMapWithWorld);
 
     // Future hook: load persistent profile data before menus spawn.
 }
@@ -150,28 +168,26 @@ void UFCGameInstance::LoadGameAsync(const FString& SlotName)
     // Cache the save data for position restoration after level load
     PendingLoadData = LoadGameInstance;
 
-    // Load level if different from current
-    FString CurrentLevelName = GetWorld()->GetMapName();
-    if (CurrentLevelName.StartsWith("UEDPIE_0_")) // PIE prefix
-    {
-        CurrentLevelName = CurrentLevelName.RightChop(9); // Remove UEDPIE_0_
-    }
-
-    FString TargetLevelName = LoadGameInstance->CurrentLevelName;
-    if (TargetLevelName.StartsWith("UEDPIE_0_"))
-    {
-        TargetLevelName = TargetLevelName.RightChop(9);
-    }
-
-    // Get transition manager for smart transitions
+    // Get level manager and transition manager
+    UFCLevelManager* LevelMgr = GetSubsystem<UFCLevelManager>();
     UFCTransitionManager* TransitionMgr = GetSubsystem<UFCTransitionManager>();
-    FName TargetLevelFName = FName(*TargetLevelName);
-    bool bIsSameLevel = (CurrentLevelName == TargetLevelName);
+    
+    if (!LevelMgr)
+    {
+        UE_LOG(LogTemp, Error, TEXT("LoadGameAsync: LevelManager subsystem not found"));
+        OnGameLoaded.Broadcast(false);
+        return;
+    }
 
-    if (!bIsSameLevel && !TargetLevelName.IsEmpty())
+    // Use LevelManager to normalize level names and check if same level
+    FName CurrentLevelName = LevelMgr->GetCurrentLevelName();
+    FName TargetLevelFName = LevelMgr->NormalizeLevelName(FName(*LoadGameInstance->CurrentLevelName));
+    bool bIsSameLevel = (CurrentLevelName == TargetLevelFName);
+
+    if (!bIsSameLevel && !TargetLevelFName.IsNone())
     {
         // Cross-level load - use fade transition
-        UE_LOG(LogTemp, Log, TEXT("Loading different level: %s (cross-level fade transition)"), *TargetLevelName);
+        UE_LOG(LogTemp, Log, TEXT("Loading different level: %s (cross-level fade transition)"), *TargetLevelFName.ToString());
         
         if (TransitionMgr)
         {
@@ -200,13 +216,9 @@ void UFCGameInstance::LoadGameAsync(const FString& SlotName)
     }
     else
     {
-        // Same level - position will be restored with smooth camera blend
-        UE_LOG(LogTemp, Log, TEXT("Same level (%s), position will be restored with camera blend"), *CurrentLevelName);
-        
-        if (TransitionMgr)
-        {
-            TransitionMgr->UpdateCurrentLevel(FName(*CurrentLevelName));
-        }
+        // Same level - restore position immediately
+        UE_LOG(LogTemp, Log, TEXT("Same level (%s), restoring player position immediately"), *CurrentLevelName.ToString());
+        RestorePlayerPosition();
     }
 
     UE_LOG(LogTemp, Log, TEXT("Successfully loaded game from slot: %s"), *SlotName);
@@ -224,6 +236,7 @@ TArray<FString> UFCGameInstance::GetAvailableSaveSlots()
         if (UGameplayStatics::DoesSaveGameExist(SlotName, 0))
         {
             SaveSlots.Add(SlotName);
+            UE_LOG(LogTemp, Log, TEXT("GetAvailableSaveSlots: Found %s"), *SlotName);
         }
     }
 
@@ -231,6 +244,7 @@ TArray<FString> UFCGameInstance::GetAvailableSaveSlots()
     if (UGameplayStatics::DoesSaveGameExist(TEXT("QuickSave"), 0))
     {
         SaveSlots.Add(TEXT("QuickSave"));
+        UE_LOG(LogTemp, Log, TEXT("GetAvailableSaveSlots: Found QuickSave"));
     }
 
     // Check for manual saves (up to 10 for now)
@@ -240,9 +254,11 @@ TArray<FString> UFCGameInstance::GetAvailableSaveSlots()
         if (UGameplayStatics::DoesSaveGameExist(SlotName, 0))
         {
             SaveSlots.Add(SlotName);
+            UE_LOG(LogTemp, Log, TEXT("GetAvailableSaveSlots: Found %s"), *SlotName);
         }
     }
 
+    UE_LOG(LogTemp, Log, TEXT("GetAvailableSaveSlots: Total found: %d"), SaveSlots.Num());
     return SaveSlots;
 }
 
@@ -301,18 +317,54 @@ void UFCGameInstance::RestorePlayerPosition()
 
     UE_LOG(LogTemp, Log, TEXT("RestorePlayerPosition: Restored to %s"), *PendingLoadData->PlayerLocation.ToString());
 
-    // Update transition manager with current level
-    UFCTransitionManager* TransitionMgr = GetSubsystem<UFCTransitionManager>();
-    if (TransitionMgr)
+    // Set PlayerController to gameplay state with proper input mode
+    // This is a save game restore, so we're loading INTO gameplay
+    PC->TransitionToGameplay();
+    
+    UE_LOG(LogTemp, Log, TEXT("RestorePlayerPosition: Set gameplay state and input mode"));
+
+    // Update level manager with current level (after position restoration)
+    UFCLevelManager* LevelMgr = GetSubsystem<UFCLevelManager>();
+    if (LevelMgr)
     {
-        FString CurrentLevelName = GetWorld()->GetMapName();
-        if (CurrentLevelName.StartsWith("UEDPIE_0_"))
-        {
-            CurrentLevelName = CurrentLevelName.RightChop(9);
-        }
-        TransitionMgr->UpdateCurrentLevel(FName(*CurrentLevelName));
+        FString RawMapName = GetWorld()->GetMapName();
+        LevelMgr->UpdateCurrentLevel(FName(*RawMapName));
     }
 
     // Clear pending data
     PendingLoadData = nullptr;
+}
+
+void UFCGameInstance::OnPostLoadMapWithWorld(UWorld* LoadedWorld)
+{
+    // Only handle if this is our world
+    if (!LoadedWorld || LoadedWorld != GetWorld())
+    {
+        return;
+    }
+
+    // Check if transition manager has an active fade
+    UFCTransitionManager* TransitionMgr = GetSubsystem<UFCTransitionManager>();
+    if (!TransitionMgr)
+    {
+        return;
+    }
+
+    // If screen is currently black, trigger fade-in to reveal the new level
+    if (TransitionMgr->IsBlack())
+    {
+        // If we have pending load data, delay fade-in longer to allow player position restoration and camera blend to start
+        float FadeInDelay = PendingLoadData ? 0.5f : 0.2f;
+        
+        FTimerHandle FadeInTimerHandle;
+        GetWorld()->GetTimerManager().SetTimer(
+            FadeInTimerHandle,
+            [TransitionMgr]()
+            {
+                TransitionMgr->BeginFadeIn(1.0f);
+            },
+            FadeInDelay,
+            false
+        );
+    }
 }

@@ -478,6 +478,41 @@
 
 ---
 
+### 🐛 Known Issues & Backlog
+
+#### Visual Polish
+
+- [ ] **BUG: Camera flicker during save game load transitions**
+  - **Symptom**: Brief flicker/flash visible when camera blends to first-person after loading a save game
+  - **Occurs**: When clicking "Continue" or loading from save slot selector
+  - **Context**:
+    - Fade-in starts at 0.5s delay (when `PendingLoadData` exists)
+    - Camera blend to first-person starts via `TransitionToGameplay()` (2.0s blend)
+    - Timing overlap between fade-in (1.0s) and camera blend (2.0s) causes brief visibility conflict
+  - **Current Impact**: Minor visual artifact, does not affect functionality
+  - **Priority**: Low (polish issue, not a blocker)
+  - **Potential Solutions**:
+    - Option A: Synchronize fade-in timing with camera blend completion (delay fade-in until blend starts)
+    - Option B: Adjust fade-in duration to complete before camera movement is visible
+    - Option C: Use camera cut instead of blend for save loads (instant transition)
+  - **Deferred**: Non-blocking issue, will address during visual polish phase
+
+#### Save System
+
+- [ ] **UI: Save slot selector only shows QuickSave slot**
+  - **Symptom**: `WBP_SaveSlotSelector` widget displays only one save slot even when multiple saves exist
+  - **Logs Confirm**: C++ correctly finds saves (`GetAvailableSaveSlots: Total found: 1` for test case with only QuickSave)
+  - **Root Cause**: Blueprint widget `WBP_SaveSlotSelector` may not be iterating through all returned save slots
+  - **Current Impact**: Cannot view/select multiple manual saves from UI (though only QuickSave exists in current test)
+  - **Priority**: Medium (will become blocker when implementing manual save feature)
+  - **Investigation Needed**:
+    - Check `WBP_SaveSlotSelector` Blueprint logic for save slot list population
+    - Verify ScrollBox binding and item template instantiation
+    - Create multiple test saves to confirm C++ returns all slots correctly
+  - **Deferred**: Current workflow only uses QuickSave, will fix when implementing manual save UI
+
+---
+
 ### 6.0 Implement in-game Office flow (table camera, ESC behaviour, pause menu, door → Main Menu)
 
 - [ ] **6.1 Implement interaction detection**

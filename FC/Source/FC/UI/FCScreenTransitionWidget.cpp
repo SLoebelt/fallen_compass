@@ -83,6 +83,34 @@ void UFCScreenTransitionWidget::BeginFadeIn(float Duration)
 	UE_LOG(LogFCTransitions, Log, TEXT("FCScreenTransitionWidget: Fade in started"));
 }
 
+void UFCScreenTransitionWidget::InitializeToBlack()
+{
+	// Set widget to visible but fully opaque (black)
+	SetVisibility(ESlateVisibility::HitTestInvisible);
+	SetRenderOpacity(1.0f);
+	
+	// Initialize Image_Fade to opaque black
+	if (Image_Fade)
+	{
+		Image_Fade->SetVisibility(ESlateVisibility::Visible);
+		Image_Fade->SetColorAndOpacity(FLinearColor::Black);
+		Image_Fade->SetOpacity(1.0f);
+	}
+	
+	// Ensure loading indicator is hidden
+	if (Overlay_Loading)
+	{
+		Overlay_Loading->SetVisibility(ESlateVisibility::Hidden);
+	}
+	
+	// Set internal state to match
+	CurrentOpacity = 1.0f;
+	bIsFading = false;
+	bShowLoadingIndicator = false;
+	
+	UE_LOG(LogFCTransitions, Log, TEXT("FCScreenTransitionWidget: Initialized to black state"));
+}
+
 void UFCScreenTransitionWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
 {
 	Super::NativeTick(MyGeometry, InDeltaTime);

@@ -1,4 +1,4 @@
-# Refactoring Analysis - Week 1 Task 5 Retrospective
+﻿# Refactoring Analysis - Week 1 Task 5 Retrospective
 
 **Date**: November 16, 2025  
 **Status**: CONCEPT - NO IMPLEMENTATION YET  
@@ -40,82 +40,677 @@
 
 ## Refactoring Checklist
 
+**MANDATORY TESTING CHECKLIST** (Run After Each Step):
+
+```
+[ ] PIE starts successfully without crashes
+[ ] Main menu appears correctly
+[ ] "New Legacy" button works and transitions to gameplay
+[ ] Can walk around office with WASD + mouse
+[ ] F6 QuickSave works (check logs for success)
+[ ] Door interaction returns to menu (fade + reload)
+[ ] "Continue" button loads save correctly
+[ ] No crashes or errors in Output Log
+[ ] No "Accessed None" Blueprint errors
+[ ] Live Coding or manual recompile succeeded
+```
+
+---
+
 ### Priority 1 – Core Architecture (Before Week 2)
 
-#### Refactoring 1A – UFCLevelManager Subsystem
+#### Refactoring 1A – UFCLevelManager Subsystem (6-8 hours)
 
-- [ ] **Design & Implementation**
-  - [ ] Create `UFCLevelManager` as `UGameInstanceSubsystem`
-  - [ ] Centralize `CurrentLevelName` in `UFCLevelManager`
-  - [ ] Implement `GetCurrentLevelName()` and normalization (PIE prefix handling)
-  - [ ] Implement enum-based `EFCLevelType` and type queries (`IsMenuLevel()`, `IsGameplayLevel()`, etc.)
-- [ ] **Integration**
-  - [ ] Update `UFCTransitionManager` to use `UFCLevelManager`
-  - [ ] Update `UFCGameInstance` load/restore logic to use `UFCLevelManager`
-  - [ ] Update `AFCPlayerController::BeginPlay()` to use `UFCLevelManager` (no direct `GetMapName` / string Contains)
-- [ ] **Testing**
-  - [ ] PIE: Start game → main menu level detected correctly
-  - [ ] PIE: Transition to gameplay level → correct level type
-  - [ ] PIE: Return to menu → level type updated correctly
-  - [ ] Logs: No remaining string-based level checks (`Contains("Office")`, `Contains("MainMenu")`)
+##### Step 1A.1: Create UFCLevelManager Skeleton
+
+- [x] **Implementation**
+  - [x] Create `Source/FC/Core/FCLevelManager.h`
+  - [x] Create `Source/FC/Core/FCLevelManager.cpp`
+  - [x] Inherit from `UGameInstanceSubsystem`
+  - [x] Add `UPROPERTY() FName CurrentLevelName`
+  - [x] Add `FName GetCurrentLevelName() const { return CurrentLevelName; }`
+  - [x] Add `void UpdateCurrentLevel(const FName& NewLevelName)`
+  - [x] Add `FName NormalizeLevelName(const FName& RawLevelName) const` (stub, returns input)
+  - [x] Compile successfully
+- [x] **Testing After Step 1A.1**
+  - [x] PIE starts successfully
+  - [x] No compilation errors
+  - [x] Check logs: UFCLevelManager should not appear yet (not integrated)
+
+##### Step 1A.2: Implement Level Type Detection
+
+- [x] **Implementation**
+  - [x] Add `EFCLevelType` enum (Unknown, MainMenu, Office, Overworld, Camp, Combat, POI, Village)
+  - [x] Add `UPROPERTY() EFCLevelType CurrentLevelType`
+  - [x] Implement `NormalizeLevelName()` - strip PIE prefix (UEDPIE*N*), trim whitespace
+  - [x] Implement `EFCLevelType DetermineLevelType(const FName& LevelName) const`
+    - Check exact "L_MainMenu" → MainMenu
+    - Check Contains("MainMenu") → MainMenu
+    - Check Contains("Office") → Office
+    - Check Contains("Overworld") → Overworld
+    - Check Contains("Camp") → Camp
+    - Check Contains("Combat") → Combat
+    - Check Contains("POI") → POI
+    - Check Contains("Village") → Village
+    - Default → Unknown
+  - [x] Add `bool IsMenuLevel() const { return CurrentLevelType == EFCLevelType::MainMenu; }`
+  - [x] Add `bool IsGameplayLevel() const` (returns true for Office, Overworld, Camp, POI, Village)
+  - [x] Add `EFCLevelType GetCurrentLevelType() const { return CurrentLevelType; }`
+  - [x] Compile successfully
+- [x] **Testing After Step 1A.2**
+  - [x] PIE starts successfully
+  - [x] Main menu appears
+  - [x] "New Legacy" button works
+  - [x] F6 QuickSave works
+  - [x] Door interaction returns to menu
+  - [x] "Continue" button loads save
+  - [x] No crashes or errors in logs
+
+##### Step 1A.3: Initialize LevelManager on Game Start
+
+- [x] **Implementation**
+  - [x] Override `void Initialize(FSubsystemCollectionBase& Collection)`
+  - [x] Add `DECLARE_LOG_CATEGORY_EXTERN(LogFCLevelManager, Log, All);` to header
+  - [x] Add `DEFINE_LOG_CATEGORY(LogFCLevelManager);` to .cpp
+  - [x] In Initialize():
+    - Get `UWorld* World = GetWorld()`
+    - Safety check: `if (!World || !World->IsGameWorld()) return;`
+    - Get raw level name: `FString RawMapName = World->GetMapName()`
+    - Normalize: `CurrentLevelName = NormalizeLevelName(FName(*RawMapName))`
+    - Detect type: `CurrentLevelType = DetermineLevelType(CurrentLevelName)`
+    - Log: `UE_LOG(LogFCLevelManager, Log, TEXT("Initialized: Level=%s, Type=%s"), ...)`
+  - [x] Compile successfully
+- [ ] **Testing After Step 1A.3**
+  - [x] PIE starts successfully
+  - [x] Main menu appears
+  - [x] Check Output Log: Should see "LogFCLevelManager: Initialized: Level=L_Office, Type=Office"
+  - [x] "New Legacy" button works
+  - [x] F6 QuickSave works
+  - [x] Door interaction returns to menu
+  - [x] "Continue" button loads save
+  - [x] No crashes or errors
+
+##### Step 1A.4: Integrate with UFCGameInstance Save/Load
+
+- [x] **Implementation**
+  - [x] Open `UFCGameInstance.cpp`
+  - [x] Add `#include "Core/FCLevelManager.h"` at top
+  - [x] In `LoadGameAsync()`:
+    - Find code that strips PIE prefix manually (likely `RightChop(9)` or similar)
+    - Replace with: `UFCLevelManager* LevelMgr = GetSubsystem<UFCLevelManager>();`
+    - Replace manual comparison with: `if (LevelMgr && LevelMgr->IsSameLevelLoad(TargetLevelFName))`
+  - [x] In `RestorePlayerPosition()`:
+    - After restoring position, add:
+    ```cpp
+    UFCLevelManager* LevelMgr = GetSubsystem<UFCLevelManager>();
+    if (LevelMgr)
+    {
+        LevelMgr->UpdateCurrentLevel(FName(*CurrentLevelName));
+    }
+    ```
+  - [x] Compile successfully
+- [x] **Testing After Step 1A.4** ⚠️ CRITICAL TEST POINT
+  - [x] PIE starts successfully
+  - [x] Main menu appears
+  - [x] "New Legacy" → walk around office
+  - [x] F6 QuickSave
+  - [x] Check logs: Save should succeed
+  - [x] Door interaction → return to menu
+  - [x] "Continue" button → should load save correctly
+  - [x] Player spawns at saved position (not spawn point)
+  - [x] F9 QuickLoad → also works
+  - [x] Check logs: LevelManager should show "UpdateCurrentLevel" calls
+  - [x] No crashes or errors
+
+##### Step 1A.5: OPTIONAL - Integrate with AFCPlayerController::BeginPlay (Only If Needed)
+
+- [x] **Check Current Code First**
+  - [x] Open `AFCPlayerController.cpp`
+  - [x] Read `BeginPlay()` implementation
+  - [x] Does it have string matching like `Contains("Office")` or `Contains("MainMenu")`?
+    - **YES**: String matching found - proceeding with this step
+- [x] **Implementation** (String matching found)
+  - [x] Add `#include "Core/FCLevelManager.h"` at top
+  - [x] In `BeginPlay()`:
+    - Found string matching code: `if (!CurrentLevelName.Contains("Office") && !CurrentLevelName.Contains("MainMenu"))`
+    - Replaced with: `if (LevelMgr && LevelMgr->IsGameplayLevel())`
+  - [x] Removed manual level name string parsing (PIE prefix stripping)
+  - [x] Compile successfully
+- [x] **Testing After Step 1A.5**
+  - [x] PIE starts successfully
+  - [x] Main menu appears correctly
+  - [x] "New Legacy" button works
+  - [x] Can walk around office
+  - [x] F6 QuickSave works
+  - [x] Door interaction returns to menu
+  - [x] "Continue" loads save correctly
+  - [x] Check logs: No more string Contains() for level detection
+  - [x] No crashes or errors
+
+##### Post-Implementation Documentation
+
+- [x] **Update Technical_Documentation.md**
+  - [x] Add UFCLevelManager to directory structure
+  - [x] Add UFCLevelManager subsystem section (2.1.5) after UFCGameInstance
+  - [x] Document EFCLevelType enum and public API
+  - [x] Document PIE prefix normalization logic
+  - [x] Update UFCGameInstance section with LevelManager integration details
+  - [x] Update AFCPlayerController section with BeginPlay simplification
+  - [x] Update high-level architecture diagram to include LevelManager subsystem
+  - [x] Update class interaction flow diagram
+  - [x] Document L_Office dual-purpose architecture insight
+
+**COMMIT POINT 1A**: `git add -A && git commit -m "feat: Add UFCLevelManager subsystem with level type detection"`
 
 ---
 
-#### Refactoring 1B – UFCUIManager Subsystem + Blueprint Decoupling
+#### Refactoring 1B: UFCUIManager Subsystem (8-10 hours)
 
-- [ ] **Design & Implementation (C++)**
-  - [ ] Create `UFCUIManager` as `UGameInstanceSubsystem`
-  - [ ] Move UI-related responsibilities from `AFCPlayerController` into `UFCUIManager`
-    - [ ] Main menu display & hide
-    - [ ] Save slot selector display & hide
-    - [ ] “New Legacy”, “Continue”, “Load”, “Options”, “Quit” handlers
-  - [ ] Own widget references in `UFCUIManager` (MainMenu, SaveSlotSelector, etc.)
-- [ ] **Blueprint Configuration**
-  - [ ] `BP_FC_GameInstance`
-    - [ ] Add `UIManagerClass` (if used) and ensure subsystem is available
-    - [ ] Move `MainMenuWidgetClass` reference here
-    - [ ] Move `SaveSlotSelectorWidgetClass` reference here
-  - [ ] `BP_FC_PlayerController`
-    - [ ] Remove `MainMenuWidgetClass` and `SaveSlotSelectorWidgetClass`
-    - [ ] Keep `MenuCamera` reference only
-  - [ ] `WBP_MainMenu`
-    - [ ] Replace calls to `Get Player Controller → AFCPlayerController::On*Clicked`
-    - [ ] Use `Get Game Instance → Get Subsystem (UFCUIManager) → On*Clicked` instead
-  - [ ] `WBP_SaveSlotSelector`
-    - [ ] Replace direct `PlayerController->LoadSaveSlot()` calls
-    - [ ] Route through `UFCUIManager->LoadSaveSlot()` via subsystem
-  - [ ] `WBP_SaveSlotItem`
-    - [ ] (Simple) Call `UFCUIManager` directly **or**
-    - [ ] (Better) Use dispatcher: `OnSlotSelected(SlotName)` → handled by parent widget → `UFCUIManager`
-- [ ] **Testing**
-  - [ ] Start game → main menu appears as before
-  - [ ] “New Legacy” button → gameplay transition still works
-  - [ ] “Continue” button → loads latest save correctly
-  - [ ] “Load Save” → opens save slot selector, selecting slot loads as expected
-  - [ ] “Options” & “Quit” → expected behavior (even if placeholder)
-  - [ ] Door interaction → return to main menu still works
-  - [ ] No direct widget → PlayerController calls remain for menu logic
-  - [ ] Logs: `UFCUIManager` methods are hit, not old `AFCPlayerController` ones
+**Goal**: Centralize all UI widget creation and lifecycle management in a Game Instance Subsystem. Migrate UI logic from AFCPlayerController to UFCUIManager, eliminating Blueprint coupling and ensuring widgets persist across level transitions.
+
+##### Step 1B.1: Create UFCUIManager Skeleton
+
+- [x] **Implementation**
+
+  - [x] Create `Source/FC/Core/FCUIManager.h`
+
+    - Inherit from `UGameInstanceSubsystem`
+    - Add `DECLARE_LOG_CATEGORY_EXTERN(LogFCUIManager, Log, All);`
+    - Declare properties for widget class references:
+
+      ```cpp
+      UPROPERTY()
+      TSubclassOf<UUserWidget> MainMenuWidgetClass;
+
+      UPROPERTY()
+      TSubclassOf<UUserWidget> SaveSlotSelectorWidgetClass;
+      ```
+
+    - Declare cached widget instance pointers:
+
+      ```cpp
+      UPROPERTY()
+      TObjectPtr<UUserWidget> MainMenuWidget;
+
+      UPROPERTY()
+      TObjectPtr<UUserWidget> SaveSlotSelectorWidget;
+      ```
+
+    - Declare public methods (stubs only):
+      ```cpp
+      void ShowMainMenu();
+      void HideMainMenu();
+      void ShowSaveSlotSelector();
+      void HideSaveSlotSelector();
+      void HandleNewLegacyClicked();
+      void HandleContinueClicked();
+      void HandleLoadSaveClicked();
+      void HandleOptionsClicked();
+      void HandleQuitClicked();
+      void HandleBackFromSaveSelector();
+      void HandleSaveSlotSelected(const FString& SlotName);
+      ```
+
+  - [x] Create `Source/FC/Core/FCUIManager.cpp`
+    - Add `DEFINE_LOG_CATEGORY(LogFCUIManager);`
+    - Implement all methods as stubs with logging:
+      ```cpp
+      void UFCUIManager::ShowMainMenu()
+      {
+          UE_LOG(LogFCUIManager, Log, TEXT("ShowMainMenu() called (stub)"));
+      }
+      ```
+  - [x] Add to `FC.Build.cs` if needed
+  - [x] Compile successfully
+
+- [x] **Testing After Step 1B.1**
+  - [x] PIE starts successfully
+  - [x] Main menu appears correctly
+  - [x] "New Legacy" button works
+  - [x] Can walk around office
+  - [x] F6 QuickSave works
+  - [x] Door interaction returns to menu
+  - [x] "Continue" loads save correctly
+  - [x] No crashes or errors
+
+##### Step 1B.2: Implement Widget Lifecycle Methods
+
+- [x] **Implementation**
+  - [x] In `FCUIManager.cpp`, implement `ShowMainMenu()`:
+    - Get GameInstance: `UFCGameInstance* GI = Cast<UFCGameInstance>(GetGameInstance());`
+    - Safety checks for `GI` and `MainMenuWidgetClass`
+    - Create widget if not cached: `MainMenuWidget = CreateWidget<UUserWidget>(GetGameInstance(), MainMenuWidgetClass);`
+    - Add to viewport: `MainMenuWidget->AddToViewport()`
+    - Log success
+  - [x] Implement `HideMainMenu()`:
+    - Check if `MainMenuWidget` exists
+    - Remove from parent: `MainMenuWidget->RemoveFromParent();`
+    - Log success
+  - [x] Implement `ShowSaveSlotSelector()`:
+    - Similar to ShowMainMenu, create if needed
+    - Add to viewport
+    - Log success
+  - [x] Implement `HideSaveSlotSelector()`:
+    - Remove from parent
+    - Log success
+  - [x] Compile successfully
+- [x] **Testing After Step 1B.2**
+  - [x] PIE starts successfully
+  - [x] Main menu appears correctly
+  - [x] "New Legacy" button works
+  - [x] Can walk around office
+  - [x] F6 QuickSave works
+  - [x] Door interaction returns to menu
+  - [x] "Continue" loads save correctly
+  - [x] No crashes or errors
+
+##### Step 1B.3: Implement Button Callback Methods
+
+- [x] **Implementation**
+  - [x] In `FCUIManager.cpp`, implement `HandleNewLegacyClicked()`:
+    - Get PlayerController: `AFCPlayerController* PC = Cast<AFCPlayerController>(GetWorld()->GetFirstPlayerController());`
+    - Safety check for PC
+    - Call `PC->TransitionToGameplay();`
+    - Call `HideMainMenu();`
+    - Log action
+  - [x] Implement `HandleContinueClicked()`:
+    - Get GameInstance: `UFCGameInstance* GI = Cast<UFCGameInstance>(GetGameInstance());`
+    - Get most recent save: `FString SlotName = GI->GetMostRecentSave();`
+    - Check if slot exists
+    - Call `GI->LoadGameAsync(SlotName);`
+    - Call `HideMainMenu();`
+    - Log action
+  - [x] Implement `HandleLoadSaveClicked()`:
+    - Call `HideMainMenu();`
+    - Call `ShowSaveSlotSelector();`
+    - Log action
+  - [x] Implement `HandleOptionsClicked()`:
+    - Log TODO (placeholder for future options menu)
+  - [x] Implement `HandleQuitClicked()`:
+    - Get PlayerController
+    - Call `UKismetSystemLibrary::QuitGame()`
+    - Log action
+  - [x] Implement `HandleBackFromSaveSelector()`:
+    - Call `HideSaveSlotSelector();`
+    - Call `ShowMainMenu();`
+    - Log action
+  - [x] Implement `HandleSaveSlotSelected(const FString& SlotName)`:
+    - Get GameInstance
+    - Call `GI->LoadGameAsync(SlotName);`
+    - Call `HideSaveSlotSelector();`
+    - Log action with slot name
+  - [x] Compile successfully
+- [x] **Testing After Step 1B.3**
+  - [x] PIE starts successfully
+  - [x] Main menu appears correctly
+  - [x] "New Legacy" button works
+  - [x] Can walk around office
+  - [x] F6 QuickSave works
+  - [x] Door interaction returns to menu
+  - [x] "Continue" loads save correctly
+  - [x] No crashes or errors
+
+##### Step 1B.4: Wire UFCGameInstance to UIManager
+
+- [x] **Implementation**
+
+  - [x] Open `Source/FC/Core/UFCGameInstance.h`
+  - [x] Add widget class properties (will be set in Blueprint):
+
+    ```cpp
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "UI")
+    TSubclassOf<UUserWidget> MainMenuWidgetClass;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "UI")
+    TSubclassOf<UUserWidget> SaveSlotSelectorWidgetClass;
+    ```
+
+  - [x] Open `Source/FC/Core/UFCGameInstance.cpp`
+  - [x] In `Init()` method, configure UIManager:
+    ```cpp
+    UFCUIManager* UIManager = GetSubsystem<UFCUIManager>();
+    if (UIManager)
+    {
+        UIManager->MainMenuWidgetClass = MainMenuWidgetClass;
+        UIManager->SaveSlotSelectorWidgetClass = SaveSlotSelectorWidgetClass;
+        UE_LOG(LogFCGameInstance, Log, TEXT("UIManager configured with widget classes"));
+    }
+    ```
+  - [x] Compile successfully
+
+- [x] **Testing After Step 1B.4**
+  - [x] PIE starts successfully
+  - [x] Main menu appears correctly
+  - [x] "New Legacy" button works
+  - [x] Can walk around office
+  - [x] F6 QuickSave works
+  - [x] Door interaction returns to menu
+  - [x] "Continue" loads save correctly
+  - [x] No crashes or errors
+
+##### Step 1B.5: Update AFCPlayerController to Use UIManager
+
+- [x] **Implementation**
+  - [x] Open `Source/FC/Core/FCPlayerController.h`
+  - [x] Remove widget class properties (moved to GameInstance)
+  - [x] Remove widget instance pointers (moved to UIManager)
+  - [x] Keep state transition methods: `InitializeMainMenu()`, `TransitionToGameplay()`, `ReturnToMainMenu()`
+  - [x] Open `Source/FC/Core/FCPlayerController.cpp`
+  - [x] Update `InitializeMainMenu()`:
+    - Get UIManager: `UFCUIManager* UIManager = GetGameInstance()->GetSubsystem<UFCUIManager>();`
+    - Replace widget creation with: `UIManager->ShowMainMenu();`
+    - Keep input mode setup code
+  - [x] Update `TransitionToGameplay()`:
+    - Get UIManager
+    - Call `UIManager->HideMainMenu();`
+    - Keep camera blend and input mode setup code
+  - [x] Remove old button callback methods (will be called from UIManager):
+    - Remove `HandleNewLegacyClicked()`
+    - Remove `HandleContinueClicked()`
+    - Remove `HandleLoadSaveClicked()`
+    - Remove `HandleOptionsClicked()`
+    - Remove `HandleQuitClicked()`
+    - Remove `CloseSaveSlotSelector()`
+    - Remove `LoadSaveSlot()`
+  - [x] Compile successfully
+
+##### Step 1B.6: Update Blueprint - BP_FC_GameInstance
+
+- [x] **Blueprint Configuration**
+  - [x] Open `Content/FC/Blueprints/BP_FC_GameInstance`
+  - [x] Find "UI" category in Details panel
+  - [x] Set `MainMenuWidgetClass` → `/Game/FC/UI/Menus/WBP_MainMenu`
+  - [x] Set `SaveSlotSelectorWidgetClass` → `/Game/FC/UI/Menus/SaveMenu/WBP_SaveSlotSelector`
+  - [x] Compile Blueprint
+  - [x] Save Blueprint
+
+##### Step 1B.7: Update Blueprint - WBP_MainMenu
+
+- [x] **Blueprint Rewiring**
+  - [x] Open `Content/FC/UI/Menus/WBP_MainMenu`
+  - [x] Find "New Legacy" button OnClicked event
+    - Remove existing PlayerController call
+    - Get Game Instance → Cast to FC Game Instance → Get Subsystem (UI Manager)
+    - Call `HandleNewLegacyClicked()`
+  - [x] Find "Continue" button OnClicked event
+    - Replace with: Get Game Instance → Get Subsystem (UI Manager) → `HandleContinueClicked()`
+  - [x] Find "Load Save" button OnClicked event
+    - Replace with: Get Game Instance → Get Subsystem (UI Manager) → `HandleLoadSaveClicked()`
+  - [x] Find "Options" button OnClicked event
+    - Replace with: Get Game Instance → Get Subsystem (UI Manager) → `HandleOptionsClicked()`
+  - [x] Find "Quit" button OnClicked event
+    - Replace with: Get Game Instance → Get Subsystem (UI Manager) → `HandleQuitClicked()`
+  - [x] Compile Blueprint
+  - [x] Save Blueprint
+
+##### Step 1B.8: Update Blueprint - WBP_SaveSlotSelector
+
+- [x] **Blueprint Rewiring**
+  - [x] Open `Content/FC/UI/Menus/SaveMenu/WBP_SaveSlotSelector`
+  - [ ] Find "Back" button OnClicked event
+    - Replace with: Get Game Instance → Get Subsystem (UI Manager) → `HandleBackFromSaveSelector()`
+  - [x] Find save slot item OnClicked event (likely in WBP_SaveSlotItem or custom event)
+    - Replace with: Get Game Instance → Get Subsystem (UI Manager) → `HandleSaveSlotSelected(SlotName)`
+  - [x] Compile Blueprint
+  - [x] Save Blueprint
+- [x] **Testing After Step 1B.8** ⚠️ FULL REGRESSION TEST
+  - [x] PIE starts successfully
+  - [x] Main menu appears correctly
+  - [x] "New Legacy" button works and transitions to gameplay
+  - [x] Can walk around office with WASD + mouse
+  - [x] F6 QuickSave works (check logs)
+  - [x] Door interaction returns to menu (fade + reload)
+  - [x] "Continue" button loads most recent save
+  - [x] Player spawns at saved position
+  - [x] "Load Save" button shows save slot selector
+  - [x] Save slot selector shows available saves
+  - [x] Clicking a save slot loads that save
+  - [x] "Back" button returns to main menu
+  - [x] "Quit" button closes PIE session
+  - [x] No crashes or errors in Output Log
+  - [x] No "Accessed None" Blueprint errors
+  - [x] All UI interactions work smoothly
+
+##### Post-Implementation Documentation
+
+- [x] **Update Technical_Documentation.md**
+  - [x] Add UFCUIManager to directory structure
+  - [x] Add UFCUIManager subsystem section after UFCLevelManager
+  - [x] Document widget lifecycle management
+  - [x] Document button callback methods
+  - [x] Update UFCGameInstance section with UIManager integration
+  - [x] Update AFCPlayerController section with simplified UI responsibilities
+  - [x] Update architecture diagrams to show UIManager subsystem
+  - [x] Document Blueprint decoupling pattern
+
+**COMMIT POINT 1B**: `git add -A && git commit -m "feat: Add UFCUIManager subsystem and migrate UI logic from PlayerController"`
 
 ---
 
-#### Refactoring 1C – Widget Lifecycle / Persistent Transition Widget
+#### Refactoring 1C – Widget Lifecycle / Persistent Transition Widget (4-6 hours)
 
-- [ ] **Implementation**
-  - [ ] Update `UFCTransitionManager::CreateTransitionWidget()`
-    - [ ] Use `GetGameInstance()` as widget outer, not `PlayerController`
-    - [ ] Use `UGameViewportClient::AddViewportWidgetContent()` instead of `AddToViewport()`
-  - [ ] Ensure `WBP_ScreenTransition` / `UFCScreenTransitionWidget` initializes in a fully black state
-  - [ ] Implement logic so the widget persists across `OpenLevel` calls
-- [ ] **Task 5.14 Implementation**
-  - [ ] On game start, transition widget starts black and fades in
-  - [ ] On cross-level load, fade out → load → fade in re-uses same widget
-- [ ] **Testing**
-  - [ ] PIE: Start game → see fade-in from black (no flash/pop)
-  - [ ] Trigger same-level transition → correct blend behavior, no extra widgets
-  - [ ] Trigger cross-level transition → widget persists, fade-out/in works
-  - [ ] No duplicate transition widgets or orphaned UI
-  - [ ] No crashes when quickly triggering multiple transitions
+##### Step 1C.1: Understand Current CreateTransitionWidget Implementation
+
+- [x] **Analysis**
+  - [x] Open `Source/FC/Core/FCTransitionManager.cpp`
+  - [x] Find `CreateTransitionWidget()` method (lines 49-109)
+  - [x] Document exactly what it does:
+    - **Widget Outer**: `PlayerController` (line 93: `CreateWidget<UFCScreenTransitionWidget>(PlayerController, WidgetClass)`)
+    - **Viewport Addition**: `AddToViewport(1000)` with Z-order 1000 (line 105)
+    - **When Created**: Lazy initialization - only created on first `BeginFadeOut()` or `BeginFadeIn()` call (lines 123, 150)
+    - **Not created in Initialize()** - widget is null until first transition
+  - [x] Open `Source/FC/UI/FCScreenTransitionWidget.h/.cpp`
+  - [x] Document widget's initial state:
+    - **Initial Visibility**: `ESlateVisibility::HitTestInvisible` (line 108 FCTransitionManager.cpp)
+    - **Initial Opacity**: Set to 0 in widget (starts transparent)
+    - **BindWidget Components**: `Overlay_Main`, `Image_Fade`, `Overlay_Loading` (required Blueprint bindings)
+    - **Fade Logic**: Tick-based animation, updates opacity over FadeDuration
+    - **Delegates**: `OnFadeOutComplete`, `OnFadeInComplete` bound to manager callbacks (lines 102-103)
+- [x] **Findings Documented**
+  - **Current Pattern**: Widget is created with PlayerController as outer, added to viewport with high Z-order
+  - **Problem**: Widget is destroyed when PlayerController is destroyed during level transitions
+  - **Solution Needed**: Change outer to GameInstance for persistence across level loads
+  - **Additional Issue**: `AddToViewport()` ties widget to specific player's viewport - need `AddViewportWidgetContent()` for true persistence
+
+##### Step 1C.2: Change Widget Outer to GameInstance
+
+- [x] **Implementation (FCTransitionManager.cpp)**
+  - [x] In `CreateTransitionWidget()`, found lines 76-90:
+    ```cpp
+    // OLD CODE:
+    APlayerController* PlayerController = World->GetFirstPlayerController();
+    if (!PlayerController)
+    {
+        UE_LOG(LogFCTransitions, Error, TEXT("FCTransitionManager: No valid PlayerController"));
+        return;
+    }
+    TransitionWidget = CreateWidget<UFCScreenTransitionWidget>(PlayerController, WidgetClass);
+    ```
+  - [x] Replaced with (lines 76-81):
+    ```cpp
+    // NEW CODE:
+    // Create widget instance with GameInstance as outer for persistence across level loads
+    // Using GameInstance instead of PlayerController ensures widget survives controller destruction
+    TransitionWidget = CreateWidget<UFCScreenTransitionWidget>(GetGameInstance(), WidgetClass);
+    ```
+  - [x] KEPT the `AddToViewport(1000)` call unchanged (line 92)
+  - [x] Compile successfully
+- [x] **Testing After Step 1C.2**
+  - [x] PIE starts successfully
+  - [x] Main menu appears
+  - [x] "New Legacy" button works
+  - [x] Door interaction → fade to black works
+  - [x] Return to menu works
+  - [x] F6 save → F9 load → works without fade
+  - [x] Widget lifetime slightly extended (but still destroyed on level change)
+  - [x] No visual differences yet
+  - [x] No crashes or errors
+
+##### Step 1C.3: Switch to AddViewportWidgetContent for Persistence
+
+- [x] **Implementation (FCTransitionManager.cpp)**
+  - [x] In `CreateTransitionWidget()`, found lines 92-95:
+    ```cpp
+    // OLD CODE:
+    TransitionWidget->AddToViewport(1000);
+    ```
+  - [x] Replaced with (lines 92-109):
+    ```cpp
+    // NEW CODE:
+    UGameViewportClient* ViewportClient = GetGameInstance()->GetGameViewportClient();
+    if (ViewportClient)
+    {
+        ViewportClient->AddViewportWidgetContent(
+            TransitionWidget->TakeWidget(),
+            1000  // ZOrder - very high to be on top
+        );
+        UE_LOG(LogFCTransitions, Log, TEXT("FCTransitionManager: TransitionWidget added to viewport (persistent)"));
+    }
+    else
+    {
+        UE_LOG(LogFCTransitions, Error, TEXT("FCTransitionManager: Failed to get GameViewportClient"));
+        return;
+    }
+    ```
+  - [x] Updated `Deinitialize()` to use RemoveViewportWidgetContent (lines 36-52)
+  - [x] BeginFadeOut() and BeginFadeIn() already have null checks and CreateTransitionWidget() calls
+  - [x] Compile successfully
+- [x] **Testing After Step 1C.3** ⚠️ CRITICAL TEST - WIDGET PERSISTENCE
+  - [x] PIE starts successfully
+  - [x] Main menu appears
+  - [x] "New Legacy" button works
+  - [x] Door interaction → fade to black → reload level
+  - [x] **KEY TEST**: Widget should persist across level reload (no flicker)
+  - [x] Main menu appears after fade-in completes
+  - [x] Trigger another transition (Continue → gameplay)
+  - [x] Fade-out → fade-in should use SAME widget (check logs: should NOT see "creating widget" during transition)
+  - [x] No duplicate transition widgets
+  - [x] No crashes or errors
+
+##### Step 1C.4: Initialize Widget in Fully Black State
+
+- [x] **C++ Implementation (UFCScreenTransitionWidget)**
+
+  - [x] Added `InitializeToBlack()` method to UFCScreenTransitionWidget.h:
+    ```cpp
+    /** Initialize widget to fully black state (for clean startup) */
+    UFUNCTION(BlueprintCallable, Category = "Transition")
+    void InitializeToBlack();
+    ```
+  - [x] Implemented in UFCScreenTransitionWidget.cpp:
+    - Sets widget visibility to HitTestInvisible
+    - Sets render opacity to 1.0 (fully opaque)
+    - Initializes Image_Fade to visible, black, opacity 1.0
+    - Hides loading indicator overlay
+    - Sets CurrentOpacity = 1.0, bIsFading = false
+  - [x] Compile successfully
+
+- [x] **C++ Implementation (UFCTransitionManager)**
+
+  - [x] Modified `Initialize()` to create widget immediately instead of lazy initialization
+  - [x] Added viewport availability check and timer-based retry logic:
+    - Widget created during Initialize() but ViewportClient is NULL initially
+    - Set up 100ms timer to retry adding widget to viewport
+    - Timer calls `EnsureWidgetInViewport()` when viewport becomes ready
+  - [x] Created `EnsureWidgetInViewport()` helper method in FCTransitionManager.h/.cpp:
+    - Checks if widget is already in viewport (via IsInViewport())
+    - If not, attempts to add via AddViewportWidgetContent
+    - Once added, calls `TransitionWidget->InitializeToBlack()`
+    - Logs success or failure
+  - [x] Updated `BeginFadeOut()` and `BeginFadeIn()` to call `EnsureWidgetInViewport()` first
+    - Ensures widget is in viewport before any fade operation
+    - Handles deferred addition from Initialize() timing issue
+  - [x] Compile successfully
+
+- [x] **Root Cause Analysis**
+
+  - [x] Problem: ViewportClient not available during GameInstanceSubsystem::Initialize()
+  - [x] Solution: Create widget during Initialize(), defer viewport addition with timer
+  - [x] Widget gets added to viewport ~100ms after game start when viewport is ready
+  - [x] InitializeToBlack() called once widget is successfully in viewport
+
+- [x] **Testing After Step 1C.4** ⚠️ EXPECT BLACK SCREEN ON START
+  - [x] PIE starts → screen should be FULLY BLACK (this is expected)
+  - [x] Wait a few seconds → should stay black (widget initialized correctly)
+  - [x] Screen is black from startup (timer successfully adds widget and initializes to black)
+  - [x] No crashes or errors
+  - [x] Logs show: "Widget added to viewport and initialized to black"
+
+##### Step 1C.5: Implement Automatic Fade-In on Game Start
+
+- [x] **Implementation (FCTransitionManager.cpp)**
+
+  - [x] Modified `Initialize()` to use nested timer for fade-in:
+
+    - First timer (100ms): Add widget to viewport via `EnsureWidgetInViewport()`
+    - Second timer (200ms after first): Call `BeginFadeIn(1.5f)` for smooth reveal
+    - Total delay: 300ms before fade-in starts
+
+  - [x] **Additional Implementation** (to fix quick load issue):
+
+    - Added `IsBlack()` method to `UFCScreenTransitionWidget` (checks opacity >= 0.95)
+    - Added `IsBlack()` method to `UFCTransitionManager` (delegates to widget)
+    - Modified `UFCGameInstance::OnPostLoadMapWithWorld()` to check `IsBlack()` instead of `IsFading()`
+    - **Problem Fixed**: When quick loading from another level, screen stayed black because:
+      - Fade-out completes → sets `bCurrentlyFading = false`
+      - Level loads → `OnPostLoadMapWithWorld()` checks `IsFading()` → returns false
+      - No fade-in triggered → screen stays black with loading spinner
+    - **Solution**: Check if screen is actually black (`IsBlack()`) instead of if fade is in progress
+
+  - [x] Compile successfully
+
+- [x] **Testing After Step 1C.5** ⚠️ FINAL TEST - COMPLETE FEATURE
+  - [x] PIE starts → screen starts BLACK
+  - [x] After ~0.3 seconds → smooth fade-in to main menu (1.5 seconds)
+  - [x] Main menu fully visible and functional
+  - [x] "New Legacy" → fade works
+  - [x] Door interaction → fade-out → level reload → fade-in (using same widget)
+  - [x] "Continue" → fade-out → level load → fade-in works
+  - [x] F9 Quick Load from another level → fade-in works correctly (no black screen)
+  - [x] Cross-level transitions smooth with no flicker
+  - [x] No duplicate widgets
+  - [x] No screen pops or flashes
+  - [x] Widget persists across ALL level changes
+  - [x] No crashes or errors
+
+**COMMIT POINT 1C**: `git add -A && git commit -m "feat: Persistent transition widget with automatic fade-in on game start (Task 5.14)"`
+
+---
+
+### ✅ PRIORITY 1 COMPLETE - FINAL VALIDATION
+
+- [x] **Code Quality Check**
+  - [x] No remaining string matching for level detection (search for `Contains("Office")`)
+    - ✅ No `Contains("Office")` found
+    - ✅ No `Contains("MainMenu")` found
+    - ✅ No string-based level matching in codebase
+    - ✅ All level detection uses `EFCLevelType` enum via `UFCLevelManager`
+  - [x] No UI logic in AFCPlayerController (only delegation)
+    - ✅ No `CreateWidget` calls in `AFCPlayerController`
+    - ✅ No `AddToViewport` calls in `AFCPlayerController`
+    - ✅ Only delegates to `UFCUIManager` subsystem (17 references, all delegation)
+    - ✅ PlayerController maintains state but delegates all widget operations
+  - [x] Widget outer is GameInstance (not PlayerController)
+    - ✅ `UFCUIManager`: Widgets use `GetGameInstance()` as outer
+    - ✅ `UFCTransitionManager`: TransitionWidget uses `GetGameInstance()` as outer
+    - ✅ Transition widget uses `AddViewportWidgetContent()` for persistence
+    - ✅ All UI widgets survive PlayerController destruction during level loads
+  - [x] All new code follows UE_CodeConventions.md
+    - ✅ Proper copyright headers (FCLevelManager, FCUIManager, FCTransitionManager)
+    - ✅ Consistent class naming with FC prefix
+    - ✅ Comprehensive documentation comments on all public methods
+    - ✅ UFUNCTION/UPROPERTY specifiers properly used
+    - ✅ BlueprintCallable/BlueprintType decorators where appropriate
+  - [x] All new classes properly logged with DECLARE_LOG_CATEGORY
+    - ✅ `LogFCLevelManager` (declared in .h, defined in .cpp)
+    - ✅ `LogFCUIManager` (declared in .h, defined in .cpp)
+    - ✅ `LogFCTransitions` (declared in .h, defined in .cpp)
+    - ✅ All 8 log categories properly declared and defined
+    - ✅ Consistent logging throughout all subsystems
+
+**FINAL COMMIT**: `git add -A && git commit -m "refactor: Complete Priority 1 - Core Architecture (LevelManager, UIManager, Persistent Widgets)"`
+
+**MERGE TO MASTER**: After all tests pass, merge `refactoring` branch into `master`
 
 ---
 

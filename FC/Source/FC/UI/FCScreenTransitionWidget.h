@@ -40,6 +40,20 @@ public:
 	void BeginFadeIn(float Duration);
 
 	/**
+	 * Initialize widget to fully black state (for clean startup)
+	 * Call this after widget creation to ensure black screen on game start
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Transition")
+	void InitializeToBlack();
+
+	/**
+	 * Check if screen is currently black (fully opaque)
+	 * @return True if opacity is at or near 1.0
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Transition")
+	bool IsBlack() const { return CurrentOpacity >= 0.95f; }
+
+	/**
 	 * Delegate broadcast when fade out animation completes
 	 */
 	UPROPERTY(BlueprintAssignable, Category = "Transition")

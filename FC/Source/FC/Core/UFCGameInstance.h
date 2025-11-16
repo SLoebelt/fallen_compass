@@ -51,6 +51,14 @@ class FC_API UFCGameInstance : public UGameInstance
     UPROPERTY(EditDefaultsOnly, Category = "UI")
     TSoftClassPtr<class UFCScreenTransitionWidget> TransitionWidgetClass;
 
+    /** Widget class for main menu (configured in Blueprint, used by UIManager) */
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "UI")
+    TSubclassOf<UUserWidget> MainMenuWidgetClass;
+    
+    /** Widget class for save slot selector (configured in Blueprint, used by UIManager) */
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "UI")
+    TSubclassOf<UUserWidget> SaveSlotSelectorWidgetClass;
+
     /** Active expedition identifier; persists across level loads. */
     UPROPERTY(BlueprintReadOnly, Category = "Expedition")
     FString CurrentExpeditionId;
@@ -99,6 +107,13 @@ class FC_API UFCGameInstance : public UGameInstance
     /** Restore player position from pending load data (called after level loads) */
     UFUNCTION(BlueprintCallable, Category = "SaveGame")
     void RestorePlayerPosition();
+
+    /** Check if we're currently restoring from a save game */
+    UFUNCTION(BlueprintPure, Category = "SaveGame")
+    bool IsRestoringSaveGame() const { return PendingLoadData != nullptr; }
+
+    /** Called when a level finishes loading - triggers fade-in if transition is active */
+    void OnPostLoadMapWithWorld(UWorld* LoadedWorld);
 
 private:
     /** Cached save data for restoring player position after level load */
