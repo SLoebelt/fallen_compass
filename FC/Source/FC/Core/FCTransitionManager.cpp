@@ -48,17 +48,10 @@ void UFCTransitionManager::Deinitialize()
 
 void UFCTransitionManager::CreateTransitionWidget()
 {
-	// Only create once, unless we're recreating after level load
-	if (TransitionWidget && !bPendingLevelTransition)
-	{
-		return;
-	}
-	
-	// If widget exists but we're in level transition, clean it up first
+	// Only create once
 	if (TransitionWidget)
 	{
-		TransitionWidget->RemoveFromParent();
-		TransitionWidget = nullptr;
+		return;
 	}
 
 	// Check if we have a valid widget class (load if soft reference)

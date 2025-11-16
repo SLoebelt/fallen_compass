@@ -1289,7 +1289,13 @@ sequenceDiagram
 
 ### Overview
 
-Implemented an in-world main menu system that provides a seamless transition between menu navigation and gameplay. The system uses a dedicated menu camera, widget-based UI, and state management to handle different game modes (Main Menu, Gameplay, Paused).
+Implemented an **in-world main menu system** within the L_Office level that provides a seamless transition between menu navigation and gameplay. The system uses a dedicated MenuCamera actor, widget-based UI, and state management to handle different game modes (Main Menu, Gameplay, Paused).
+
+**Key Architecture Decision**: There is **no separate main menu level** (no L_MainMenu). Instead, the L_Office level serves dual purposes:
+1. **Main Menu State**: Player views the office through a static MenuCamera while interacting with the main menu UI
+2. **Gameplay State**: Player controls first-person character with full movement and interaction
+
+This approach creates an immersive, seamless experience where the menu "exists" in the game world.
 
 ### Main Menu Architecture
 
@@ -1463,8 +1469,11 @@ Called from door interaction to return to menu:
 
 1. Sets `CurrentGameState = EFCGameState::Loading`
 2. Fades camera to black (1.0s)
-3. Reloads `L_Office` level after fade completes
-4. Level reload triggers `InitializeMainMenu()` automatically
+3. Reloads `L_Office` level after fade completes (resets level state)
+4. On level reload, `BeginPlay()` detects MainMenu state and calls `InitializeMainMenu()` automatically
+5. Player sees the same office space but from MenuCamera perspective with UI active
+
+**Note**: Level reload is necessary to properly reset all interactive objects and restore the office to its initial state.
 
 ### Widget System
 
@@ -1555,11 +1564,18 @@ The system maintains three key state variables:
 
 The door interaction system integrates with main menu via `ReturnToMainMenu()`:
 
-1. Player interacts with door
+1. Player interacts with door (Press E on SM_Door in L_Office)
 2. `BP_MenuDoor::OnInteract()` calls `AFCPlayerController::ReturnToMainMenu()`
 3. Screen fades to black
-4. Level reloads to reset state
+4. L_Office level reloads to reset state
 5. `InitializeMainMenu()` sets up fresh menu state
+6. Player sees menu UI with MenuCamera view of the same office
+
+**Architectural Note**: Both the main menu and gameplay occur in the same L_Office level. The distinction is purely state-based:
+- **MainMenu State**: Static MenuCamera view + UI controls + mouse cursor
+- **Gameplay State**: First-person character control + interaction system + hidden cursor
+
+This creates a unique "menu within the world" experience where the office serves as both the menu backdrop and the gameplay environment.
 
 ### Save/Load System Foundation
 
