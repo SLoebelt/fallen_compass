@@ -10,22 +10,76 @@ DEFINE_LOG_CATEGORY(LogFCUIManager);
 
 void UFCUIManager::ShowMainMenu()
 {
-	UE_LOG(LogFCUIManager, Log, TEXT("ShowMainMenu() called (stub)"));
+	if (!MainMenuWidgetClass)
+	{
+		UE_LOG(LogFCUIManager, Error, TEXT("ShowMainMenu: MainMenuWidgetClass is null!"));
+		return;
+	}
+
+	// Create widget if not already cached
+	if (!MainMenuWidget)
+	{
+		MainMenuWidget = CreateWidget<UUserWidget>(GetGameInstance(), MainMenuWidgetClass);
+		if (!MainMenuWidget)
+		{
+			UE_LOG(LogFCUIManager, Error, TEXT("ShowMainMenu: Failed to create MainMenuWidget!"));
+			return;
+		}
+		UE_LOG(LogFCUIManager, Log, TEXT("ShowMainMenu: Created MainMenuWidget"));
+	}
+
+	// Add to viewport
+	MainMenuWidget->AddToViewport();
+	UE_LOG(LogFCUIManager, Log, TEXT("ShowMainMenu: Widget added to viewport"));
 }
 
 void UFCUIManager::HideMainMenu()
 {
-	UE_LOG(LogFCUIManager, Log, TEXT("HideMainMenu() called (stub)"));
+	if (!MainMenuWidget)
+	{
+		UE_LOG(LogFCUIManager, Warning, TEXT("HideMainMenu: MainMenuWidget is null, nothing to hide"));
+		return;
+	}
+
+	MainMenuWidget->RemoveFromParent();
+	UE_LOG(LogFCUIManager, Log, TEXT("HideMainMenu: Widget removed from viewport"));
 }
 
 void UFCUIManager::ShowSaveSlotSelector()
 {
-	UE_LOG(LogFCUIManager, Log, TEXT("ShowSaveSlotSelector() called (stub)"));
+	if (!SaveSlotSelectorWidgetClass)
+	{
+		UE_LOG(LogFCUIManager, Error, TEXT("ShowSaveSlotSelector: SaveSlotSelectorWidgetClass is null!"));
+		return;
+	}
+
+	// Create widget if not already cached
+	if (!SaveSlotSelectorWidget)
+	{
+		SaveSlotSelectorWidget = CreateWidget<UUserWidget>(GetGameInstance(), SaveSlotSelectorWidgetClass);
+		if (!SaveSlotSelectorWidget)
+		{
+			UE_LOG(LogFCUIManager, Error, TEXT("ShowSaveSlotSelector: Failed to create SaveSlotSelectorWidget!"));
+			return;
+		}
+		UE_LOG(LogFCUIManager, Log, TEXT("ShowSaveSlotSelector: Created SaveSlotSelectorWidget"));
+	}
+
+	// Add to viewport
+	SaveSlotSelectorWidget->AddToViewport();
+	UE_LOG(LogFCUIManager, Log, TEXT("ShowSaveSlotSelector: Widget added to viewport"));
 }
 
 void UFCUIManager::HideSaveSlotSelector()
 {
-	UE_LOG(LogFCUIManager, Log, TEXT("HideSaveSlotSelector() called (stub)"));
+	if (!SaveSlotSelectorWidget)
+	{
+		UE_LOG(LogFCUIManager, Warning, TEXT("HideSaveSlotSelector: SaveSlotSelectorWidget is null, nothing to hide"));
+		return;
+	}
+
+	SaveSlotSelectorWidget->RemoveFromParent();
+	UE_LOG(LogFCUIManager, Log, TEXT("HideSaveSlotSelector: Widget removed from viewport"));
 }
 
 void UFCUIManager::HandleNewLegacyClicked()
