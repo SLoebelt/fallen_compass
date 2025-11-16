@@ -30,6 +30,9 @@ void UFCGameInstance::Init()
         UE_LOG(LogTemp, Warning, TEXT("UFCGameInstance: Failed to get UIManager subsystem"));
     }
 
+    // Bind to world context change for handling level load completion
+    FCoreUObjectDelegates::PostLoadMapWithWorld.AddUObject(this, &UFCGameInstance::OnPostLoadMapWithWorld);
+
     // Future hook: load persistent profile data before menus spawn.
 }
 
@@ -326,4 +329,36 @@ void UFCGameInstance::RestorePlayerPosition()
 
     // Clear pending data
     PendingLoadData = nullptr;
+}
+
+void UFCGameInstance::OnPostLoadMapWithWorld(UWorld* LoadedWorld)
+{
+    // Only handle if this is our world
+    if (!LoadedWorld || LoadedWorld != GetWorld())
+    {
+        return;
+    }
+
+    // Check if transition manager has an active fade
+    UFCTransitionManager* TransitionMgr = GetSubsystem<UFCTransitionManager>();
+    if (!TransitionMgr)
+    {
+        return;
+    }
+
+    // If we're currently faded out (black screen), trigger fade-in to reveal the new level
+    // Add slight delay to ensure level is fully initialized
+    if (TransitionMgr->IsFading())
+    {
+        FTimerHandle FadeInTimerHandle;
+        GetWorld()->GetTimerManager().SetTimer(
+            FadeInTimerHandle,
+            [TransitionMgr]()
+            {
+                TransitionMgr->BeginFadeIn(1.0f);
+            },
+            0.2f,  // 200ms delay for level initialization
+            false
+        );
+    }
 }

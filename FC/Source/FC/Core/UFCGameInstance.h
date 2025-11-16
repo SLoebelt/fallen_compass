@@ -112,6 +112,9 @@ class FC_API UFCGameInstance : public UGameInstance
     UFUNCTION(BlueprintPure, Category = "SaveGame")
     bool IsRestoringSaveGame() const { return PendingLoadData != nullptr; }
 
+    /** Called when a level finishes loading - triggers fade-in if transition is active */
+    void OnPostLoadMapWithWorld(UWorld* LoadedWorld);
+
 private:
     /** Cached save data for restoring player position after level load */
     UPROPERTY()

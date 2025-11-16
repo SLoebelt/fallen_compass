@@ -34,12 +34,21 @@ void UFCTransitionManager::Initialize(FSubsystemCollectionBase& Collection)
 
 void UFCTransitionManager::Deinitialize()
 {
-	// Clean up widget if it exists
-	if (TransitionWidget && TransitionWidget->IsInViewport())
+	// Clean up persistent widget using RemoveViewportWidgetContent
+	if (TransitionWidget)
 	{
-		TransitionWidget->RemoveFromParent();
+		UGameViewportClient* ViewportClient = GetGameInstance()->GetGameViewportClient();
+		if (ViewportClient)
+		{
+			TSharedPtr<SWidget> WidgetSlatePtr = TransitionWidget->GetCachedWidget();
+			if (WidgetSlatePtr.IsValid())
+			{
+				ViewportClient->RemoveViewportWidgetContent(WidgetSlatePtr.ToSharedRef());
+				UE_LOG(LogFCTransitions, Log, TEXT("FCTransitionManager: Removed persistent widget from viewport"));
+			}
+		}
+		TransitionWidget = nullptr;
 	}
-	TransitionWidget = nullptr;
 
 	UE_LOG(LogFCTransitions, Log, TEXT("FCTransitionManager: Deinitialized"));
 
@@ -86,13 +95,27 @@ void UFCTransitionManager::CreateTransitionWidget()
 	TransitionWidget->OnFadeOutComplete.AddDynamic(this, &UFCTransitionManager::OnWidgetFadeOutComplete);
 	TransitionWidget->OnFadeInComplete.AddDynamic(this, &UFCTransitionManager::OnWidgetFadeInComplete);
 
-	// Add to viewport with high Z-order to ensure it's always on top
-	TransitionWidget->AddToViewport(1000);
+	// Add to viewport using AddViewportWidgetContent for persistence across level loads
+	// This method keeps the widget alive even when PlayerController is destroyed
+	UGameViewportClient* ViewportClient = GetGameInstance()->GetGameViewportClient();
+	if (ViewportClient)
+	{
+		ViewportClient->AddViewportWidgetContent(
+			TransitionWidget->TakeWidget(),
+			1000  // ZOrder - very high to be on top of everything
+		);
+		UE_LOG(LogFCTransitions, Log, TEXT("FCTransitionManager: TransitionWidget added to viewport (persistent)"));
+	}
+	else
+	{
+		UE_LOG(LogFCTransitions, Error, TEXT("FCTransitionManager: Failed to get GameViewportClient"));
+		return;
+	}
 
 	// Start invisible (opacity 0)
 	TransitionWidget->SetVisibility(ESlateVisibility::HitTestInvisible);
 
-	UE_LOG(LogFCTransitions, Log, TEXT("FCTransitionManager: TransitionWidget created and added to viewport"));
+	UE_LOG(LogFCTransitions, Log, TEXT("FCTransitionManager: TransitionWidget created successfully"));
 }
 
 void UFCTransitionManager::BeginFadeOut(float Duration, bool bShowLoadingIndicator)
