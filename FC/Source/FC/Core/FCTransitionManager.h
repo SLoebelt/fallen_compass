@@ -53,6 +53,12 @@ public:
 	bool IsFading() const { return bCurrentlyFading; }
 
 	/**
+	 * Check if screen is currently black (fully opaque)
+	 * @return True if transition widget exists and is showing black screen
+	 */
+	bool IsBlack() const;
+
+	/**
 	 * Check if loading into the same level we're currently in
 	 * @param TargetLevelName Name of the level being loaded
 	 * @return True if target level matches current level
@@ -108,6 +114,11 @@ protected:
 	 * Create and add transition widget to viewport
 	 */
 	void CreateTransitionWidget();
+
+	/**
+	 * Ensure widget is added to viewport (handles deferred addition when viewport wasn't ready during Initialize)
+	 */
+	void EnsureWidgetInViewport();
 
 	/**
 	 * Called when widget's fade out animation completes

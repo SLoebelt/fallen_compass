@@ -236,6 +236,7 @@ TArray<FString> UFCGameInstance::GetAvailableSaveSlots()
         if (UGameplayStatics::DoesSaveGameExist(SlotName, 0))
         {
             SaveSlots.Add(SlotName);
+            UE_LOG(LogTemp, Log, TEXT("GetAvailableSaveSlots: Found %s"), *SlotName);
         }
     }
 
@@ -243,6 +244,7 @@ TArray<FString> UFCGameInstance::GetAvailableSaveSlots()
     if (UGameplayStatics::DoesSaveGameExist(TEXT("QuickSave"), 0))
     {
         SaveSlots.Add(TEXT("QuickSave"));
+        UE_LOG(LogTemp, Log, TEXT("GetAvailableSaveSlots: Found QuickSave"));
     }
 
     // Check for manual saves (up to 10 for now)
@@ -252,9 +254,11 @@ TArray<FString> UFCGameInstance::GetAvailableSaveSlots()
         if (UGameplayStatics::DoesSaveGameExist(SlotName, 0))
         {
             SaveSlots.Add(SlotName);
+            UE_LOG(LogTemp, Log, TEXT("GetAvailableSaveSlots: Found %s"), *SlotName);
         }
     }
 
+    UE_LOG(LogTemp, Log, TEXT("GetAvailableSaveSlots: Total found: %d"), SaveSlots.Num());
     return SaveSlots;
 }
 
@@ -346,10 +350,12 @@ void UFCGameInstance::OnPostLoadMapWithWorld(UWorld* LoadedWorld)
         return;
     }
 
-    // If we're currently faded out (black screen), trigger fade-in to reveal the new level
-    // Add slight delay to ensure level is fully initialized
-    if (TransitionMgr->IsFading())
+    // If screen is currently black, trigger fade-in to reveal the new level
+    if (TransitionMgr->IsBlack())
     {
+        // If we have pending load data, delay fade-in longer to allow player position restoration and camera blend to start
+        float FadeInDelay = PendingLoadData ? 0.5f : 0.2f;
+        
         FTimerHandle FadeInTimerHandle;
         GetWorld()->GetTimerManager().SetTimer(
             FadeInTimerHandle,
@@ -357,7 +363,7 @@ void UFCGameInstance::OnPostLoadMapWithWorld(UWorld* LoadedWorld)
             {
                 TransitionMgr->BeginFadeIn(1.0f);
             },
-            0.2f,  // 200ms delay for level initialization
+            FadeInDelay,
             false
         );
     }
