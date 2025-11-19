@@ -3482,9 +3482,9 @@ void UFCExpeditionPlanningWidget::OnStartExpeditionClicked()
     if (GEngine)
     {
         GEngine->AddOnScreenDebugMessage(
-            -1, 
-            3.0f, 
-            FColor::Yellow, 
+            -1,
+            3.0f,
+            FColor::Yellow,
             TEXT("Coming Soon - Overworld in Week 3")
         );
     }
@@ -3520,6 +3520,7 @@ void UFCExpeditionPlanningWidget::UpdateSuppliesDisplay()
 - **Purpose**: Blueprint child providing visual styling and layout
 
 **Component Hierarchy**:
+
 ```
 WBP_ExpeditionPlanning
 ├── RootCanvas (Canvas Panel)
@@ -3539,6 +3540,7 @@ WBP_ExpeditionPlanning
 ```
 
 **Styling Notes**:
+
 - Parchment-themed background for immersive table map aesthetic
 - Button hover/pressed states implemented in Blueprint
 - All component names match C++ BindWidget properties exactly
@@ -3571,6 +3573,7 @@ void AFCPlayerController::HandlePausePressed()
 ```
 
 **Dual ESC Behavior Flow**:
+
 1. **Widget Open**: ESC → Close widget → Return to TableView (mouse cursor remains, can click other objects)
 2. **TableView (no widget)**: ESC → Exit TableView → Return to FirstPerson
 3. **FirstPerson**: ESC → Toggle pause menu

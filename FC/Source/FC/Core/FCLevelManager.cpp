@@ -1,7 +1,10 @@
 // Copyright (c) 2024 @ Steffen Loebelt. All Rights Reserved.
 
 #include "Core/FCLevelManager.h"
+#include "Core/FCTransitionManager.h"
+#include "Core/UFCGameInstance.h"
 #include "Engine/World.h"
+#include "Kismet/GameplayStatics.h"
 
 DEFINE_LOG_CATEGORY(LogFCLevelManager);
 
@@ -24,6 +27,9 @@ void UFCLevelManager::Initialize(FSubsystemCollectionBase& Collection)
 	CurrentLevelName = NormalizeLevelName(FName(*RawMapName));
 	CurrentLevelType = DetermineLevelType(CurrentLevelName);
 
+	// Initialize PreviousLevelName to None
+	PreviousLevelName = NAME_None;
+
 	UE_LOG(LogFCLevelManager, Log, TEXT("Initialized: Level=%s, Type=%s"), 
 		*CurrentLevelName.ToString(), 
 		*UEnum::GetValueAsString(CurrentLevelType));
@@ -31,12 +37,16 @@ void UFCLevelManager::Initialize(FSubsystemCollectionBase& Collection)
 
 void UFCLevelManager::UpdateCurrentLevel(const FName& NewLevelName)
 {
+	// Store previous level before updating
+	PreviousLevelName = CurrentLevelName;
+
 	CurrentLevelName = NormalizeLevelName(NewLevelName);
 	CurrentLevelType = DetermineLevelType(CurrentLevelName);
 	
-	UE_LOG(LogFCLevelManager, Log, TEXT("UpdateCurrentLevel: Level=%s, Type=%s"), 
+	UE_LOG(LogFCLevelManager, Log, TEXT("UpdateCurrentLevel: Level=%s, Type=%s, PreviousLevel=%s"), 
 		*CurrentLevelName.ToString(), 
-		*UEnum::GetValueAsString(CurrentLevelType));
+		*UEnum::GetValueAsString(CurrentLevelType),
+		*PreviousLevelName.ToString());
 }
 
 FName UFCLevelManager::NormalizeLevelName(const FName& RawLevelName) const
@@ -111,4 +121,64 @@ bool UFCLevelManager::IsGameplayLevel() const
 	       CurrentLevelType == EFCLevelType::Camp ||
 	       CurrentLevelType == EFCLevelType::POI ||
 	       CurrentLevelType == EFCLevelType::Village;
+}
+
+void UFCLevelManager::LoadLevel(FName LevelName, bool bShowLoadingScreen)
+{
+	if (LevelName.IsNone())
+	{
+		UE_LOG(LogFCLevelManager, Error, TEXT("LoadLevel: Invalid level name"));
+		return;
+	}
+
+	// Normalize level name
+	FName NormalizedLevelName = NormalizeLevelName(LevelName);
+
+	UE_LOG(LogFCLevelManager, Log, TEXT("LoadLevel: Loading %s (ShowLoadingScreen: %s)"),
+		*NormalizedLevelName.ToString(),
+		bShowLoadingScreen ? TEXT("true") : TEXT("false"));
+
+	// Get TransitionManager from GameInstance
+	UFCGameInstance* GI = Cast<UFCGameInstance>(GetGameInstance());
+	if (!GI)
+	{
+		UE_LOG(LogFCLevelManager, Error, TEXT("LoadLevel: Failed to get GameInstance"));
+		return;
+	}
+
+	UFCTransitionManager* TransitionMgr = GI->GetSubsystem<UFCTransitionManager>();
+	if (!TransitionMgr)
+	{
+		UE_LOG(LogFCLevelManager, Error, TEXT("LoadLevel: Failed to get TransitionManager"));
+		return;
+	}
+
+	// Store level name for callback
+	LevelToLoad = NormalizedLevelName;
+
+	// Bind to OnFadeOutComplete delegate
+	TransitionMgr->OnFadeOutComplete.AddDynamic(this, &UFCLevelManager::OnFadeOutCompleteForLevelLoad);
+
+	// Start fade out
+	TransitionMgr->BeginFadeOut();
+}
+
+void UFCLevelManager::OnFadeOutCompleteForLevelLoad()
+{
+	// Unbind delegate (one-shot callback)
+	UFCGameInstance* GI = Cast<UFCGameInstance>(GetGameInstance());
+	if (GI)
+	{
+		UFCTransitionManager* TransitionMgr = GI->GetSubsystem<UFCTransitionManager>();
+		if (TransitionMgr)
+		{
+			TransitionMgr->OnFadeOutComplete.RemoveDynamic(this, &UFCLevelManager::OnFadeOutCompleteForLevelLoad);
+		}
+	}
+
+	// Load new level
+	UGameplayStatics::OpenLevel(this, LevelToLoad);
+
+	// Note: FadeIn will be handled automatically by new level's BeginPlay or PlayerController
+	// For Week 2, we rely on existing fade-in logic; Week 3+ will add explicit loading screen handling
 }

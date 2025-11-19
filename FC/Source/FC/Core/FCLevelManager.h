@@ -8,6 +8,9 @@
 
 DECLARE_LOG_CATEGORY_EXTERN(LogFCLevelManager, Log, All);
 
+// Forward declarations
+class UFCTransitionManager;
+
 /**
  * EFCLevelType
  * 
@@ -59,6 +62,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "FC|Level")
 	EFCLevelType GetCurrentLevelType() const { return CurrentLevelType; }
 
+	/** Get the previous level name (for back navigation) */
+	UFUNCTION(BlueprintCallable, Category = "FC|Level")
+	FName GetPreviousLevelName() const { return PreviousLevelName; }
+
 	/** Check if current level is a menu level */
 	UFUNCTION(BlueprintCallable, Category = "FC|Level")
 	bool IsMenuLevel() const { return CurrentLevelType == EFCLevelType::MainMenu; }
@@ -69,6 +76,14 @@ public:
 
 	/** Update the current level (called after level transitions) */
 	void UpdateCurrentLevel(const FName& NewLevelName);
+
+	/**
+	 * Load a new level with optional fade transition and loading screen
+	 * @param LevelName Name of level to load (will be normalized)
+	 * @param bShowLoadingScreen Whether to show loading screen during transition (not implemented in Week 2)
+	 */
+	UFUNCTION(BlueprintCallable, Category = "FC|Level")
+	void LoadLevel(FName LevelName, bool bShowLoadingScreen = false);
 
 	/** Normalize level name (strip PIE prefix, trim whitespace) */
 	FName NormalizeLevelName(const FName& RawLevelName) const;
@@ -84,4 +99,15 @@ private:
 	/** Current level type */
 	UPROPERTY()
 	EFCLevelType CurrentLevelType;
+
+	/** Previously loaded level name (for back navigation) */
+	UPROPERTY()
+	FName PreviousLevelName;
+
+	/** Level name pending load (used by LoadLevel callback) */
+	FName LevelToLoad;
+
+	/** Callback when fade out completes before level load */
+	UFUNCTION()
+	void OnFadeOutCompleteForLevelLoad();
 };
