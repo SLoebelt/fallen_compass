@@ -875,36 +875,36 @@ Create `IFCTableInteractable` C++ interface and `BP_TableObject` base Blueprint 
 
 ##### Step 2.3.1: Create BP_TableObject_Map (Map Object)
 
-- [ ] **Analysis**
+- [x] **Analysis**
 
-  - [ ] Inherits from BP_TableObject
-  - [ ] Override GetWidgetClass to return WBP_MapTable (will be created in Task 3)
-  - [ ] Unique static mesh: parchment/map appearance (placeholder cube for now)
-  - [ ] Position: Center of table in L_Office
+  - [x] Inherits from BP_TableObject
+  - [x] Override GetWidgetClass to return WBP_MapTable (will be created in Task 3)
+  - [x] Unique static mesh: parchment/map appearance (placeholder cube for now)
+  - [x] Position: Center of table in L_Office
 
-- [ ] **Implementation (Blueprint)**
+- [x] **Implementation (Blueprint)**
 
-  - [ ] Content Browser → `/Content/FC/World/Blueprints/Interactables/`
-  - [ ] Right-click BP_TableObject → Create Child Blueprint Class
-  - [ ] Name: `BP_TableObject_Map`
-  - [ ] Open BP_TableObject_Map
-  - [ ] Components:
-    - [ ] Select PlaceholderMesh → Details → Material: Set tint color to tan/beige (map appearance)
-    - [ ] Adjust transform if needed for visual distinction
-  - [ ] Event Graph:
-    - [ ] Override Event Get Widget Class:
-      - [ ] Return Node → Select Class: `WBP_MapTable` (will be nullptr until Task 3 creates widget)
-      - [ ] Note: Set this to WBP_MapTable after Task 3 is complete
-    - [ ] Override Event On Table Object Clicked:
-      - [ ] Print String ("Map clicked - will show WBP_MapTable")
-  - [ ] Compile Blueprint
+  - [x] Content Browser → `/Content/FC/World/Blueprints/Interactables/`
+  - [x] Right-click BP_TableObject → Create Child Blueprint Class
+  - [x] Name: `BP_TableObject_Map`
+  - [x] Open BP_TableObject_Map
+  - [x] Components:
+    - [x] Select PlaceholderMesh → Details → Material: Set tint color to tan/beige (map appearance)
+    - [x] Adjust transform if needed for visual distinction
+  - [x] Event Graph:
+    - [x] Override Event Get Widget Class:
+      - [x] Return Node → Select Class: `WBP_MapTable` (will be nullptr until Task 3 creates widget)
+      - [x] Note: Set this to WBP_MapTable after Task 3 is complete
+    - [x] Override Event On Table Object Clicked:
+      - [x] Print String ("Map clicked - will show WBP_MapTable")
+  - [x] Compile Blueprint
 
-- [ ] **Testing After Step 2.3.1** ✅ CHECKPOINT
-  - [ ] Compile succeeds
-  - [ ] Drag BP_TableObject_Map into L_Office level
-  - [ ] Position at table center (approximately where map would be)
-  - [ ] PIE: Verify map object visible with distinct appearance
-  - [ ] No errors in Output Log
+- [x] **Testing After Step 2.3.1** ✅ CHECKPOINT
+  - [x] Compile succeeds
+  - [x] Drag BP_TableObject_Map into L_Office level
+  - [x] Position at table center (approximately where map would be)
+  - [x] PIE: Verify map object visible with distinct appearance
+  - [x] No errors in Output Log
 
 **COMMIT POINT 2.3.1**: `git add -A && git commit -m "feat(interaction): Create BP_TableObject_Map"`
 
