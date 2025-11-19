@@ -20,6 +20,8 @@
 #include "FCTransitionManager.h"
 #include "Core/FCLevelManager.h"
 #include "Core/FCUIManager.h"
+#include "../Interaction/FCTableInteractable.h"
+#include "GameFramework/Character.h"
 
 DEFINE_LOG_CATEGORY(LogFallenCompassPlayerController);
 
@@ -121,6 +123,17 @@ AFCPlayerController::AFCPlayerController()
 	{
 		UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("Failed to load IA_Escape."));
 	}
+
+	static ConstructorHelpers::FObjectFinder<UInputAction> ClickActionFinder(TEXT("/Game/FC/Input/IA_Click"));
+	if (ClickActionFinder.Succeeded())
+	{
+		ClickAction = ClickActionFinder.Object;
+		UE_LOG(LogFallenCompassPlayerController, Log, TEXT("Loaded IA_Click"));
+	}
+	else
+	{
+		UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("Failed to load IA_Click."));
+	}
 }
 
 void AFCPlayerController::BeginPlay()
@@ -193,6 +206,15 @@ void AFCPlayerController::BeginPlay()
 	else
 	{
 		UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("EscapeAction not assigned on %s."), *GetName());
+	}
+
+	if (ClickAction)
+	{
+		EnhancedInput->BindAction(ClickAction, ETriggerEvent::Triggered, this, &AFCPlayerController::HandleTableObjectClick);
+	}
+	else
+	{
+		UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("ClickAction not assigned on %s."), *GetName());
 	}
 }
 
@@ -271,26 +293,6 @@ void AFCPlayerController::HandlePausePressed()
 
 	// If in main menu state or other UI states, ESC does nothing (handled by UI widgets)
 	UE_LOG(LogFallenCompassPlayerController, Log, TEXT("ESC pressed in state %d - no action"), static_cast<int32>(CurrentGameState));
-}
-
-void AFCPlayerController::EnterTableViewPlaceholder()
-{
-	SetFallenCompassCameraMode(EFCPlayerCameraMode::TableView);
-	UE_LOG(LogFallenCompassPlayerController, Display, TEXT("TODO: Blend to table-view camera and disable movement."));
-	if (GEngine)
-	{
-		GEngine->AddOnScreenDebugMessage(-1, 4.f, FColor::Orange, TEXT("Entering Table View (TODO: Blend camera)"));
-	}
-}
-
-void AFCPlayerController::ExitTableViewPlaceholder()
-{
-	SetFallenCompassCameraMode(EFCPlayerCameraMode::FirstPerson);
-	UE_LOG(LogFallenCompassPlayerController, Display, TEXT("TODO: Restore first-person camera and re-enable input."));
-	if (GEngine)
-	{
-		GEngine->AddOnScreenDebugMessage(-1, 4.f, FColor::Orange, TEXT("Exiting Table View (TODO: Restore camera)"));
-	}
 }
 
 void AFCPlayerController::ShowPauseMenuPlaceholder()
@@ -471,6 +473,15 @@ void AFCPlayerController::SetCameraModeLocal(EFCPlayerCameraMode NewMode, float 
 					}, BlendTime + 0.1f, false);
 				}
 				bIsInTableView = false; // Exiting table view
+				
+				// Disable cursor and mouse events
+				bShowMouseCursor = false;
+				bEnableClickEvents = false;
+				bEnableMouseOverEvents = false;
+				
+				// Set input mode back to Game Only
+				FInputModeGameOnly InputMode;
+				SetInputMode(InputMode);
 			}
 			
 			// Restore FirstPerson input mapping (movement + ESC)
@@ -542,6 +553,17 @@ void AFCPlayerController::SetCameraModeLocal(EFCPlayerCameraMode NewMode, float 
 								Subsystem->ClearAllMappings();
 								Subsystem->AddMappingContext(StaticSceneMappingContext, 0);
 							}
+							
+							// Enable cursor and click events for table interaction
+							bShowMouseCursor = true;
+							bEnableClickEvents = true;
+							bEnableMouseOverEvents = true;
+							
+							// Set input mode to Game and UI
+							FInputModeGameAndUI InputMode;
+							InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+							InputMode.SetHideCursorDuringCapture(false);
+							SetInputMode(InputMode);
 							
 							LogStateChange(TEXT("Camera switched to TableView"));
 							UE_LOG(LogFallenCompassPlayerController, Log, TEXT("TableView: Camera smoothly blending to CameraTargetPoint at location %s, rotation %s"), 
@@ -837,4 +859,47 @@ void AFCPlayerController::FadeScreenIn(float Duration)
 
 	TransitionMgr->BeginFadeIn(Duration);
 	UE_LOG(LogFallenCompassPlayerController, Log, TEXT("FadeScreenIn: Initiated fade (Duration: %.2fs)"), Duration);
+}
+
+void AFCPlayerController::HandleTableObjectClick()
+{
+	// Perform line trace from cursor position
+	FHitResult HitResult;
+	bool bHit = GetHitResultUnderCursor(ECC_Visibility, false, HitResult);
+
+	if (bHit && HitResult.GetActor())
+	{
+		AActor* HitActor = HitResult.GetActor();
+		UE_LOG(LogFallenCompassPlayerController, Log, TEXT("Cursor hit actor: %s"), *HitActor->GetName());
+
+		// Check if actor implements IFCTableInteractable
+		if (HitActor->Implements<UFCTableInteractable>())
+		{
+			// Check if interaction is allowed
+			bool bCanInteract = IFCTableInteractable::Execute_CanInteract(HitActor);
+			if (bCanInteract)
+			{
+				UE_LOG(LogFallenCompassPlayerController, Log, TEXT("Table object clicked: %s"), *HitActor->GetName());
+				OnTableObjectClicked(HitActor);
+			}
+			else
+			{
+				UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("Table object cannot be interacted with: %s"), *HitActor->GetName());
+			}
+		}
+		else
+		{
+			UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("Hit actor does not implement IFCTableInteractable: %s"), *HitActor->GetName());
+		}
+	}
+	else
+	{
+		UE_LOG(LogFallenCompassPlayerController, Verbose, TEXT("Cursor click - no actor hit"));
+	}
+}
+
+void AFCPlayerController::OnTableObjectClicked(AActor* TableObject)
+{
+	// Implementation in next step
+	UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("OnTableObjectClicked called but not yet implemented for %s"), *GetNameSafe(TableObject));
 }

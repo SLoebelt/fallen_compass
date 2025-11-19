@@ -12,8 +12,9 @@
 4. [Office Level & Greybox (Task 4)](#office-level--greybox-task-4)
 5. [Main Menu System (Task 5)](#main-menu-system-task-5)
 6. [Office Flow & Interactions (Task 6)](#office-flow--interactions-task-6)
-7. [Logging & Debugging](#logging--debugging)
-8. [Build & Configuration](#build--configuration)
+7. [Table Interaction System (Week 2)](#table-interaction-system-week-2)
+8. [Logging & Debugging](#logging--debugging)
+9. [Build & Configuration](#build--configuration)
 
 ---
 
@@ -2912,6 +2913,410 @@ void Interact();
 ### Design Rationale
 
 Interface-based design allows easy addition of new interactables without modifying core logic. Component-based detection keeps character class clean. Screen-space positioning ensures prompts appear over objects regardless of camera angle.
+
+---
+
+## Table Interaction System (Week 2)
+
+### Overview
+
+Week 2 implements a specialized table interaction system for the office desk, allowing players to click on individual table objects (Map, Logbook, Letters, Compass) when in TableView camera mode. This system extends the interaction framework with cursor-based detection and lays the foundation for UI widgets in Week 3.
+
+**Status**: Task 2 (Interface & Table Objects) complete ✅ | Task 3 (Click Detection) Step 3.1 complete ✅ | Tasks 3.2-3.6 (Camera Focus & Widgets) pending ⏳
+
+### Architecture Overview
+
+```mermaid
+flowchart TB
+    subgraph TableViewMode["TableView Camera Mode"]
+        PC[AFCPlayerController]
+        Cursor[Mouse Cursor Enabled]
+        IA[IA_Click Input Action]
+    end
+
+    subgraph TableObjects["Table Objects"]
+        Map[BP_TableObject_Map]
+        Log[BP_TableObject_Logbook]
+        Let[BP_TableObject_Letters]
+        Comp[BP_TableObject_Compass]
+        Base[BP_TableObject<br/>Base Class]
+    end
+
+    subgraph Interface["IFCTableInteractable"]
+        Methods[GetCameraTargetTransform<br/>CanInteract<br/>OnTableObjectClicked<br/>GetWidgetClass]
+    end
+
+    PC -->|GetHitResultUnderCursor| Cursor
+    Cursor -->|Trace ECC_Visibility| TableObjects
+    IA -->|Left Mouse Button| PC
+    Map -->|Implements| Interface
+    Log -->|Implements| Interface
+    Let -->|Implements| Interface
+    Comp -->|Implements| Interface
+    Base -->|Parent| Map
+    Base -->|Parent| Log
+    Base -->|Parent| Let
+    Base -->|Parent| Comp
+    Base -->|Implements| Interface
+
+    style PC fill:#4a90e2
+    style Interface fill:#50c878
+    style Base fill:#e91e63
+```
+
+### IFCTableInteractable Interface
+
+- **Files**: `Source/FC/Interaction/FCTableInteractable.h/.cpp`
+- **Inheritance**: `UInterface`
+- **Purpose**: Defines the contract for all table objects that can be clicked and interacted with in TableView mode.
+
+#### Key Methods
+
+```cpp
+/**
+ * Get the camera target transform for focusing on this table object
+ * @return Transform where the camera should move to when this object is clicked
+ */
+UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Table Interaction")
+FTransform GetCameraTargetTransform() const;
+
+/**
+ * Check if this table object can currently be interacted with
+ * @return True if interaction is allowed, false otherwise
+ */
+UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Table Interaction")
+bool CanInteract() const;
+
+/**
+ * Called when this table object is clicked by the player
+ * @param Interactor The player controller that clicked this object
+ */
+UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Table Interaction")
+void OnTableObjectClicked(AActor* Interactor);
+
+/**
+ * Get the widget class to display when this table object is focused
+ * @return Widget class to show (nullptr if no widget needed)
+ */
+UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Table Interaction")
+TSubclassOf<UUserWidget> GetWidgetClass() const;
+```
+
+#### Default Implementations
+
+```cpp
+FTransform IFCTableInteractable::GetCameraTargetTransform_Implementation() const
+{
+    // Default: Return world transform of implementing actor
+    const AActor* Actor = Cast<AActor>(this);
+    return Actor ? Actor->GetActorTransform() : FTransform::Identity;
+}
+
+bool IFCTableInteractable::CanInteract_Implementation() const
+{
+    return true; // Always interactable by default
+}
+
+void IFCTableInteractable::OnTableObjectClicked_Implementation(AActor* Interactor)
+{
+    UE_LOG(LogFCInteraction, Log, TEXT("OnTableObjectClicked: %s"), *GetNameSafe(Cast<AActor>(this)));
+}
+
+TSubclassOf<UUserWidget> IFCTableInteractable::GetWidgetClass_Implementation() const
+{
+    return nullptr; // No widget by default
+}
+```
+
+#### Design Notes
+
+- Separate from `IFCInteractable` (E-key interactions) to avoid conflicting interaction modes
+- Blueprint-friendly: All methods use `_Implementation` suffix for BlueprintNativeEvent
+- Camera target typically points to a SceneComponent positioned above the table object
+- Widget class allows per-object UI (e.g., BP_TableObject_Map shows map widget)
+
+### BP_TableObject Base Class
+
+- **Type**: Blueprint Actor (based on AActor)
+- **Location**: `/Content/FC/World/Blueprints/Interactables/BP_TableObject`
+- **Purpose**: Shared base class for all table objects with common components and interface implementation
+
+#### Component Structure
+
+```
+BP_TableObject (Actor)
+├── DefaultSceneRoot (Root)
+├── CameraTargetPoint (SceneComponent)
+│   └── Transform: Relative Location (X=-50, Y=0, Z=50)
+│   └── Rotation: (Pitch=-30, Yaw=0, Roll=0)
+├── InteractionCollision (SphereCollision)
+│   └── Radius: 50.0
+│   └── Collision Preset: OverlapAllDynamic
+│   └── Visibility Channel: Block (enables cursor traces)
+└── PlaceholderMesh (StaticMeshComponent)
+    └── Mesh: /Engine/BasicShapes/Cube
+    └── Scale: (X=0.2, Y=0.2, Z=0.1)
+    └── Collision: NoCollision (disabled to avoid blocking cursor)
+```
+
+#### Interface Implementation (Blueprint)
+
+**GetCameraTargetTransform**:
+
+- Get Component by Class → CameraTargetPoint (SceneComponent)
+- Get World Transform → Return transform
+- This positions the camera to look down at the table object from above
+
+**CanInteract**:
+
+- Returns `true` (always interactable)
+- Child classes can override for conditional interaction
+
+**OnTableObjectClicked**:
+
+- Print String: "BP_TableObject clicked - override in child class"
+- Child classes override to show specific widgets or trigger events
+
+**GetWidgetClass**:
+
+- Returns `nullptr` (no widget by default)
+- Child classes set specific widget classes (e.g., WBP_MapTable for Map object)
+
+### Table Object Instances
+
+#### BP_TableObject_Map
+
+- **Location**: `/Content/FC/World/Blueprints/Interactables/BP_TableObject_Map`
+- **Parent**: BP_TableObject
+- **Visual**: Cube with brown/tan tint (parchment appearance)
+- **Scale**: (X=0.3, Y=0.2, Z=0.02) - flat map shape
+- **Widget Class**: WBP_MapTable (Week 3)
+- **Purpose**: Opens expedition planning interface
+
+#### BP_TableObject_Logbook
+
+- **Location**: `/Content/FC/World/Blueprints/Interactables/BP_TableObject_Logbook`
+- **Parent**: BP_TableObject
+- **Visual**: Cube with dark brown tint (leather-bound book)
+- **Scale**: (X=0.15, Y=0.2, Z=0.05) - thick book shape
+- **Widget Class**: None (Week 3 feature)
+- **Purpose**: Shows expedition diary/log entries
+
+#### BP_TableObject_Letters
+
+- **Location**: `/Content/FC/World/Blueprints/Interactables/BP_TableObject_Letters`
+- **Parent**: BP_TableObject
+- **Visual**: Cube with light yellow tint (aged paper)
+- **Scale**: (X=0.2, Y=0.15, Z=0.01) - scattered letters
+- **Widget Class**: None (Week 3 feature)
+- **Purpose**: Displays correspondence and mission briefings
+
+#### BP_TableObject_Compass
+
+- **Location**: `/Content/FC/World/Blueprints/Interactables/BP_TableObject_Compass`
+- **Parent**: BP_TableObject
+- **Visual**: Cube with cyan/transparent tint (glass appearance)
+- **Scale**: (X=0.12, Y=0.12, Z=0.02) - magnifying glass shape
+- **Widget Class**: None (Week 8 feature)
+- **Purpose**: Triggers expedition start confirmation dialog
+
+### AFCPlayerController Click Detection (Task 3.1)
+
+#### Enhanced Input Configuration
+
+**IA_Click Input Action**:
+
+- **Location**: `/Content/FC/Input/Actions/IA_Click`
+- **Type**: Digital (bool)
+- **Mapping**: Left Mouse Button in `IMC_FC_StaticScene` context
+- **Trigger**: Pressed
+
+**ClickAction Property**:
+
+```cpp
+/** Input action for table object click */
+UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FC|Input")
+TObjectPtr<UInputAction> ClickAction;
+```
+
+**Input Binding** (in `SetupInputComponent`):
+
+```cpp
+if (ClickAction)
+{
+    EnhancedInput->BindAction(ClickAction, ETriggerEvent::Triggered, this, &AFCPlayerController::HandleTableObjectClick);
+}
+else
+{
+    UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("ClickAction not assigned on %s."), *GetName());
+}
+```
+
+#### Cursor-Based Detection
+
+**HandleTableObjectClick Implementation**:
+
+```cpp
+void AFCPlayerController::HandleTableObjectClick()
+{
+    // Perform cursor-based trace to detect objects at mouse position
+    FHitResult HitResult;
+    bool bHit = GetHitResultUnderCursor(ECC_Visibility, false, HitResult);
+
+    if (bHit && HitResult.GetActor())
+    {
+        AActor* HitActor = HitResult.GetActor();
+        UE_LOG(LogFallenCompassPlayerController, Log, TEXT("Cursor hit actor: %s"), *HitActor->GetName());
+
+        // Check if actor implements IFCTableInteractable
+        if (HitActor->Implements<UFCTableInteractable>())
+        {
+            // Check if interaction is allowed
+            bool bCanInteract = IFCTableInteractable::Execute_CanInteract(HitActor);
+            if (bCanInteract)
+            {
+                UE_LOG(LogFallenCompassPlayerController, Log, TEXT("Table object clicked: %s"), *HitActor->GetName());
+                OnTableObjectClicked(HitActor);
+            }
+            else
+            {
+                UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("Table object cannot be interacted with: %s"), *HitActor->GetName());
+            }
+        }
+        else
+        {
+            UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("Hit actor does not implement IFCTableInteractable: %s"), *HitActor->GetName());
+        }
+    }
+    else
+    {
+        UE_LOG(LogFallenCompassPlayerController, Verbose, TEXT("Cursor click - no actor hit"));
+    }
+}
+```
+
+**Key Design Decisions**:
+
+- **Cursor-based trace** (`GetHitResultUnderCursor`) instead of camera-forward trace ensures clicks follow mouse position
+- **ECC_Visibility channel** used for consistency with interaction system
+- **Interface check** (`Implements<UFCTableInteractable>()`) ensures only table objects respond
+- **CanInteract validation** allows conditional interaction (e.g., locked objects)
+- **Comprehensive logging** at all stages for debugging (hit detection, interface check, interaction validation)
+
+#### OnTableObjectClicked Stub
+
+```cpp
+void AFCPlayerController::OnTableObjectClicked(AActor* TableObject)
+{
+    // Implementation pending: Task 3.2 (Camera Focus)
+    UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("OnTableObjectClicked called but not yet implemented for %s"), *GetNameSafe(TableObject));
+}
+```
+
+**Planned Implementation** (Task 3.2):
+
+1. Store original view target for restoration
+2. Get camera target transform from `IFCTableInteractable::GetCameraTargetTransform()`
+3. Spawn or reuse temporary camera actor at target transform
+4. Blend camera to table object focus (2s cubic blend, Week 1 pattern)
+5. After blend completes, show widget from `IFCTableInteractable::GetWidgetClass()`
+6. Set input mode to `FInputModeUIOnly` with mouse cursor
+
+### TableView Mode Integration
+
+**Cursor Visibility** (integrated into `SetCameraModeLocal`):
+
+```cpp
+if (NewMode == EFCPlayerCameraMode::TableView)
+{
+    // Enable mouse cursor for table object clicking
+    bShowMouseCursor = true;
+    bEnableClickEvents = true;
+    bEnableMouseOverEvents = true;
+
+    // Switch to StaticScene input mapping (includes IA_Click)
+    SetInputMappingMode(EFCInputMappingMode::StaticScene);
+
+    // Set input mode to GameAndUI (allows mouse cursor + ESC key)
+    FInputModeGameAndUI InputMode;
+    InputMode.SetHideCursorDuringCapture(false);
+    SetInputMode(InputMode);
+}
+```
+
+**Key Integration Points**:
+
+- Mouse cursor enabled when entering TableView via BP_OfficeDesk interaction
+- `IMC_FC_StaticScene` mapping context activated (contains IA_Click)
+- Input mode set to `GameAndUI` allowing both cursor and keyboard input
+- Cursor remains visible until exiting TableView back to FirstPerson
+
+### Collision Configuration Notes
+
+**Critical Settings**:
+
+- **InteractionCollision** (Sphere): Must have **Visibility response set to Block** for cursor traces to work
+- **PlaceholderMesh**: Must have **Collision set to NoCollision** to avoid blocking traces to parent actor
+- **Actor Mobility**: Static or Movable (both work, Static preferred for performance)
+
+**Common Issue**: If compass or other object not detecting clicks:
+
+1. Check `InteractionCollision` has Visibility → Block
+2. Verify `PlaceholderMesh` has Collision → NoCollision
+3. Ensure object is placed in level (not just blueprint exists)
+4. Confirm interface is added in Blueprint Class Settings
+
+### File Structure
+
+```
+FC/
+├── Source/FC/Interaction/
+│   ├── FCTableInteractable.h (Interface definition)
+│   └── FCTableInteractable.cpp (Default implementations)
+├── Source/FC/Core/
+│   ├── FCPlayerController.h (ClickAction property, HandleTableObjectClick declaration)
+│   └── FCPlayerController.cpp (Click detection logic, OnTableObjectClicked stub)
+├── Content/FC/Input/
+│   ├── Actions/IA_Click (Input Action asset)
+│   └── IMC_FC_StaticScene (Mapping context with IA_Click → Left Mouse Button)
+└── Content/FC/World/Blueprints/Interactables/
+    ├── BP_TableObject (Base class with interface implementation)
+    ├── BP_TableObject_Map
+    ├── BP_TableObject_Logbook
+    ├── BP_TableObject_Letters
+    └── BP_TableObject_Compass
+```
+
+### Testing & Validation
+
+**Implemented & Tested** ✅:
+
+- IA_Click input action creation and mapping
+- Cursor visibility in TableView mode
+- Cursor-based click detection via `GetHitResultUnderCursor`
+- Interface validation for all 4 table objects
+- Logging at all detection stages
+- Collision configuration for all table objects
+
+**Pending Implementation** ⏳:
+
+- Camera focus/blend on table object click (Task 3.2)
+- Widget display after camera blend (Task 3.2)
+- CloseTableWidget method (Task 3.3)
+- ESC key binding to close widgets (Task 3.5)
+- End-to-end interaction flow testing (Task 3.6)
+
+### Design Rationale
+
+**Separate Interface from IFCInteractable**: Table objects use a different interaction paradigm (cursor clicks in TableView) vs world objects (E-key in FirstPerson). Separate interfaces prevent mode conflicts and allow specialized behavior.
+
+**Cursor-Based Detection**: Using `GetHitResultUnderCursor` ensures clicks follow mouse position exactly, providing intuitive point-and-click interaction instead of aiming with camera center.
+
+**Component-Based Camera Targets**: CameraTargetPoint SceneComponent allows designers to adjust camera angles per object in Blueprint Editor without C++ changes.
+
+**Interface-Driven Widgets**: `GetWidgetClass()` allows each table object to specify its own UI (Map → WBP_MapTable, Logbook → WBP_LogbookViewer) without hardcoding in PlayerController.
+
+**Stub Implementation Pattern**: `OnTableObjectClicked` logs warnings until fully implemented, ensuring clear feedback during iterative development and preventing silent failures.
 
 ---
 

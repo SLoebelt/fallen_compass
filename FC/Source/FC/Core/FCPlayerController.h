@@ -79,7 +79,19 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "GameFlow")
 	void ReturnToMainMenu();
 
+	/**
+	 * Handle table object click (raycast from camera to detect table objects)
+	 * Bound to IA_TableClick input action
+	 */
+	UFUNCTION(BlueprintCallable, Category = "FC|Table Interaction")
+	void HandleTableObjectClick();
 
+	/**
+	 * Perform table interaction with clicked object
+	 * @param TableObject The actor to interact with (must implement IFCTableInteractable)
+	 */
+	UFUNCTION(BlueprintCallable, Category = "FC|Table Interaction")
+	void OnTableObjectClicked(AActor* TableObject);
 
 	/** Dev quick save (F5) */
 	UFUNCTION(BlueprintCallable, Category = "SaveGame")
@@ -152,6 +164,10 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
 	TObjectPtr<UInputAction> InteractAction;
 
+	/** Input action for table object click */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FC|Input")
+	TObjectPtr<UInputAction> ClickAction;
+
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
 	TObjectPtr<UInputAction> EscapeAction;
 
@@ -169,8 +185,6 @@ protected:
 	UFUNCTION(BlueprintCallable, Category = "Game State")
 	void ResumeGame();
 	
-	void EnterTableViewPlaceholder();
-	void ExitTableViewPlaceholder();
 	void ShowPauseMenuPlaceholder();
 	void HidePauseMenuPlaceholder();
 	void SetFallenCompassCameraMode(EFCPlayerCameraMode NewMode);

@@ -266,6 +266,7 @@ Establish foundational architecture for the map table interaction system, includ
    class FC_API UFCExpeditionManager : public UGameInstanceSubsystem
    {
        GENERATED_BODY()
+
    public:
        virtual void Initialize(FSubsystemCollectionBase& Collection) override;
    };
@@ -611,7 +612,7 @@ Create `UFCExpeditionData` C++ class (UObject) to store expedition metadata and 
 **Acceptance Criteria Met:**
 
 - [x] `UFCExpeditionData` class created with ExpeditionName, StartDate, TargetRegion, StartingSupplies, ExpeditionStatus
-- [x] `EFCExpeditionStatus` enum defined (Planning, InProgress, Completed, Failed)
+- [x] `EFCExpeditionStatus` enum defined (Planning, Active, Completed, Failed)
 - [x] `UFCExpeditionManager` subsystem created with StartNewExpedition(), GetCurrentExpedition(), EndExpedition()
 - [x] Subsystem initializes correctly on game start
 - [x] Test Blueprint successfully creates, retrieves, and ends expeditions
@@ -1050,17 +1051,17 @@ Create `IFCTableInteractable` C++ interface and `BP_TableObject` base Blueprint 
 
 ##### Step 2.5.1: Create Test Blueprint to Validate Interface Calls
 
-- [ ] **Analysis**
+- [x] **Analysis**
 
-  - [ ] Test interface methods on all 4 table objects
-  - [ ] Verify GetCameraTargetTransform returns valid transforms
-  - [ ] Verify CanInteract returns true
-  - [ ] Verify OnTableObjectClicked prints expected messages
+  - [x] Test interface methods on all 4 table objects
+  - [x] Verify GetCameraTargetTransform returns valid transforms
+  - [x] Verify CanInteract returns true
+  - [x] Verify OnTableObjectClicked prints expected messages
 
-- [ ] **Implementation (Level Blueprint Test)**
+- [x] **Implementation (Level Blueprint Test)**
 
-  - [ ] Open L_Office Level Blueprint
-  - [ ] Add test sequence in BeginPlay:
+  - [x] Open L_Office Level Blueprint
+  - [x] Add test sequence in BeginPlay:
     ```
     BeginPlay → Delay (2.0s)
              → Get All Actors of Class (BP_TableObject)
@@ -1075,16 +1076,16 @@ Create `IFCTableInteractable` C++ interface and `BP_TableObject` base Blueprint 
                  → Print String (show can interact result)
     ```
 
-- [ ] **Testing After Step 2.5.1** ✅ CHECKPOINT
-  - [ ] Compile Level Blueprint
-  - [ ] PIE in L_Office
-  - [ ] Verify console output:
-    - [ ] All 4 table objects listed ✅
-    - [ ] Each object implements IFCTableInteractable ✅
-    - [ ] Each object returns valid camera target transform ✅
-    - [ ] Each object returns CanInteract = true ✅
-  - [ ] No "Accessed None" errors
-  - [ ] No interface call failures
+- [x] **Testing After Step 2.5.1** ✅ CHECKPOINT
+  - [x] Compile Level Blueprint
+  - [x] PIE in L_Office
+  - [x] Verify console output:
+    - [x] All 4 table objects listed ✅
+    - [x] Each object implements IFCTableInteractable ✅
+    - [x] Each object returns valid camera target transform ✅
+    - [x] Each object returns CanInteract = true ✅
+  - [x] No "Accessed None" errors
+  - [x] No interface call failures
 
 **COMMIT POINT 2.5.1**: `git add -A && git commit -m "test(interaction): Add interface validation test for table objects"`
 
@@ -1102,397 +1103,11 @@ Create `IFCTableInteractable` C++ interface and `BP_TableObject` base Blueprint 
 - [x] Interface validation test confirms all objects implement IFCTableInteractable correctly
 - [x] Collision and camera target points configured properly
 
-**Next Steps:** Task 3 - Create Map Table Widget (Placeholder UI)
+**Next Steps:** Task 3 - Player Controller Integration (Interaction Logic)
 
 ---
 
-### Task 3: Create Map Table Widget (Placeholder UI)
-
-Create `WBP_MapTable` widget with placeholder UI showing expedition planning interface. Widget displays current supplies from GameInstance and provides "Start Test Expedition" button (non-functional until Week 3 Overworld exists) and "Back" button to return to first-person view.
-
-**Key Deliverables:**
-
-- `WBP_MapTable` widget at `/Game/FC/UI/MapTable/`
-- Canvas with parchment/map background texture
-- Static world map image (placeholder, non-interactive)
-- Text displays: Title, current supplies count
-- Buttons: "Start Test Expedition" (shows "Coming Soon" message), "Back" (closes widget)
-- Blueprint bindings reading supplies from UFCGameInstance
-
----
-
-#### Step 3.1: Create Widget Blueprint Structure
-
-##### Step 3.1.1: Create WBP_MapTable Widget with Canvas Layout
-
-- [ ] **Analysis**
-
-  - [ ] Review Week 1 widget patterns (WBP_MainMenu, WBP_SaveSlotSelector) for structure
-  - [ ] Widget needs fullscreen canvas for immersive map table view
-  - [ ] Review UE*NamingConventions.md: Widget Blueprints use `WBP*` prefix
-  - [ ] Folder structure: `/Content/FC/UI/MapTable/`
-
-- [ ] **Implementation (Widget Blueprint)**
-
-  - [ ] Open Content Browser → Navigate to `/Content/FC/UI/MapTable/` (create folder if not exists)
-  - [ ] Right-click → User Interface → Widget Blueprint
-  - [ ] Name: `WBP_MapTable`
-  - [ ] Open WBP_MapTable in Widget Designer
-  - [ ] Designer Canvas:
-    - [ ] Root: Canvas Panel (default)
-    - [ ] Add Image (child of Canvas Panel), name: `BackgroundImage`
-      - [ ] Anchors: Fill entire screen (0,0 to 1,1)
-      - [ ] Position: (0, 0), Size: (0, 0) with stretch anchors
-      - [ ] Color and Opacity: Tan/parchment color (R=0.9, G=0.85, B=0.7, A=1.0)
-      - [ ] Brush: SolidColor (placeholder until texture asset added)
-
-- [ ] **Testing After Step 3.1.1** ✅ CHECKPOINT
-  - [ ] Compile Widget Blueprint
-  - [ ] Add to viewport test (Level Blueprint):
-    ```
-    BeginPlay → Create Widget (WBP_MapTable)
-             → Add to Viewport
-             → Delay (3.0s)
-             → Remove from Parent
-    ```
-  - [ ] PIE: Verify fullscreen tan background appears for 3 seconds ✅
-  - [ ] No errors
-
-**COMMIT POINT 3.1.1**: `git add -A && git commit -m "feat(ui): Create WBP_MapTable widget with background"`
-
----
-
-##### Step 3.1.2: Add Map Image Placeholder
-
-- [ ] **Analysis**
-
-  - [ ] Static map image for visual reference (non-interactive in Week 2)
-  - [ ] Center of screen, leaving space for UI elements at top/bottom
-  - [ ] Placeholder: Use simple texture or colored image
-
-- [ ] **Implementation (Widget Designer)**
-
-  - [ ] Open WBP_MapTable Widget Designer
-  - [ ] Add Image (child of Canvas Panel), name: `MapImage`
-    - [ ] Anchors: Center (0.5, 0.5)
-    - [ ] Position: (0, 0) - centered
-    - [ ] Size: (800, 600) - large but not fullscreen
-    - [ ] Alignment: (0.5, 0.5) - center alignment
-    - [ ] Color and Opacity: Light gray (R=0.7, G=0.7, B=0.7, A=1.0)
-    - [ ] Brush: SolidColor (placeholder for map texture)
-  - [ ] Add Text Block (child of Canvas Panel, overlay on MapImage), name: `MapPlaceholderText`
-    - [ ] Anchors: Center (0.5, 0.5)
-    - [ ] Position: (0, 0)
-    - [ ] Size to Content: ✅ Enabled
-    - [ ] Text: "World Map Placeholder\n(Route Planning Coming Week 9)"
-    - [ ] Font Size: 24
-    - [ ] Justification: Center
-    - [ ] Color: Dark Gray (R=0.3, G=0.3, B=0.3, A=1.0)
-
-- [ ] **Testing After Step 3.1.2** ✅ CHECKPOINT
-  - [ ] Compile Widget
-  - [ ] PIE with add to viewport test
-  - [ ] Verify map placeholder visible in center with text ✅
-  - [ ] No layout issues
-
-**COMMIT POINT 3.1.2**: `git add -A && git commit -m "feat(ui): Add map placeholder image to WBP_MapTable"`
-
----
-
-#### Step 3.2: Add Title and Supplies Display
-
-##### Step 3.2.1: Add Title Text at Top
-
-- [ ] **Analysis**
-
-  - [ ] Title: "Expedition Planning" at top center
-  - [ ] Large, prominent font for immersion
-  - [ ] Anchored to top of screen
-
-- [ ] **Implementation (Widget Designer)**
-
-  - [ ] Open WBP_MapTable Widget Designer
-  - [ ] Add Text Block (child of Canvas Panel), name: `TitleText`
-    - [ ] Anchors: Top Center (0.5, 0.0)
-    - [ ] Position: (0, 40) - offset from top
-    - [ ] Alignment: (0.5, 0.0)
-    - [ ] Size to Content: ✅ Enabled
-    - [ ] Text: "Expedition Planning"
-    - [ ] Font Size: 48
-    - [ ] Justification: Center
-    - [ ] Color: Dark Brown (R=0.2, G=0.15, B=0.1, A=1.0)
-    - [ ] Font Style: Bold (if available)
-
-- [ ] **Testing After Step 3.2.1** ✅ CHECKPOINT
-  - [ ] Compile Widget
-  - [ ] PIE with add to viewport test
-  - [ ] Verify title visible at top center ✅
-  - [ ] Text readable and prominent
-
-**COMMIT POINT 3.2.1**: `git add -A && git commit -m "feat(ui): Add title text to WBP_MapTable"`
-
----
-
-##### Step 3.2.2: Add Supplies Display with Data Binding
-
-- [ ] **Analysis**
-
-  - [ ] Display current supplies from UFCGameInstance
-  - [ ] Use Blueprint binding to read CurrentSupplies property
-  - [ ] Position: Below title, left-aligned or centered
-  - [ ] Format: "Supplies: [Amount]"
-
-- [ ] **Implementation (Widget Designer)**
-
-  - [ ] Open WBP_MapTable Widget Designer
-  - [ ] Add Horizontal Box (child of Canvas Panel), name: `SuppliesContainer`
-    - [ ] Anchors: Top Center (0.5, 0.0)
-    - [ ] Position: (0, 100) - below title
-    - [ ] Alignment: (0.5, 0.0)
-    - [ ] Size to Content: ✅ Enabled
-  - [ ] Add Text Block (child of SuppliesContainer), name: `SuppliesLabelText`
-    - [ ] Text: "Supplies: "
-    - [ ] Font Size: 28
-    - [ ] Color: Dark Brown (R=0.2, G=0.15, B=0.1, A=1.0)
-  - [ ] Add Text Block (child of SuppliesContainer), name: `SuppliesValueText`
-    - [ ] Text: "0" (will be bound dynamically)
-    - [ ] Font Size: 28
-    - [ ] Color: Dark Orange (R=0.8, G=0.4, B=0.1, A=1.0)
-    - [ ] Is Variable: ✅ Enabled (so we can access in Graph)
-
-- [ ] **Implementation (Event Graph - Data Binding)**
-
-  - [ ] Open WBP_MapTable Event Graph
-  - [ ] Create Custom Event: `UpdateSuppliesDisplay`
-  - [ ] Add nodes:
-    ```
-    UpdateSuppliesDisplay → Get Game Instance
-                         → Cast to FCGameInstance
-                         → Get Current Supplies (variable)
-                         → Format Text ("{0}", supplies)
-                         → Set Text (SuppliesValueText)
-    ```
-  - [ ] Create Event Construct (widget initialization):
-    ```
-    Event Construct → UpdateSuppliesDisplay
-    ```
-  - [ ] Optional: Add Event Tick for real-time updates (can be optimized later):
-    ```
-    Event Tick → UpdateSuppliesDisplay
-    ```
-    - [ ] Note: For Week 2, Tick is fine; will optimize with event-driven updates in future weeks
-
-- [ ] **Testing After Step 3.2.2** ✅ CHECKPOINT
-  - [ ] Compile Widget
-  - [ ] Set CurrentSupplies in GameInstance Blueprint (BP_FC_GameInstance):
-    - [ ] Open BP_FC_GameInstance → Class Defaults
-    - [ ] Set CurrentSupplies = 100 (for testing)
-  - [ ] PIE with add to viewport test
-  - [ ] Verify supplies display shows "Supplies: 100" ✅
-  - [ ] Change CurrentSupplies to 50, PIE again, verify display updates ✅
-  - [ ] No "Accessed None" errors
-
-**COMMIT POINT 3.2.2**: `git add -A && git commit -m "feat(ui): Add supplies display with data binding in WBP_MapTable"`
-
----
-
-#### Step 3.3: Add "Start Test Expedition" Button (Placeholder)
-
-##### Step 3.3.1: Create Button with "Coming Soon" Message
-
-- [ ] **Analysis**
-
-  - [ ] Button should be prominent, centered at bottom of map
-  - [ ] Clicking shows "Coming Soon - Overworld in Week 3" message (no actual level load)
-  - [ ] Button enabled only when supplies > 0
-
-- [ ] **Implementation (Widget Designer)**
-
-  - [ ] Open WBP_MapTable Widget Designer
-  - [ ] Add Button (child of Canvas Panel), name: `StartExpeditionButton`
-    - [ ] Anchors: Bottom Center (0.5, 1.0)
-    - [ ] Position: (0, -120) - offset from bottom
-    - [ ] Alignment: (0.5, 1.0)
-    - [ ] Size: (300, 60)
-  - [ ] Add Text Block (child of StartExpeditionButton), name: `StartExpeditionButtonText`
-    - [ ] Text: "Start Test Expedition"
-    - [ ] Font Size: 24
-    - [ ] Justification: Center
-    - [ ] Color: White (R=1.0, G=1.0, B=1.0, A=1.0)
-  - [ ] Button Style:
-    - [ ] Normal: Dark Green (R=0.1, G=0.4, B=0.1, A=1.0)
-    - [ ] Hovered: Lighter Green (R=0.2, G=0.5, B=0.2, A=1.0)
-    - [ ] Pressed: Darker Green (R=0.05, G=0.3, B=0.05, A=1.0)
-    - [ ] Disabled: Gray (R=0.3, G=0.3, B=0.3, A=1.0)
-
-- [ ] **Implementation (Event Graph - Button Logic)**
-
-  - [ ] Open WBP_MapTable Event Graph
-  - [ ] Add Event: OnClicked (StartExpeditionButton)
-  - [ ] Add nodes:
-    ```
-    OnClicked (StartExpeditionButton) → Print String ("Coming Soon - Overworld Level in Week 3")
-                                      → Duration: 5.0s
-                                      → Text Color: Yellow
-    ```
-  - [ ] Add button enabled logic in UpdateSuppliesDisplay:
-    ```
-    UpdateSuppliesDisplay → Get Current Supplies
-                         → Greater Than (0)
-                         → Set Is Enabled (StartExpeditionButton)
-    ```
-
-- [ ] **Testing After Step 3.3.1** ✅ CHECKPOINT
-  - [ ] Compile Widget
-  - [ ] PIE with add to viewport test
-  - [ ] Click "Start Test Expedition" button
-  - [ ] Verify on-screen message: "Coming Soon - Overworld Level in Week 3" ✅
-  - [ ] Set CurrentSupplies = 0 in GameInstance
-  - [ ] PIE again, verify button is grayed out/disabled ✅
-  - [ ] Set CurrentSupplies = 100, verify button re-enabled ✅
-  - [ ] No errors
-
-**COMMIT POINT 3.3.1**: `git add -A && git commit -m "feat(ui): Add Start Test Expedition button with placeholder message"`
-
----
-
-#### Step 3.4: Add "Back" Button to Close Widget
-
-##### Step 3.4.1: Create Back Button with Close Functionality
-
-- [ ] **Analysis**
-
-  - [ ] "Back" button returns player to first-person view
-  - [ ] For now, just removes widget from parent (full camera blend in Task 4)
-  - [ ] Position: Bottom left corner or near Start Expedition button
-
-- [ ] **Implementation (Widget Designer)**
-
-  - [ ] Open WBP_MapTable Widget Designer
-  - [ ] Add Button (child of Canvas Panel), name: `BackButton`
-    - [ ] Anchors: Bottom Center (0.5, 1.0)
-    - [ ] Position: (-170, -120) - left of Start Expedition button
-    - [ ] Alignment: (0.5, 1.0)
-    - [ ] Size: (120, 60)
-  - [ ] Add Text Block (child of BackButton), name: `BackButtonText`
-    - [ ] Text: "Back"
-    - [ ] Font Size: 24
-    - [ ] Justification: Center
-    - [ ] Color: White (R=1.0, G=1.0, B=1.0, A=1.0)
-  - [ ] Button Style:
-    - [ ] Normal: Dark Red (R=0.4, G=0.1, B=0.1, A=1.0)
-    - [ ] Hovered: Lighter Red (R=0.5, G=0.2, B=0.2, A=1.0)
-    - [ ] Pressed: Darker Red (R=0.3, G=0.05, B=0.05, A=1.0)
-
-- [ ] **Implementation (Event Graph - Close Logic)**
-
-  - [ ] Open WBP_MapTable Event Graph
-  - [ ] Add Event: OnClicked (BackButton)
-  - [ ] Add nodes:
-    ```
-    OnClicked (BackButton) → Print String ("Closing map table - full camera blend in Task 4")
-                          → Remove from Parent (self)
-    ```
-  - [ ] Note: Task 4 will replace this with proper camera blend and input mode restoration
-
-- [ ] **Testing After Step 3.4.1** ✅ CHECKPOINT
-  - [ ] Compile Widget
-  - [ ] PIE with add to viewport test
-  - [ ] Click "Back" button
-  - [ ] Verify widget disappears ✅
-  - [ ] Verify on-screen message appears ✅
-  - [ ] No errors or crashes
-
-**COMMIT POINT 3.4.1**: `git add -A && git commit -m "feat(ui): Add Back button to WBP_MapTable"`
-
----
-
-#### Step 3.5: Polish Widget Layout and Styling
-
-##### Step 3.5.1: Adjust Spacing and Visual Hierarchy
-
-- [ ] **Analysis**
-
-  - [ ] Review overall layout for readability and balance
-  - [ ] Ensure all elements have proper spacing
-  - [ ] Add visual polish (borders, shadows, etc.) if time permits
-
-- [ ] **Implementation (Widget Designer)**
-
-  - [ ] Open WBP_MapTable Widget Designer
-  - [ ] Review all elements:
-    - [ ] Title: Properly centered and visible ✅
-    - [ ] Supplies: Readable and clear ✅
-    - [ ] Map placeholder: Centered, not overlapping UI ✅
-    - [ ] Buttons: Accessible and visually distinct ✅
-  - [ ] Optional polish:
-    - [ ] Add Border (child of Canvas Panel) around MapImage for frame effect
-    - [ ] Add Shadow/Outline to TitleText for better readability
-    - [ ] Adjust button padding for better appearance
-  - [ ] Compile Widget
-
-- [ ] **Testing After Step 3.5.1** ✅ CHECKPOINT
-  - [ ] PIE with add to viewport test
-  - [ ] Verify entire UI is readable and functional ✅
-  - [ ] No overlapping elements
-  - [ ] Professional appearance (within placeholder constraints)
-
-**COMMIT POINT 3.5.1**: `git add -A && git commit -m "feat(ui): Polish WBP_MapTable layout and styling"`
-
----
-
-#### Step 3.6: Link WBP_MapTable to BP_TableObject_Map
-
-##### Step 3.6.1: Set Widget Class in Table Object
-
-- [ ] **Analysis**
-
-  - [ ] BP_TableObject_Map should return WBP_MapTable in GetWidgetClass
-  - [ ] This enables Task 4 to show widget when map is clicked
-
-- [ ] **Implementation (Blueprint)**
-
-  - [ ] Open BP_TableObject_Map Blueprint
-  - [ ] Event Graph → Find "Event Get Widget Class" override
-  - [ ] Modify Return Node:
-    - [ ] Return Value: Select Class → WBP_MapTable
-  - [ ] Compile Blueprint
-
-- [ ] **Testing After Step 3.6.1** ✅ CHECKPOINT
-  - [ ] PIE in L_Office
-  - [ ] Test from Level Blueprint:
-    ```
-    BeginPlay → Delay (2.0s)
-             → Get Actor of Class (BP_TableObject_Map)
-             → Get Widget Class (call interface)
-             → Print String (show widget class name)
-    ```
-  - [ ] Verify console shows "WBP_MapTable" ✅
-  - [ ] No "Accessed None" errors
-
-**COMMIT POINT 3.6.1**: `git add -A && git commit -m "feat(ui): Link WBP_MapTable to BP_TableObject_Map"`
-
----
-
-**Task 3 Complete** ✅
-
-**Acceptance Criteria Met:**
-
-- [x] `WBP_MapTable` widget created at `/Content/FC/UI/MapTable/`
-- [x] Fullscreen canvas with parchment background color
-- [x] Static world map placeholder image (gray box with text)
-- [x] Title text: "Expedition Planning"
-- [x] Supplies display with data binding to UFCGameInstance.CurrentSupplies
-- [x] "Start Test Expedition" button (shows "Coming Soon" message, enabled when supplies > 0)
-- [x] "Back" button (closes widget)
-- [x] Widget linked to BP_TableObject_Map via GetWidgetClass interface
-- [x] All UI elements properly positioned and styled
-
-**Next Steps:** Task 4 - Implement Table Interaction Flow (Camera Focus + Widget Display)
-
----
-
-### Task 4: Implement Table Interaction Flow (Camera Focus + Widget Display)
+### Task 3: Player Controller Integration (Interaction Logic)
 
 Extend `AFCPlayerController` with methods to handle table object clicks: blend camera to focus on object (reuse Week 1's 2s cubic blend), show appropriate widget, switch input mode to UI-only. Implement reverse flow: close widget, blend camera back to first-person, restore gameplay input.
 
@@ -1508,59 +1123,58 @@ Extend `AFCPlayerController` with methods to handle table object clicks: blend c
 
 ---
 
-#### Step 4.1: Add Click Detection for Table Objects
+#### Step 3.1: Add Click Detection for Table Objects
 
-##### Step 4.1.1: Add Input Action for Table Object Click
+##### Step 3.1.1: Add Input Action for Table Object Click
 
-- [ ] **Analysis**
+- [x] **Analysis**
 
-  - [ ] Review Week 1 Enhanced Input system (IMC_FirstPerson, IA_Interact)
-  - [ ] Need mouse click detection in first-person mode
-  - [ ] Use existing IA_Interact or create new IA_TableClick
-  - [ ] Raycast from camera to detect table objects
+  - [x] Review Week 1 Enhanced Input system (IMC_FirstPerson, IA_Interact)
+  - [x] Need mouse click detection in first-person mode
+  - [x] Use existing IA_Interact or create new IA_Click
+  - [x] Raycast from camera to detect table objects
 
-- [ ] **Implementation (Input Actions)**
+- [x] **Implementation (Input Actions)**
 
-  - [ ] Open Content Browser → `/Content/FC/Input/Actions/`
-  - [ ] Option A: Reuse existing `IA_Interact` (if click-based)
-  - [ ] Option B: Create new Input Action:
-    - [ ] Right-click → Input → Input Action
-    - [ ] Name: `IA_TableClick`
-    - [ ] Value Type: Digital (bool)
-  - [ ] Open `/Content/FC/Input/IMC_FirstPerson` mapping context
-  - [ ] Add mapping:
-    - [ ] Input Action: IA_TableClick (or IA_Interact)
-    - [ ] Key: Left Mouse Button
-    - [ ] Triggers: Pressed
+  - [x] Open Content Browser → `/Content/FC/Input/Actions/`
+  - [x] Create new Input Action:
+    - [x] Right-click → Input → Input Action
+    - [x] Name: `IA_Click`
+    - [x] Value Type: Digital (bool)
+  - [x] Open `/Content/FC/Input/IMC_FC_StaticScene` mapping context
+  - [x] Add mapping:
+    - [x] Input Action: IA_Click
+    - [x] Key: Left Mouse Button
+    - [x] Triggers: Pressed
 
-- [ ] **Testing After Step 4.1.1** ✅ CHECKPOINT
-  - [ ] PIE in L_Office
-  - [ ] Add debug Print String in AFCPlayerController input binding to verify click detection
-  - [ ] Click mouse, verify message appears ✅
-  - [ ] No errors
+- [x] **Testing After Step 3.1.1** ✅ CHECKPOINT
+  - [x] PIE in L_Office
+  - [x] Add debug Print String in AFCPlayerController input binding to verify click detection
+  - [x] Click mouse, verify message appears ✅
+  - [x] No errors
 
-**COMMIT POINT 4.1.1**: `git add -A && git commit -m "feat(input): Add table object click input action"`
+**COMMIT POINT 3.1.1**: `git add -A && git commit -m "feat(input): Add table object click input action"`
 
 ---
 
-##### Step 4.1.2: Implement Raycast for Table Object Detection in PlayerController
+##### Step 3.1.2: Implement Cursor-Based Click Detection for Table Objects in PlayerController
 
-- [ ] **Analysis**
+- [x] **Analysis**
 
-  - [ ] Review AFCPlayerController input handling from Week 1
-  - [ ] Raycast from camera center to detect actors
-  - [ ] Check if hit actor implements IFCTableInteractable
-  - [ ] Call interface method if valid
+  - [x] Review AFCPlayerController input handling from Week 1
+  - [x] Use cursor-based trace (GetHitResultUnderCursor) to detect actors at mouse position
+  - [x] Check if hit actor implements IFCTableInteractable
+  - [x] Call interface method if valid
 
-- [ ] **Implementation (FCPlayerController.h)**
+- [x] **Implementation (FCPlayerController.h)**
 
-  - [ ] Open `/Source/FC/Core/FCPlayerController.h`
-  - [ ] Add method declaration in public section:
+  - [x] Open `/Source/FC/Core/FCPlayerController.h`
+  - [x] Add method declaration in public section:
 
     ```cpp
     /**
      * Handle table object click (raycast from camera to detect table objects)
-     * Bound to IA_TableClick input action
+     * Bound to IA_Click input action
      */
     UFUNCTION(BlueprintCallable, Category = "FC|Table Interaction")
     void HandleTableObjectClick();
@@ -1571,73 +1185,69 @@ Extend `AFCPlayerController` with methods to handle table object clicks: blend c
      */
     UFUNCTION(BlueprintCallable, Category = "FC|Table Interaction")
     void OnTableObjectClicked(AActor* TableObject);
+
+    /** Input action for table object click */
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FC|Input")
+    TObjectPtr<UInputAction> ClickAction;
     ```
 
-- [ ] **Implementation (FCPlayerController.cpp)**
+- [x] **Implementation (FCPlayerController.cpp)**
 
-  - [ ] Open `/Source/FC/Core/FCPlayerController.cpp`
-  - [ ] Add includes at top:
+  - [x] Open `/Source/FC/Core/FCPlayerController.cpp`
+  - [x] Add includes at top:
     ```cpp
-    #include "Interaction/IFCTableInteractable.h"
+    #include "../Interaction/FCTableInteractable.h"
     #include "Camera/CameraComponent.h"
     #include "GameFramework/Character.h"
     ```
-  - [ ] Implement HandleTableObjectClick:
+  - [x] Implement HandleTableObjectClick:
 
     ```cpp
     void AFCPlayerController::HandleTableObjectClick()
     {
-        // Get camera location and direction
-        FVector CameraLocation;
-        FRotator CameraRotation;
-        GetPlayerViewPoint(CameraLocation, CameraRotation);
-
-        FVector TraceStart = CameraLocation;
-        FVector TraceEnd = TraceStart + (CameraRotation.Vector() * 1000.0f); // 10m raycast
-
-        // Perform line trace
+        // Perform cursor-based trace to detect objects at mouse position
         FHitResult HitResult;
-        FCollisionQueryParams QueryParams;
-        QueryParams.AddIgnoredActor(GetPawn());
-
-        bool bHit = GetWorld()->LineTraceSingleByChannel(
-            HitResult,
-            TraceStart,
-            TraceEnd,
-            ECC_Visibility,
-            QueryParams
-        );
+        bool bHit = GetHitResultUnderCursor(ECC_Visibility, false, HitResult);
 
         if (bHit && HitResult.GetActor())
         {
             AActor* HitActor = HitResult.GetActor();
+            UE_LOG(LogFallenCompassPlayerController, Log, TEXT("Cursor hit actor: %s"), *HitActor->GetName());
 
             // Check if actor implements IFCTableInteractable
-            if (HitActor->Implements<UIFCTableInteractable>())
+            if (HitActor->Implements<UFCTableInteractable>())
             {
                 // Check if interaction is allowed
-                bool bCanInteract = IIFCTableInteractable::Execute_CanInteract(HitActor);
+                bool bCanInteract = IFCTableInteractable::Execute_CanInteract(HitActor);
                 if (bCanInteract)
                 {
-                    UE_LOG(LogTemp, Log, TEXT("Table object clicked: %s"), *HitActor->GetName());
+                    UE_LOG(LogFallenCompassPlayerController, Log, TEXT("Table object clicked: %s"), *HitActor->GetName());
                     OnTableObjectClicked(HitActor);
                 }
                 else
                 {
-                    UE_LOG(LogTemp, Warning, TEXT("Table object cannot be interacted with: %s"), *HitActor->GetName());
+                    UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("Table object cannot be interacted with: %s"), *HitActor->GetName());
                 }
             }
+            else
+            {
+                UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("Hit actor does not implement IFCTableInteractable: %s"), *HitActor->GetName());
+            }
+        }
+        else
+        {
+            UE_LOG(LogFallenCompassPlayerController, Verbose, TEXT("Cursor click - no actor hit"));
         }
     }
 
     void AFCPlayerController::OnTableObjectClicked(AActor* TableObject)
     {
         // Implementation in next step
-        UE_LOG(LogTemp, Warning, TEXT("OnTableObjectClicked called but not yet implemented"));
+        UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("OnTableObjectClicked called but not yet implemented for %s"), *GetNameSafe(TableObject));
     }
     ```
 
-  - [ ] Bind HandleTableObjectClick to input action in SetupInputComponent (find existing input setup):
+  - [x] Bind HandleTableObjectClick to input action in SetupInputComponent (find existing input setup):
 
     ```cpp
     // In AFCPlayerController::SetupInputComponent or BeginPlay
@@ -1646,37 +1256,49 @@ Extend `AFCPlayerController` with methods to handle table object clicks: blend c
         // ... existing bindings
 
         // Bind table click action
-        if (TableClickAction) // Add UPROPERTY for UInputAction* TableClickAction
+        if (ClickAction) // Add UPROPERTY for UInputAction* ClickAction
         {
-            EnhancedInput->BindAction(TableClickAction, ETriggerEvent::Triggered, this, &AFCPlayerController::HandleTableObjectClick);
+            EnhancedInput->BindAction(ClickAction, ETriggerEvent::Triggered, this, &AFCPlayerController::HandleTableObjectClick);
         }
     }
     ```
 
-  - [ ] Add UPROPERTY for TableClickAction in FCPlayerController.h:
+  - [x] Add UPROPERTY for ClickAction in FCPlayerController.h:
     ```cpp
     /** Input action for table object click */
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FC|Input")
-    TObjectPtr<UInputAction> TableClickAction;
+    TObjectPtr<UInputAction> ClickAction;
     ```
 
-- [ ] **Testing After Step 4.1.2** ✅ CHECKPOINT
-  - [ ] Compile C++ code
-  - [ ] Open BP_FCPlayerController (Blueprint child of AFCPlayerController)
-  - [ ] Class Defaults → Set TableClickAction to IA_TableClick
-  - [ ] PIE in L_Office
-  - [ ] Click on BP_TableObject_Map
-  - [ ] Verify Output Log: "Table object clicked: BP_TableObject_Map_X" ✅
-  - [ ] Click on empty space, verify no log (no hit) ✅
-  - [ ] No crashes or "Accessed None" errors
+- [x] **Testing After Step 3.1.2** ✅ CHECKPOINT
+  - [x] Compile C++ code
+  - [x] Open BP_FCPlayerController (Blueprint child of AFCPlayerController)
+  - [x] Class Defaults → Set ClickAction to IA_Click
+  - [x] PIE in L_Office
+  - [x] Click on BP_TableObject_Map
+  - [x] Verify Output Log: "Table object clicked: BP_TableObject_Map_X" ✅
+  - [x] Click on empty space, verify verbose log (no hit) ✅
+  - [x] No crashes or "Accessed None" errors
 
-**COMMIT POINT 4.1.2**: `git add -A && git commit -m "feat(interaction): Implement raycast table object detection"`
+**COMMIT POINT 3.1.2**: `git add -A && git commit -m "feat(interaction): Implement cursor-based click detection for table objects"`
 
 ---
 
-#### Step 4.2: Implement Camera Focus on Table Object
+##### Step 3.1.3: Fix Cursor Visibility in Table View
 
-##### Step 4.2.1: Add Camera Blend Logic to OnTableObjectClicked
+- [x] **Issue**: Cursor is hidden when entering Table View.
+- [x] **Fix**: Update `EnterTableViewMode` in `FCPlayerController.cpp`.
+  - [x] Set `bShowMouseCursor = true`.
+  - [x] Set `bEnableClickEvents = true`.
+  - [x] Set `bEnableMouseOverEvents = true`.
+  - [x] Switch Input Mapping to `StaticScene`.
+  - [x] Set Input Mode to `GameAndUI`.
+
+---
+
+#### Step 3.2: Implement Camera Focus on Table Object
+
+##### Step 3.2.1: Add Camera Blend Logic to OnTableObjectClicked
 
 - [ ] **Analysis**
 
@@ -1800,7 +1422,7 @@ Extend `AFCPlayerController` with methods to handle table object clicks: blend c
     }
     ```
 
-- [ ] **Testing After Step 4.2.1** ✅ CHECKPOINT
+- [ ] **Testing After Step 3.2.1** ✅ CHECKPOINT
   - [ ] Compile C++ code
   - [ ] PIE in L_Office
   - [ ] Click on BP_TableObject_Map
@@ -1810,13 +1432,13 @@ Extend `AFCPlayerController` with methods to handle table object clicks: blend c
   - [ ] Verify Output Log shows blend and widget messages ✅
   - [ ] No crashes or errors
 
-**COMMIT POINT 4.2.1**: `git add -A && git commit -m "feat(interaction): Implement camera blend to table object"`
+**COMMIT POINT 3.2.1**: `git add -A && git commit -m "feat(interaction): Implement camera blend to table object"`
 
 ---
 
-#### Step 4.3: Implement Close Table Widget Functionality
+#### Step 3.3: Implement Close Table Widget Functionality
 
-##### Step 4.3.1: Add CloseTableWidget Method
+##### Step 3.3.1: Add CloseTableWidget Method
 
 - [ ] **Analysis**
 
@@ -1877,7 +1499,7 @@ Extend `AFCPlayerController` with methods to handle table object clicks: blend c
     }
     ```
 
-- [ ] **Testing After Step 4.3.1** ✅ CHECKPOINT
+- [ ] **Testing After Step 3.3.1** ✅ CHECKPOINT
   - [ ] Compile C++ code
   - [ ] PIE in L_Office
   - [ ] Click on BP_TableObject_Map to open widget
@@ -1888,13 +1510,13 @@ Extend `AFCPlayerController` with methods to handle table object clicks: blend c
   - [ ] Verify Output Log shows close messages ✅
   - [ ] No crashes
 
-**COMMIT POINT 4.3.1**: `git add -A && git commit -m "feat(interaction): Implement CloseTableWidget method"`
+**COMMIT POINT 3.3.1**: `git add -A && git commit -m "feat(interaction): Implement CloseTableWidget method"`
 
 ---
 
-#### Step 4.4: Wire Back Button to CloseTableWidget
+#### Step 3.4: Wire Back Button to CloseTableWidget
 
-##### Step 4.4.1: Update WBP_MapTable Back Button to Call PlayerController
+##### Step 3.4.1: Update WBP_MapTable Back Button to Call PlayerController
 
 - [ ] **Analysis**
 
@@ -1915,7 +1537,7 @@ Extend `AFCPlayerController` with methods to handle table object clicks: blend c
   - [ ] Remove old "Remove from Parent" node
   - [ ] Compile Widget
 
-- [ ] **Testing After Step 4.4.1** ✅ CHECKPOINT
+- [ ] **Testing After Step 3.4.1** ✅ CHECKPOINT
   - [ ] PIE in L_Office
   - [ ] Click on BP_TableObject_Map to open widget
   - [ ] Click "Back" button in widget
@@ -1923,13 +1545,13 @@ Extend `AFCPlayerController` with methods to handle table object clicks: blend c
   - [ ] Verify gameplay input restored after 2 seconds ✅
   - [ ] No errors
 
-**COMMIT POINT 4.4.1**: `git add -A && git commit -m "feat(ui): Wire Back button to CloseTableWidget"`
+**COMMIT POINT 3.4.1**: `git add -A && git commit -m "feat(ui): Wire Back button to CloseTableWidget"`
 
 ---
 
-#### Step 4.5: Add ESC Key Binding to Close Widget
+#### Step 3.5: Add ESC Key Binding to Close Widget
 
-##### Step 4.5.1: Create Input Action for Close Widget
+##### Step 3.5.1: Create Input Action for Close Widget
 
 - [ ] **Analysis**
 
@@ -1951,16 +1573,16 @@ Extend `AFCPlayerController` with methods to handle table object clicks: blend c
     - [ ] Key: Escape
     - [ ] Triggers: Pressed
 
-- [ ] **Testing After Step 4.5.1** ✅ CHECKPOINT
+- [ ] **Testing After Step 3.5.1** ✅ CHECKPOINT
   - [ ] PIE in L_Office
   - [ ] Verify input action appears in project settings ✅
   - [ ] No errors
 
-**COMMIT POINT 4.5.1**: `git add -A && git commit -m "feat(input): Add IA_CloseWidget input action"`
+**COMMIT POINT 3.5.1**: `git add -A && git commit -m "feat(input): Add IA_CloseWidget input action"`
 
 ---
 
-##### Step 4.5.2: Bind ESC Key to CloseTableWidget in PlayerController
+##### Step 3.5.2: Bind ESC Key to CloseTableWidget in PlayerController
 
 - [ ] **Analysis**
 
@@ -2008,7 +1630,7 @@ Extend `AFCPlayerController` with methods to handle table object clicks: blend c
   - [ ] Open BP_FCPlayerController (Blueprint child)
   - [ ] Class Defaults → Set CloseWidgetAction to IA_CloseWidget
 
-- [ ] **Testing After Step 4.5.2** ✅ CHECKPOINT
+- [ ] **Testing After Step 3.5.2** ✅ CHECKPOINT
   - [ ] Compile C++ code
   - [ ] PIE in L_Office
   - [ ] Click on BP_TableObject_Map to open widget
@@ -2017,13 +1639,13 @@ Extend `AFCPlayerController` with methods to handle table object clicks: blend c
   - [ ] Press ESC when no widget open, verify no crash ✅
   - [ ] No errors
 
-**COMMIT POINT 4.5.2**: `git add -A && git commit -m "feat(input): Bind ESC key to close table widget"`
+**COMMIT POINT 3.5.2**: `git add -A && git commit -m "feat(input): Bind ESC key to close table widget"`
 
 ---
 
-#### Step 4.6: End-to-End Table Interaction Test
+#### Step 3.6: End-to-End Table Interaction Test
 
-##### Step 4.6.1: Full Interaction Flow Verification
+##### Step 3.6.1: Full Interaction Flow Verification
 
 - [ ] **Analysis**
 
@@ -2036,11 +1658,11 @@ Extend `AFCPlayerController` with methods to handle table object clicks: blend c
   - [ ] PIE in L_Office
   - [ ] **Test 1: Map object with widget**
     - [ ] Click BP_TableObject_Map
-    - [ ] Verify camera blends to map view (2s) ✅
-    - [ ] Verify WBP_MapTable appears ✅
+    - [ ] Verify camera blends to map view over 2 seconds ✅
+    - [ ] Verify WBP_MapTable widget appears ✅
     - [ ] Verify mouse cursor visible, UI input mode active ✅
     - [ ] Click "Back" button
-    - [ ] Verify camera blends back to first-person (2s) ✅
+    - [ ] Verify widget closes and camera blends back ✅
     - [ ] Verify gameplay input restored ✅
   - [ ] **Test 2: Close via ESC**
     - [ ] Click BP_TableObject_Map again
@@ -2049,26 +1671,54 @@ Extend `AFCPlayerController` with methods to handle table object clicks: blend c
     - [ ] Verify widget closes properly ✅
   - [ ] **Test 3: Logbook object (no widget)**
     - [ ] Click BP_TableObject_Logbook
-    - [ ] Verify camera blends ✅
-    - [ ] Verify placeholder message appears (no widget class set) ✅
-    - [ ] Press ESC to return
-  - [ ] **Test 4: Rapid clicks (edge case)**
+    - [ ] Verify camera focus, no widget (Week 3 feature) ✅
+    - [ ] Click Back
+  - [ ] **Test 4: Letters object (no widget)**
+    - [ ] Click BP_TableObject_Letters
+    - [ ] Verify camera focus, no widget ✅
+    - [ ] Click Back
+  - [ ] **Test 5: Glass object (no widget)**
+    - [ ] Click BP_TableObject_Compass
+    - [ ] Verify camera focus, no widget ✅
+    - [ ] Click Back
+  - [ ] **Test 6: Game State - Add supplies**
+    - [ ] From console: `GetGameInstance()->AddSupplies(50)`
+    - [ ] Click BP_TableObject_Map
+    - [ ] Verify supplies display: "Supplies: 150" ✅
+    - [ ] Click Back
+  - [ ] **Test 7: Game State - Consume supplies (success)**
+    - [ ] From console: `GetGameInstance()->ConsumeSupplies(50, bSuccess)`
+    - [ ] Click BP_TableObject_Map
+    - [ ] Verify supplies display: "Supplies: 100" ✅
+    - [ ] Click Back
+  - [ ] **Test 8: Game State - Consume supplies (insufficient)**
+    - [ ] From console: `GetGameInstance()->ConsumeSupplies(200, bSuccess)` (have 100, need 200)
+    - [ ] Check Output Log: "ConsumeSupplies: Insufficient supplies" ✅
+    - [ ] Click BP_TableObject_Map
+    - [ ] Verify supplies still shows: "Supplies: 100" (unchanged) ✅
+    - [ ] Click Back
+  - [ ] **Test 9: Level transition (placeholder)**
+    - [ ] Click BP_TableObject_Map
+    - [ ] Click "Start Test Expedition" button
+    - [ ] Verify message appears: "Coming Soon - Overworld in Week 3" ✅
+    - [ ] Verify no level transition occurs ✅
+  - [ ] **Test 10: Rapid clicks (edge case)**
     - [ ] Click BP_TableObject_Map
     - [ ] Immediately click BP_TableObject_Logbook (before blend completes)
     - [ ] Verify no crashes ✅
     - [ ] Verify only one camera blend active ✅
 
-- [ ] **Testing After Step 4.6.1** ✅ CHECKPOINT
+- [ ] **Testing After Step 3.6.1** ✅ CHECKPOINT
   - [ ] All tests pass ✅
   - [ ] No "Accessed None" errors
   - [ ] No camera jitter or input mode bugs
   - [ ] Output Log clean (no unexpected warnings)
 
-**COMMIT POINT 4.6.1**: `git add -A && git commit -m "test(interaction): Add end-to-end table interaction flow verification"`
+**COMMIT POINT 3.6.1**: `git add -A && git commit -m "test(interaction): Add end-to-end table interaction flow verification"`
 
 ---
 
-**Task 4 Complete** ✅
+**Task 3 Complete** ✅
 
 **Acceptance Criteria Met:**
 
@@ -2080,6 +1730,391 @@ Extend `AFCPlayerController` with methods to handle table object clicks: blend c
 - [x] ESC key binding to close current widget (IA_CloseWidget)
 - [x] BP_TableObject_Map successfully shows WBP_MapTable when clicked
 - [x] Full interaction flow tested and verified
+
+**Next Steps:** Task 4 - Create Map Table Widget (Placeholder UI)
+
+---
+
+### Task 4: Create Map Table Widget (Placeholder UI)
+
+Create `WBP_MapTable` widget with placeholder UI showing expedition planning interface. Widget displays current supplies from GameInstance and provides "Start Test Expedition" button (non-functional until Week 3 Overworld exists) and "Back" button to return to first-person view.
+
+**Key Deliverables:**
+
+- `WBP_MapTable` widget at `/Game/FC/UI/MapTable/`
+- Canvas with parchment/map background texture
+- Static world map image (placeholder, non-interactive)
+- Text displays: Title, current supplies count
+- Buttons: "Start Test Expedition" (shows "Coming Soon" message), "Back" (closes widget)
+- Blueprint bindings reading supplies from UFCGameInstance
+
+---
+
+#### Step 4.1: Create Widget Blueprint Structure
+
+##### Step 4.1.1: Create WBP_MapTable Widget with Canvas Layout
+
+- [ ] **Analysis**
+
+  - [ ] Review Week 1 widget patterns (WBP_MainMenu, WBP_SaveSlotSelector) for structure
+  - [ ] Widget needs fullscreen canvas for immersive map table view
+  - [ ] Review UE*NamingConventions.md: Widget Blueprints use `WBP*` prefix
+  - [ ] Folder structure: `/Content/FC/UI/MapTable/`
+
+- [ ] **Implementation (Widget Blueprint)**
+
+  - [ ] Open Content Browser → Navigate to `/Content/FC/UI/MapTable/` (create folder if not exists)
+  - [ ] Right-click → User Interface → Widget Blueprint
+  - [ ] Name: `WBP_MapTable`
+  - [ ] Open WBP_MapTable in Widget Designer
+  - [ ] Designer Canvas:
+    - [ ] Root: Canvas Panel (default)
+    - [ ] Add Image (child of Canvas Panel), name: `BackgroundImage`
+      - [ ] Anchors: Fill entire screen (0,0 to 1,1)
+      - [ ] Position: (0, 0), Size: (0, 0) with stretch anchors
+      - [ ] Color and Opacity: Tan/parchment color (R=0.9, G=0.85, B=0.7, A=1.0)
+      - [ ] Brush: SolidColor (placeholder until texture asset added)
+
+- [ ] **Testing After Step 4.1.1** ✅ CHECKPOINT
+  - [ ] Compile Widget Blueprint
+  - [ ] Add to viewport test (Level Blueprint):
+    ```
+    BeginPlay → Create Widget (WBP_MapTable)
+             → Add to Viewport
+             → Delay (3.0s)
+             → Remove from Parent
+    ```
+  - [ ] PIE: Verify fullscreen tan background appears for 3 seconds ✅
+  - [ ] No errors
+
+**COMMIT POINT 4.1.1**: `git add -A && git commit -m "feat(ui): Create WBP_MapTable widget with background"`
+
+---
+
+##### Step 4.1.2: Add Map Image Placeholder
+
+- [ ] **Analysis**
+
+  - [ ] Static map image for visual reference (non-interactive in Week 2)
+  - [ ] Center of screen, leaving space for UI elements at top/bottom
+  - [ ] Placeholder: Use simple texture or colored image
+
+- [ ] **Implementation (Widget Designer)**
+
+  - [ ] Open WBP_MapTable Widget Designer
+  - [ ] Add Image (child of Canvas Panel), name: `MapImage`
+    - [ ] Anchors: Center (0.5, 0.5)
+    - [ ] Position: (0, 0) - centered
+    - [ ] Size: (800, 600) - large but not fullscreen
+    - [ ] Alignment: (0.5, 0.5) - center alignment
+    - [ ] Color and Opacity: Light gray (R=0.7, G=0.7, B=0.7, A=1.0)
+    - [ ] Brush: SolidColor (placeholder for map texture)
+  - [ ] Add Text Block (child of Canvas Panel, overlay on MapImage), name: `MapPlaceholderText`
+    - [ ] Anchors: Center (0.5, 0.5)
+    - [ ] Position: (0, 0)
+    - [ ] Size to Content: ✅ Enabled
+    - [ ] Text: "World Map Placeholder\n(Route Planning Coming Week 9)"
+    - [ ] Font Size: 24
+    - [ ] Justification: Center
+    - [ ] Color: Dark Gray (R=0.3, G=0.3, B=0.3, A=1.0)
+    - [ ] Font Style: Bold (if available)
+
+- [ ] **Testing After Step 4.1.2** ✅ CHECKPOINT
+  - [ ] Compile Widget
+  - [ ] PIE with add to viewport test
+  - [ ] Verify map placeholder visible in center with text ✅
+  - [ ] No layout issues
+
+**COMMIT POINT 4.1.2**: `git add -A && git commit -m "feat(ui): Add map placeholder image to WBP_MapTable"`
+
+---
+
+#### Step 4.2: Add Title and Supplies Display
+
+##### Step 4.2.1: Add Title Text at Top
+
+- [ ] **Analysis**
+
+  - [ ] Title: "Expedition Planning" at top center
+  - [ ] Large, prominent font for immersion
+  - [ ] Anchored to top of screen
+
+- [ ] **Implementation (Widget Designer)**
+
+  - [ ] Open WBP_MapTable Widget Designer
+  - [ ] Add Text Block (child of Canvas Panel), name: `TitleText`
+    - [ ] Anchors: Top Center (0.5, 0.0)
+    - [ ] Position: (0, 40) - offset from top
+    - [ ] Alignment: (0.5, 0.0)
+    - [ ] Size to Content: ✅ Enabled
+    - [ ] Text: "Expedition Planning"
+    - [ ] Font Size: 48
+    - [ ] Justification: Center
+    - [ ] Color: Dark Brown (R=0.2, G=0.15, B=0.1, A=1.0)
+    - [ ] Font Style: Bold (if available)
+
+- [ ] **Testing After Step 4.2.1** ✅ CHECKPOINT
+  - [ ] Compile Widget
+  - [ ] PIE with add to viewport test
+  - [ ] Verify title visible at top center ✅
+  - [ ] Text readable and prominent
+
+**COMMIT POINT 4.2.1**: `git add -A && git commit -m "feat(ui): Add title text to WBP_MapTable"`
+
+---
+
+##### Step 4.2.2: Add Supplies Display with Data Binding
+
+- [ ] **Analysis**
+
+  - [ ] Display current supplies from UFCGameInstance
+  - [ ] Use Blueprint binding to read CurrentSupplies property
+  - [ ] Position: Below title, left-aligned or centered
+  - [ ] Format: "Supplies: [Amount]"
+
+- [ ] **Implementation (Widget Designer)**
+
+  - [ ] Open WBP_MapTable Widget Designer
+  - [ ] Add Horizontal Box (child of Canvas Panel), name: `SuppliesContainer`
+    - [ ] Anchors: Top Center (0.5, 0.0)
+    - [ ] Position: (0, 100) - below title
+    - [ ] Alignment: (0.5, 0.0)
+    - [ ] Size to Content: ✅ Enabled
+  - [ ] Add Text Block (child of SuppliesContainer), name: `SuppliesLabelText`
+    - [ ] Text: "Supplies: "
+    - [ ] Font Size: 28
+    - [ ] Color: Dark Brown (R=0.2, G=0.15, B=0.1, A=1.0)
+  - [ ] Add Text Block (child of SuppliesContainer), name: `SuppliesValueText`
+    - [ ] Text: "0" (will be bound dynamically)
+    - [ ] Font Size: 28
+    - [ ] Color: Dark Orange (R=0.8, G=0.4, B=0.1, A=1.0)
+    - [ ] Is Variable: ✅ Enabled (so we can access in Graph)
+
+- [ ] **Implementation (Event Graph - Data Binding)**
+
+  - [ ] Open WBP_MapTable Event Graph
+  - [ ] Create Custom Event: `UpdateSuppliesDisplay`
+  - [ ] Add nodes:
+    ```
+    UpdateSuppliesDisplay → Get Game Instance
+                         → Cast to FCGameInstance
+                         → Get Current Supplies (variable)
+                         → Format Text ("{0}", supplies)
+                         → Set Text (SuppliesValueText)
+    ```
+  - [ ] Create Event Construct (widget initialization):
+    ```
+    Event Construct → UpdateSuppliesDisplay
+    ```
+  - [ ] Optional: Add Event Tick for real-time updates (can be optimized later):
+    ```
+    Event Tick → UpdateSuppliesDisplay
+    ```
+    - [ ] Note: For Week 2, Tick is fine; will optimize with event-driven updates in future weeks
+
+- [ ] **Testing After Step 4.2.2** ✅ CHECKPOINT
+  - [ ] Compile Widget
+  - [ ] Set CurrentSupplies in GameInstance Blueprint (BP_FC_GameInstance):
+    - [ ] Open BP_FC_GameInstance → Class Defaults
+    - [ ] Set CurrentSupplies = 100 (for testing)
+  - [ ] PIE with add to viewport test
+  - [ ] Verify supplies display shows "Supplies: 100" ✅
+  - [ ] Change CurrentSupplies to 50, PIE again, verify display updates ✅
+  - [ ] No "Accessed None" errors
+
+**COMMIT POINT 4.2.2**: `git add -A && git commit -m "feat(ui): Add supplies display with data binding in WBP_MapTable"`
+
+---
+
+#### Step 4.3: Add "Start Test Expedition" Button (Placeholder)
+
+##### Step 4.3.1: Create Button with "Coming Soon" Message
+
+- [ ] **Analysis**
+
+  - [ ] Button should be prominent, centered at bottom of map
+  - [ ] Clicking shows "Coming Soon - Overworld in Week 3" message (no actual level load)
+  - [ ] Button enabled only when supplies > 0
+
+- [ ] **Implementation (Widget Designer)**
+
+  - [ ] Open WBP_MapTable Widget Designer
+  - [ ] Add Button (child of Canvas Panel), name: `StartExpeditionButton`
+    - [ ] Anchors: Bottom Center (0.5, 1.0)
+    - [ ] Position: (0, -120) - offset from bottom
+    - [ ] Alignment: (0.5, 1.0)
+    - [ ] Size: (300, 60)
+  - [ ] Add Text Block (child of StartExpeditionButton), name: `StartExpeditionButtonText`
+    - [ ] Text: "Start Test Expedition"
+    - [ ] Font Size: 24
+    - [ ] Justification: Center
+    - [ ] Color: White (R=1.0, G=1.0, B=1.0, A=1.0)
+  - [ ] Button Style:
+    - [ ] Normal: Dark Green (R=0.1, G=0.4, B=0.1, A=1.0)
+    - [ ] Hovered: Lighter Green (R=0.2, G=0.5, B=0.2, A=1.0)
+    - [ ] Pressed: Darker Green (R=0.05, G=0.3, B=0.05, A=1.0)
+    - [ ] Disabled: Gray (R=0.3, G=0.3, B=0.3, A=1.0)
+
+- [ ] **Implementation (Event Graph - Button Logic)**
+
+  - [ ] Open WBP_MapTable Event Graph
+  - [ ] Add Event: OnClicked (StartExpeditionButton)
+  - [ ] Add nodes:
+    ```
+    OnClicked (StartExpeditionButton) → Print String ("Coming Soon - Overworld Level in Week 3")
+                                      → Duration: 5.0s
+                                      → Text Color: Yellow
+    ```
+  - [ ] Add button enabled logic in UpdateSuppliesDisplay:
+    ```
+    UpdateSuppliesDisplay → Get Current Supplies
+                         → Greater Than (0)
+                         → Set Is Enabled (StartExpeditionButton)
+    ```
+
+- [ ] **Testing After Step 4.3.1** ✅ CHECKPOINT
+  - [ ] Compile Widget
+  - [ ] PIE with add to viewport test
+  - [ ] Click "Start Test Expedition" button
+  - [ ] Verify on-screen message: "Coming Soon - Overworld Level in Week 3" ✅
+  - [ ] Set CurrentSupplies = 0 in GameInstance
+  - [ ] PIE again, verify button is grayed out/disabled ✅
+  - [ ] Set CurrentSupplies = 100, verify button re-enabled ✅
+  - [ ] No errors
+
+**COMMIT POINT 4.3.1**: `git add -A && git commit -m "feat(ui): Add Start Test Expedition button with placeholder message"`
+
+---
+
+#### Step 4.4: Add "Back" Button to Close Widget
+
+##### Step 4.4.1: Create Back Button with Close Functionality
+
+- [ ] **Analysis**
+
+  - [ ] "Back" button returns player to first-person view
+  - [ ] For now, just removes widget from parent (full camera blend in Task 4)
+  - [ ] Position: Bottom left corner or near Start Expedition button
+
+- [ ] **Implementation (Widget Designer)**
+
+  - [ ] Open WBP_MapTable Widget Designer
+  - [ ] Add Button (child of Canvas Panel), name: `BackButton`
+    - [ ] Anchors: Bottom Center (0.5, 1.0)
+    - [ ] Position: (-170, -120) - left of Start Expedition button
+    - [ ] Alignment: (0.5, 1.0)
+    - [ ] Size: (120, 60)
+  - [ ] Add Text Block (child of BackButton), name: `BackButtonText`
+    - [ ] Text: "Back"
+    - [ ] Font Size: 24
+    - [ ] Justification: Center
+    - [ ] Color: White (R=1.0, G=1.0, B=1.0, A=1.0)
+  - [ ] Button Style:
+    - [ ] Normal: Dark Red (R=0.4, G=0.1, B=0.1, A=1.0)
+    - [ ] Hovered: Lighter Red (R=0.5, G=0.2, B=0.2, A=1.0)
+    - [ ] Pressed: Darker Red (R=0.3, G=0.05, B=0.05, A=1.0)
+
+- [ ] **Implementation (Event Graph - Close Logic)**
+
+  - [ ] Open WBP_MapTable Event Graph
+  - [ ] Add Event: OnClicked (BackButton)
+  - [ ] Add nodes:
+    ```
+    OnClicked (BackButton) → Print String ("Closing map table - full camera blend in Task 4")
+                          → Remove from Parent (self)
+    ```
+  - [ ] Note: Task 4 will replace this with proper camera blend and input mode restoration
+
+- [ ] **Testing After Step 4.4.1** ✅ CHECKPOINT
+  - [ ] Compile Widget
+  - [ ] PIE with add to viewport test
+  - [ ] Click "Back" button
+  - [ ] Verify widget disappears ✅
+  - [ ] Verify on-screen message appears ✅
+  - [ ] No errors or crashes
+
+**COMMIT POINT 4.4.1**: `git add -A && git commit -m "feat(ui): Add Back button to WBP_MapTable"`
+
+#### Step 4.5: Polish Widget Layout and Styling
+
+##### Step 4.5.1: Adjust Spacing and Visual Hierarchy
+
+- [ ] **Analysis**
+
+  - [ ] Review overall layout for readability and balance
+  - [ ] Ensure all elements have proper spacing
+  - [ ] Add visual polish (borders, shadows, etc.) if time permits
+
+- [ ] **Implementation (Widget Designer)**
+
+  - [ ] Open WBP_MapTable Widget Designer
+  - [ ] Review all elements:
+    - [ ] Title: Properly centered and visible ✅
+    - [ ] Supplies: Readable and clear ✅
+    - [ ] Map placeholder: Centered, not overlapping UI ✅
+    - [ ] Buttons: Accessible and visually distinct ✅
+  - [ ] Optional polish:
+    - [ ] Add Border (child of Canvas Panel) around MapImage for frame effect
+    - [ ] Add Shadow/Outline to TitleText for better readability
+    - [ ] Adjust button padding for better appearance
+  - [ ] Compile Widget
+
+- [ ] **Testing After Step 4.5.1** ✅ CHECKPOINT
+  - [ ] PIE with add to viewport test
+  - [ ] Verify entire UI is readable and functional ✅
+  - [ ] No overlapping elements
+  - [ ] Professional appearance (within placeholder constraints)
+
+**COMMIT POINT 4.5.1**: `git add -A && git commit -m "feat(ui): Polish WBP_MapTable layout and styling"`
+
+---
+
+#### Step 4.6: Link WBP_MapTable to BP_TableObject_Map
+
+##### Step 4.6.1: Set Widget Class in Table Object
+
+- [ ] **Analysis**
+
+  - [ ] BP_TableObject_Map should return WBP_MapTable in GetWidgetClass
+  - [ ] This enables Task 4 to show widget when map is clicked
+
+- [ ] **Implementation (Blueprint)**
+
+  - [ ] Open BP_TableObject_Map Blueprint
+  - [ ] Event Graph → Find "Event Get Widget Class" override
+  - [ ] Modify Return Node:
+    - [ ] Return Value: Select Class → WBP_MapTable
+  - [ ] Compile Blueprint
+
+- [ ] **Testing After Step 4.6.1** ✅ CHECKPOINT
+  - [ ] PIE in L_Office
+  - [ ] Test from Level Blueprint:
+    ```
+    BeginPlay → Delay (2.0s)
+             → Get Actor of Class (BP_TableObject_Map)
+             → Get Widget Class (call interface)
+             → Print String (show widget class name)
+    ```
+  - [ ] Verify console shows "WBP_MapTable" ✅
+  - [ ] No "Accessed None" errors
+
+**COMMIT POINT 4.6.1**: `git add -A && git commit -m "feat(ui): Link WBP_MapTable to BP_TableObject_Map"`
+
+---
+
+**Task 4 Complete** ✅
+
+**Acceptance Criteria Met:**
+
+- [x] `WBP_MapTable` widget created at `/Content/FC/UI/MapTable/`
+- [x] Fullscreen canvas with parchment background color
+- [x] Static world map placeholder image (gray box with text)
+- [x] Title text: "Expedition Planning"
+- [x] Supplies display with data binding to UFCGameInstance.CurrentSupplies
+- [x] "Start Test Expedition" button (shows "Coming Soon" message, enabled when supplies > 0)
+- [x] "Back" button (closes widget)
+- [x] Widget linked to BP_TableObject_Map via GetWidgetClass interface
+- [x] All UI elements properly positioned and styled
 
 **Next Steps:** Task 5 - Extend Level Transition Architecture (Loading Framework)
 
@@ -2103,33 +2138,33 @@ Extend `UFCLevelManager` subsystem with `LoadLevel()` method supporting fade/loa
 
 ##### Step 5.1.1: Add PreviousLevel Property and Getter
 
-- [ ] **Analysis**
+- [x] **Analysis**
 
-  - [ ] Review UFCLevelManager.h for existing CurrentLevel tracking
-  - [ ] Add PreviousLevel property to enable back navigation in future weeks
-  - [ ] Update UpdateCurrentLevel to track previous level before changing
+  - [x] Review UFCLevelManager.h for existing CurrentLevel tracking
+  - [x] Add PreviousLevel property to enable back navigation in future weeks
+  - [x] Update UpdateCurrentLevel to track previous level before changing
 
-- [ ] **Implementation (FCLevelManager.h)**
+- [x] **Implementation (FCLevelManager.h)**
 
-  - [ ] Open `/Source/FC/Core/FCLevelManager.h`
-  - [ ] Add private property:
+  - [x] Open `/Source/FC/Core/FCLevelManager.h`
+  - [x] Add private property:
     ```cpp
     private:
         /** Previously loaded level name (for back navigation) */
         FName PreviousLevelName;
     ```
-  - [ ] Add public getter:
+  - [x] Add public getter:
     ```cpp
     /** Get the previous level name (for back navigation) */
     UFUNCTION(BlueprintCallable, Category = "FC|Level")
     FName GetPreviousLevelName() const { return PreviousLevelName; }
     ```
 
-- [ ] **Implementation (FCLevelManager.cpp)**
+- [x] **Implementation (FCLevelManager.cpp)**
 
-  - [ ] Open `/Source/FC/Core/FCLevelManager.cpp`
-  - [ ] Find `UpdateCurrentLevel` method
-  - [ ] Modify to track previous level:
+  - [x] Open `/Source/FC/Core/FCLevelManager.cpp`
+  - [x] Find `UpdateCurrentLevel` method
+  - [x] Modify to track previous level:
 
     ```cpp
     void UFCLevelManager::UpdateCurrentLevel(const FName& NewLevelName)
@@ -2148,7 +2183,7 @@ Extend `UFCLevelManager` subsystem with `LoadLevel()` method supporting fade/loa
     }
     ```
 
-  - [ ] Initialize PreviousLevelName in Initialize method:
+  - [x] Initialize PreviousLevelName in Initialize method:
 
     ```cpp
     void UFCLevelManager::Initialize(FSubsystemCollectionBase& Collection)
@@ -2161,11 +2196,11 @@ Extend `UFCLevelManager` subsystem with `LoadLevel()` method supporting fade/loa
     }
     ```
 
-- [ ] **Testing After Step 5.1.1** ✅ CHECKPOINT
-  - [ ] Compile C++ code
-  - [ ] PIE in L_Office
-  - [ ] Check Output Log for: "UpdateCurrentLevel: Level=L_Office, Type=Office, PreviousLevel=None" ✅
-  - [ ] No errors
+- [x] **Testing After Step 5.1.1** ✅ CHECKPOINT
+  - [x] Compile C++ code
+  - [x] PIE in L_Office
+  - [x] Check Output Log for: "UpdateCurrentLevel: Level=L_Office, Type=Office, PreviousLevel=None" ✅
+  - [x] No errors
 
 **COMMIT POINT 5.1.1**: `git add -A && git commit -m "feat(level): Add PreviousLevel tracking to UFCLevelManager"`
 
@@ -2175,20 +2210,20 @@ Extend `UFCLevelManager` subsystem with `LoadLevel()` method supporting fade/loa
 
 ##### Step 5.2.1: Add LoadLevel Method Declaration
 
-- [ ] **Analysis**
+- [x] **Analysis**
 
-  - [ ] Review UFCTransitionManager for fade methods (FadeOut, FadeIn, OnTransitionComplete delegate)
-  - [ ] LoadLevel should: fade out → load level → fade in
-  - [ ] Support optional loading screen display (placeholder for Week 3+)
+  - [x] Review UFCTransitionManager for fade methods (FadeOut, FadeIn, OnTransitionComplete delegate)
+  - [x] LoadLevel should: fade out → load level → fade in
+  - [x] Support optional loading screen display (placeholder for Week 3+)
 
-- [ ] **Implementation (FCLevelManager.h)**
+- [x] **Implementation (FCLevelManager.h)**
 
-  - [ ] Open `/Source/FC/Core/FCLevelManager.h`
-  - [ ] Add forward declaration:
+  - [x] Open `/Source/FC/Core/FCLevelManager.h`
+  - [x] Add forward declaration:
     ```cpp
     class UFCTransitionManager;
     ```
-  - [ ] Add public method:
+  - [x] Add public method:
     ```cpp
     /**
      * Load a new level with optional fade transition and loading screen
@@ -2199,9 +2234,9 @@ Extend `UFCLevelManager` subsystem with `LoadLevel()` method supporting fade/loa
     void LoadLevel(FName LevelName, bool bShowLoadingScreen = false);
     ```
 
-- [ ] **Testing After Step 5.2.1** ✅ CHECKPOINT
-  - [ ] Compile C++ code (declaration only)
-  - [ ] No errors
+- [x] **Testing After Step 5.2.1** ✅ CHECKPOINT
+  - [x] Compile C++ code (declaration only)
+  - [x] No errors
 
 **COMMIT POINT 5.2.1**: `git add -A && git commit -m "feat(level): Add LoadLevel method declaration"`
 
@@ -2209,22 +2244,22 @@ Extend `UFCLevelManager` subsystem with `LoadLevel()` method supporting fade/loa
 
 ##### Step 5.2.2: Implement LoadLevel Method with Fade Transition
 
-- [ ] **Analysis**
+- [x] **Analysis**
 
-  - [ ] Get UFCTransitionManager from GameInstance
-  - [ ] Bind to OnTransitionComplete delegate for fade out
-  - [ ] After fade completes, call OpenLevel
-  - [ ] Note: bShowLoadingScreen is placeholder for Week 3+
+  - [x] Get UFCTransitionManager from GameInstance
+  - [x] Bind to OnTransitionComplete delegate for fade out
+  - [x] After fade completes, call OpenLevel
+  - [x] Note: bShowLoadingScreen is placeholder for Week 3+
 
-- [ ] **Implementation (FCLevelManager.cpp)**
+- [x] **Implementation (FCLevelManager.cpp)**
 
-  - [ ] Add includes at top:
+  - [x] Add includes at top:
     ```cpp
     #include "Core/FCTransitionManager.h"
     #include "Core/UFCGameInstance.h"
     #include "Kismet/GameplayStatics.h"
     ```
-  - [ ] Implement LoadLevel:
+  - [x] Implement LoadLevel:
 
     ```cpp
     void UFCLevelManager::LoadLevel(FName LevelName, bool bShowLoadingScreen)
@@ -2308,7 +2343,7 @@ Extend `UFCLevelManager` subsystem with `LoadLevel()` method supporting fade/loa
   - [ ] Test from console: `CE GetGameInstance()->GetSubsystem<UFCLevelManager>()->LoadLevel(TEXT("L_MainMenu"), false)`
   - [ ] Verify fade out occurs ✅
   - [ ] Verify level loads (returns to main menu) ✅
-  - [ ] Check Output Log for: "LoadLevel: Loading L_MainMenu" ✅
+  - [ ] Check Output Log: "LoadLevel: Loading L_MainMenu" ✅
   - [ ] No crashes
 
 **COMMIT POINT 5.2.2**: `git add -A && git commit -m "feat(level): Implement LoadLevel with fade transition"`
@@ -2382,17 +2417,16 @@ Extend `UFCGameInstance` with persistent game state data: create `FFCGameStateDa
 
 ##### Step 6.1.1: Define Game State Data Structure in UFCGameInstance.h
 
-- [ ] **Analysis**
+- [x] **Analysis**
 
-  - [ ] Review UFCGameInstance.h for existing properties (CurrentExpeditionId, DiscoveredRegions, etc.)
-  - [ ] Create struct to group related game state data
-  - [ ] Struct should be BlueprintType for Blueprint access
-  - [ ] Fields: Supplies, Money, Day (all int32)
+  - [x] Review UFCGameInstance.h for existing properties (CurrentExpeditionId, DiscoveredRegions, etc.)
+  - [x] Create struct to group related game state data
+  - [x] Struct should be BlueprintType for Blueprint access
+  - [x] Fields: Supplies, Money, Day (all int32)
 
-- [ ] **Implementation (UFCGameInstance.h)**
+- [x] **Implementation (UFCGameInstance.h)**
 
-  - [ ] Open `/Source/FC/Core/UFCGameInstance.h`
-  - [ ] Add struct definition before class declaration:
+  - [x] Add struct definition before class declaration:
 
     ```cpp
     /**
@@ -2428,10 +2462,10 @@ Extend `UFCGameInstance` with persistent game state data: create `FFCGameStateDa
     };
     ```
 
-- [ ] **Testing After Step 6.1.1** ✅ CHECKPOINT
-  - [ ] Compile C++ code
-  - [ ] PIE: No errors
-  - [ ] Verify struct appears in Blueprint struct list (can be searched in Variable Type dropdown)
+- [x] **Testing After Step 6.1.1** ✅ CHECKPOINT
+  - [x] Compile C++ code
+  - [x] PIE: No errors
+  - [x] Verify struct appears in Blueprint struct list (can be searched in Variable Type dropdown)
 
 **COMMIT POINT 6.1.1**: `git add -A && git commit -m "feat(gamestate): Add FFCGameStateData struct to UFCGameInstance"`
 
@@ -2441,21 +2475,21 @@ Extend `UFCGameInstance` with persistent game state data: create `FFCGameStateDa
 
 ##### Step 6.2.1: Add GameStateData Property and Getter/Setter Methods
 
-- [ ] **Analysis**
+- [x] **Analysis**
 
-  - [ ] Add FFCGameStateData instance as member variable
-  - [ ] Provide getter for read access
-  - [ ] Add helper methods: AddSupplies, ConsumeSupplies (with validation)
+  - [x] Add FFCGameStateData instance as member variable
+  - [x] Provide getter for read access
+  - [x] Add helper methods: AddSupplies, ConsumeSupplies (with validation)
 
-- [ ] **Implementation (UFCGameInstance.h)**
+- [x] **Implementation (UFCGameInstance.h)**
 
-  - [ ] Add public property:
+  - [x] Add public property:
     ```cpp
     /** Current game state data */
     UPROPERTY(BlueprintReadOnly, Category = "Game State")
     FFCGameStateData GameStateData;
     ```
-  - [ ] Add public methods:
+  - [x] Add public methods:
 
     ```cpp
     /**
@@ -2487,9 +2521,9 @@ Extend `UFCGameInstance` with persistent game state data: create `FFCGameStateDa
     int32 GetCurrentSupplies() const { return GameStateData.Supplies; }
     ```
 
-- [ ] **Testing After Step 6.2.1** ✅ CHECKPOINT
-  - [ ] Compile C++ code (declarations only)
-  - [ ] No errors
+- [x] **Testing After Step 6.2.1** ✅ CHECKPOINT
+  - [x] Compile C++ code (declarations only)
+  - [x] No errors
 
 **COMMIT POINT 6.2.1**: `git add -A && git commit -m "feat(gamestate): Add GameStateData property and method declarations"`
 
@@ -2497,15 +2531,15 @@ Extend `UFCGameInstance` with persistent game state data: create `FFCGameStateDa
 
 ##### Step 6.2.2: Implement Supply Manipulation Methods
 
-- [ ] **Analysis**
+- [x] **Analysis**
 
-  - [ ] AddSupplies: Simply add amount (can go negative if needed)
-  - [ ] ConsumeSupplies: Validate sufficient supplies before consuming
-  - [ ] Log all supply changes for debugging
+  - [x] AddSupplies: Simply add amount (can go negative if needed)
+  - [x] ConsumeSupplies: Validate sufficient supplies before consuming
+  - [x] Log all supply changes for debugging
 
-- [ ] **Implementation (UFCGameInstance.cpp)**
+- [x] **Implementation (UFCGameInstance.cpp)**
 
-  - [ ] Implement AddSupplies:
+  - [x] Implement AddSupplies:
 
     ```cpp
     void UFCGameInstance::AddSupplies(int32 Amount)
@@ -2520,7 +2554,7 @@ Extend `UFCGameInstance` with persistent game state data: create `FFCGameStateDa
     }
     ```
 
-  - [ ] Implement ConsumeSupplies:
+  - [x] Implement ConsumeSupplies:
 
     ```cpp
     int32 UFCGameInstance::ConsumeSupplies(int32 Amount, bool& bSuccess)
@@ -2554,10 +2588,10 @@ Extend `UFCGameInstance` with persistent game state data: create `FFCGameStateDa
     }
     ```
 
-- [ ] **Testing After Step 6.2.2** ✅ CHECKPOINT
-  - [ ] Compile C++ code
-  - [ ] PIE in L_Office
-  - [ ] Test from Level Blueprint:
+- [x] **Testing After Step 6.2.2** ✅ CHECKPOINT
+  - [x] Compile C++ code
+  - [x] PIE in L_Office
+  - [x] Test from Level Blueprint:
     ```
     BeginPlay → Delay (2.0s)
              → Get Game Instance
@@ -2568,10 +2602,10 @@ Extend `UFCGameInstance` with persistent game state data: create `FFCGameStateDa
              → Consume Supplies (30, bSuccess out)
              → Print String (bSuccess, remaining supplies)
     ```
-  - [ ] Verify Output Log:
-    - [ ] "AddSupplies: 50 (New Total: 150)" ✅
-    - [ ] "ConsumeSupplies: 30 (Remaining: 120)" ✅
-  - [ ] No errors
+  - [x] Verify Output Log:
+    - [x] "AddSupplies: 50 (New Total: 150)" ✅
+    - [x] "ConsumeSupplies: 30 (Remaining: 120)" ✅
+  - [x] No errors
 
 **COMMIT POINT 6.2.2**: `git add -A && git commit -m "feat(gamestate): Implement AddSupplies and ConsumeSupplies methods"`
 
@@ -2581,17 +2615,17 @@ Extend `UFCGameInstance` with persistent game state data: create `FFCGameStateDa
 
 ##### Step 6.3.1: Verify WBP_MapTable Reads from GameInstance (Already Implemented in Task 3)
 
-- [ ] **Analysis**
+- [x] **Analysis**
 
-  - [ ] Task 3 Step 3.2.2 already implemented supplies display with data binding
-  - [ ] Binding reads CurrentSupplies property (which we just added as GetCurrentSupplies method)
-  - [ ] Verify binding works with new struct-based approach
+  - [x] Task 3 Step 3.2.2 already implemented supplies display with data binding
+  - [x] Binding reads CurrentSupplies property (which we just added as GetCurrentSupplies method)
+  - [x] Verify binding works with new struct-based approach
 
-- [ ] **Implementation (Verification Only)**
+- [x] **Implementation (Verification Only)**
 
-  - [ ] Open WBP_MapTable Event Graph
-  - [ ] Find UpdateSuppliesDisplay custom event
-  - [ ] Verify logic:
+  - [x] Open WBP_MapTable Event Graph
+  - [x] Find UpdateSuppliesDisplay custom event
+  - [x] Verify logic:
     ```
     UpdateSuppliesDisplay → Get Game Instance
                          → Cast to FCGameInstance
@@ -2599,15 +2633,15 @@ Extend `UFCGameInstance` with persistent game state data: create `FFCGameStateDa
                          → Format Text ("{0}", supplies)
                          → Set Text (SuppliesValueText)
     ```
-  - [ ] No changes needed if binding already uses GetCurrentSupplies or GameStateData.Supplies
+  - [x] No changes needed if binding already uses GetCurrentSupplies or GameStateData.Supplies
 
-- [ ] **Testing After Step 6.3.1** ✅ CHECKPOINT
-  - [ ] PIE in L_Office
-  - [ ] Click BP_TableObject_Map to open widget
-  - [ ] Verify supplies display shows "Supplies: 100" (default value from FFCGameStateData) ✅
-  - [ ] From console, call: `GetGameInstance()->AddSupplies(50)`
-  - [ ] Verify widget updates to "Supplies: 150" (if using Tick) or refresh on next open ✅
-  - [ ] No "Accessed None" errors
+- [x] **Testing After Step 6.3.1** ✅ CHECKPOINT
+  - [x] PIE in L_Office
+  - [x] Click BP_TableObject_Map to open widget
+  - [x] Verify supplies display shows "Supplies: 100" (default value from FFCGameStateData) ✅
+  - [x] From console, call: `GetGameInstance()->AddSupplies(50)`
+  - [x] Verify widget updates to "Supplies: 150" (if using Tick) or refresh on next open ✅
+  - [x] No "Accessed None" errors
 
 **COMMIT POINT 6.3.1**: `git add -A && git commit -m "test(gamestate): Verify WBP_MapTable displays supplies from GameStateData"`
 
@@ -2617,46 +2651,77 @@ Extend `UFCGameInstance` with persistent game state data: create `FFCGameStateDa
 
 ##### Step 6.4.1: End-to-End Game State Verification
 
-- [ ] **Analysis**
+- [x] **Analysis**
 
-  - [ ] Test full data flow: Modify supplies in code → GameInstance updates → Widget reflects changes
-  - [ ] Test supply consumption validation (insufficient supplies case)
-  - [ ] Verify state persists across widget open/close cycles
+  - [x] Test full data flow: Modify supplies in code → GameInstance updates → Widget reflects changes
+  - [x] Test supply consumption validation (insufficient supplies case)
+  - [x] Verify state persists across widget open/close cycles
 
-- [ ] **Test Sequence**
+- [x] **Test Sequence**
 
-  - [ ] PIE in L_Office
-  - [ ] **Test 1: Initial state**
-    - [ ] Click BP_TableObject_Map
-    - [ ] Verify supplies display: "Supplies: 100" ✅
-    - [ ] Click Back to close
-  - [ ] **Test 2: Add supplies**
-    - [ ] From console: `GetGameInstance()->AddSupplies(25)`
-    - [ ] Click BP_TableObject_Map again
-    - [ ] Verify supplies display: "Supplies: 125" ✅
-    - [ ] Click Back
-  - [ ] **Test 3: Consume supplies (success)**
-    - [ ] From console: `GetGameInstance()->ConsumeSupplies(50, bSuccess)`
-    - [ ] Click BP_TableObject_Map
-    - [ ] Verify supplies display: "Supplies: 75" ✅
-    - [ ] Verify "Start Test Expedition" button enabled ✅
-    - [ ] Click Back
-  - [ ] **Test 4: Consume supplies (insufficient)**
-    - [ ] From console: `GetGameInstance()->ConsumeSupplies(100, bSuccess)` (have 75, need 100)
-    - [ ] Check Output Log: "ConsumeSupplies: Insufficient supplies" ✅
-    - [ ] Click BP_TableObject_Map
-    - [ ] Verify supplies still shows: "Supplies: 75" (unchanged) ✅
-  - [ ] **Test 5: Consume to zero**
-    - [ ] From console: `GetGameInstance()->ConsumeSupplies(75, bSuccess)`
-    - [ ] Click BP_TableObject_Map
-    - [ ] Verify supplies display: "Supplies: 0" ✅
-    - [ ] Verify "Start Test Expedition" button disabled/grayed out ✅
+  - [x] PIE in L_Office
+  - [x] **Test 1: Initial state**
+    - [x] Click BP_TableObject_Map
+    - [x] Verify supplies display: "Supplies: 100" ✅
+    - [x] Click Back to close
+  - [x] **Test 2: Add supplies**
+    - [x] From console: `GetGameInstance()->AddSupplies(25)`
+    - [x] Click BP_TableObject_Map again
+    - [x] Verify supplies display: "Supplies: 125" ✅
+    - [x] Click Back
+  - [x] **Test 3: Consume supplies (success)**
+    - [x] From console: `GetGameInstance()->ConsumeSupplies(50, bSuccess)`
+    - [x] Click BP_TableObject_Map
+    - [x] Verify supplies display: "Supplies: 75" ✅
+    - [x] Verify "Start Test Expedition" button enabled ✅
+    - [x] Click Back
+  - [x] **Test 4: Consume supplies (insufficient)**
+    - [x] From console: `GetGameInstance()->ConsumeSupplies(100, bSuccess)` (have 75, need 100)
+    - [x] Check Output Log: "ConsumeSupplies: Insufficient supplies" ✅
+    - [x] Click BP_TableObject_Map
+    - [x] Verify supplies still shows: "Supplies: 75" (unchanged) ✅
+    - [x] Click Back
+  - [x] **Test 5: Consume to zero**
+    - [x] From console: `GetGameInstance()->ConsumeSupplies(75, bSuccess)`
+    - [x] Click BP_TableObject_Map
+    - [x] Verify supplies display: "Supplies: 0" ✅
+    - [x] Verify "Start Test Expedition" button disabled/grayed out ✅
+  - [x] **Test 6: Game State - Add supplies (edge case)**:
+    - [x] From console: `GetGameInstance()->AddSupplies(-10)` (subtract 10)
+    - [x] Click BP_TableObject_Map
+    - [x] Verify supplies display: "Supplies: 0" (remains zero) ✅
+    - [x] Verify warning in Output Log ✅
+  - [x] **Test 7: Game State - Consume negative supplies (edge case)**:
+    - [x] From console: `GetGameInstance()->ConsumeSupplies(-5, bSuccess)`
+    - [x] Click BP_TableObject_Map
+    - [x] Verify supplies display: "Supplies: 0" (remains zero) ✅
+    - [x] Verify no crash or unexpected behavior ✅
+  - [x] **Test 8: Game State - Rapid add/remove supplies**:
+    - [x] From console: `GetGameInstance()->AddSupplies(50)`
+    - [x] From console: `GetGameInstance()->ConsumeSupplies(20, bSuccess)`
+    - [x] Click BP_TableObject_Map
+    - [x] Verify supplies display reflects correct value (30) ✅
+    - [x] Click Back
+  - [x] **Test 9: Game State - Open/close widget multiple times**:
+    - [x] Click BP_TableObject_Map
+    - [x] Click Back
+    - [x] Click BP_TableObject_Map
+    - [x] Verify supplies display: "Supplies: 30" (unchanged) ✅
+    - [x] Click Back
+  - [x] **Test 10: Level transition (placeholder)**
+    - [x] Click BP_TableObject_Map
+    - [x] Click "Start Test Expedition" button
+    - [x] Verify message appears: "Coming Soon - Overworld in Week 3" ✅
+    - [x] Verify no level transition occurs ✅
+    - [x] Click Back
+    - [x] Verify camera blends back to PlayerStart ✅
+    - [x] Verify gameplay input restored ✅
 
-- [ ] **Testing After Step 6.4.1** ✅ CHECKPOINT
-  - [ ] All tests pass ✅
-  - [ ] No "Accessed None" errors
-  - [ ] Button enable/disable logic works correctly
-  - [ ] Output Log shows all supply changes with correct values
+- [x] **Testing After Step 6.4.1** ✅ CHECKPOINT
+  - [x] All tests pass ✅
+  - [x] No "Accessed None" errors
+  - [x] No crashes or unexpected behavior
+  - [x] Output Log shows all supply changes with correct values
 
 **COMMIT POINT 6.4.1**: `git add -A && git commit -m "test(gamestate): Add end-to-end game state data flow verification"`
 
@@ -2707,7 +2772,7 @@ After completing Tasks 1-6, conduct comprehensive verification to ensure all Wee
     - [ ] Verify "Start Test Expedition" button enabled ✅
     - [ ] Verify "Back" button visible ✅
   - [ ] Test Button Interactions:
-    - [ ] Click "Start Test Expedition" → Verify message: "Coming Soon - Overworld Level in Week 3" ✅
+    - [ ] Click "Start Test Expedition" → Verify message: "Coming Soon - Overworld in Week 3" ✅
     - [ ] Click "Back" → Verify widget closes ✅
     - [ ] Verify camera blends back to PlayerStart ✅
     - [ ] Verify gameplay input restored ✅
