@@ -1016,31 +1016,31 @@ Create `IFCTableInteractable` C++ interface and `BP_TableObject` base Blueprint 
 
 ##### Step 2.4.1: Arrange Table Objects for Optimal Layout
 
-- [ ] **Analysis**
+- [x] **Analysis**
 
-  - [ ] Review GDD §3.1.2 for intended table layout
-  - [ ] Objects should be easily clickable without overlap
-  - [ ] Camera target points should provide good viewing angles
+  - [x] Review GDD §3.1.2 for intended table layout
+  - [x] Objects should be easily clickable without overlap
+  - [x] Camera target points should provide good viewing angles
 
-- [ ] **Implementation (Level Editing)**
+- [x] **Implementation (Level Editing)**
 
-  - [ ] Open L_Office level
-  - [ ] Select all table objects in World Outliner
-  - [ ] Arrange objects on table mesh:
-    - [ ] BP_TableObject_Map: Center of table, slightly toward player
-    - [ ] BP_TableObject_Logbook: Left side, angled toward player
-    - [ ] BP_TableObject_Letters: Right side, angled toward player
-    - [ ] BP_TableObject_Compass: Upper center, between map and far edge
-  - [ ] Verify collision spheres don't overlap (use Show → Collision in viewport)
-  - [ ] Adjust CameraTargetPoint positions in each Blueprint if needed for better camera angles
+  - [x] Open L_Office level
+  - [x] Select all table objects in World Outliner
+  - [x] Arrange objects on table mesh:
+    - [x] BP_TableObject_Map: Center of table, upper level, above Logbook
+    - [x] BP_TableObject_Logbook: Center of table, angled toward player
+    - [x] BP_TableObject_Letters: Right side, angled toward player
+    - [x] BP_TableObject_Compass: Left side, on top of other books
+  - [x] Verify collision spheres don't overlap (use Show → Collision in viewport)
+  - [x] Adjust CameraTargetPoint positions in each Blueprint if needed for better camera angles
 
-- [ ] **Testing After Step 2.4.1** ✅ CHECKPOINT
-  - [ ] PIE in L_Office
-  - [ ] All 4 objects visible from first-person start position
-  - [ ] Objects visually distinct (colors, sizes, positions)
-  - [ ] Collision spheres don't overlap (check with Show → Collision)
-  - [ ] No Z-fighting or mesh clipping through table
-  - [ ] No errors
+- [x] **Testing After Step 2.4.1** ✅ CHECKPOINT
+  - [x] PIE in L_Office
+  - [x] All 4 objects visible from first-person start position
+  - [x] Objects visually distinct (colors, sizes, positions)
+  - [x] Collision spheres don't overlap (check with Show → Collision)
+  - [x] No Z-fighting or mesh clipping through table
+  - [x] No errors
 
 **COMMIT POINT 2.4.1**: `git add -A && git commit -m "feat(interaction): Arrange table objects in L_Office"`
 
