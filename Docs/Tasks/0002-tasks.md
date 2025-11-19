@@ -791,39 +791,39 @@ Create `IFCTableInteractable` C++ interface and `BP_TableObject` base Blueprint 
 
 ##### Step 2.2.1: Create Base Actor Blueprint with Interface Implementation
 
-- [ ] **Analysis**
+- [x] **Analysis**
 
-  - [ ] Blueprint should be based on AActor (static object on table)
-  - [ ] Needs SceneComponent for camera target position/rotation
-  - [ ] Needs collision component for raycast detection (sphere or box)
-  - [ ] Review folder structure: `/Content/FC/World/Blueprints/Interactables/` for table objects
+  - [x] Blueprint should be based on AActor (static object on table) ✅
+  - [x] Needs SceneComponent for camera target position/rotation ✅
+  - [x] Needs collision component for raycast detection (sphere or box) ✅
+  - [x] Review folder structure: `/Content/FC/World/Blueprints/Interactables/` for table objects ✅
 
-- [ ] **Implementation (Blueprint)**
+- [x] **Implementation (Blueprint)**
 
-  - [ ] Open Unreal Editor Content Browser
-  - [ ] Navigate to `/Content/FC/World/Blueprints/Interactables/` (create folder if not exists)
-  - [ ] Right-click → Blueprint Class → Actor
-  - [ ] Name: `BP_TableObject`
-  - [ ] Open BP_TableObject Blueprint editor
-  - [ ] Class Settings → Interfaces → Add `IFCTableInteractable`
-  - [ ] Add Components:
-    - [ ] Root: DefaultSceneRoot (keep existing)
-    - [ ] Add Component → Scene Component, name: `CameraTargetPoint`
-      - [ ] Details → Transform → Location: (X=-50, Y=0, Z=50) relative to root (camera offset)
-      - [ ] Details → Transform → Rotation: (Pitch=-30, Yaw=0, Roll=0) (look down at table)
-    - [ ] Add Component → Sphere Collision, name: `InteractionCollision`
-      - [ ] Details → Collision → Collision Presets: `OverlapAllDynamic`
-      - [ ] Details → Collision → Generate Overlap Events: ✅ Enabled
-      - [ ] Details → Shape → Sphere Radius: 50.0
-    - [ ] Add Component → Static Mesh (optional, for visual placeholder), name: `PlaceholderMesh`
-      - [ ] Details → Static Mesh: `/Engine/BasicShapes/Cube` (temporary)
-      - [ ] Details → Transform → Scale: (X=0.2, Y=0.2, Z=0.1)
+  - [x] Open Unreal Editor Content Browser
+  - [x] Navigate to `/Content/FC/World/Blueprints/Interactables/` (create folder if not exists)
+  - [x] Right-click → Blueprint Class → Actor
+  - [x] Name: `BP_TableObject`
+  - [x] Open BP_TableObject Blueprint editor
+  - [x] Class Settings → Interfaces → Add `IFCTableInteractable`
+  - [x] Add Components:
+    - [x] Root: DefaultSceneRoot (keep existing)
+    - [x] Add Component → Scene Component, name: `CameraTargetPoint`
+      - [x] Details → Transform → Location: (X=-50, Y=0, Z=50) relative to root (camera offset)
+      - [x] Details → Transform → Rotation: (Pitch=-30, Yaw=0, Roll=0) (look down at table)
+    - [x] Add Component → Sphere Collision, name: `InteractionCollision`
+      - [x] Details → Collision → Collision Presets: `OverlapAllDynamic`
+      - [x] Details → Collision → Generate Overlap Events: ✅ Enabled
+      - [x] Details → Shape → Sphere Radius: 50.0
+    - [x] Add Component → Static Mesh (optional, for visual placeholder), name: `PlaceholderMesh`
+      - [x] Details → Static Mesh: `/Engine/BasicShapes/Cube` (temporary)
+      - [x] Details → Transform → Scale: (X=0.2, Y=0.2, Z=0.1)
 
-- [ ] **Testing After Step 2.2.1** ✅ CHECKPOINT
-  - [ ] Compile Blueprint
-  - [ ] Drag BP_TableObject into L_Office level
-  - [ ] PIE: Verify placeholder cube visible
-  - [ ] No errors in Output Log
+- [x] **Testing After Step 2.2.1** ✅ CHECKPOINT
+  - [x] Compile Blueprint
+  - [x] Drag BP_TableObject into L_Office level
+  - [x] PIE: Verify placeholder cube visible
+  - [x] No errors in Output Log
 
 **COMMIT POINT 2.2.1**: `git add -A && git commit -m "feat(interaction): Create BP_TableObject base class"`
 
