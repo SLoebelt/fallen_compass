@@ -946,33 +946,33 @@ Create `IFCTableInteractable` C++ interface and `BP_TableObject` base Blueprint 
 
 ##### Step 2.3.3: Create BP_TableObject_Letters (Letters Object)
 
-- [ ] **Analysis**
+- [x] **Analysis**
 
-  - [ ] Inherits from BP_TableObject
-  - [ ] Will show WBP_MessagesHub widget (Weeks 13/21 features)
-  - [ ] Visual: Stack of papers appearance (placeholder cube with white tint)
-  - [ ] Position: Right side of table
+  - [x] Inherits from BP_TableObject
+  - [x] Will show WBP_MessagesHub widget (Weeks 13/21 features)
+  - [x] Visual: Stack of papers appearance (placeholder cube with white tint)
+  - [x] Position: Right side of table
 
-- [ ] **Implementation (Blueprint)**
+- [x] **Implementation (Blueprint)**
 
-  - [ ] Content Browser → `/Content/FC/World/Blueprints/Interactables/`
-  - [ ] Right-click BP_TableObject → Create Child Blueprint Class
-  - [ ] Name: `BP_TableObject_Letters`
-  - [ ] Open BP_TableObject_Letters
-  - [ ] Components:
-    - [ ] Select PlaceholderMesh → Details → Material: Set tint color to white/cream (paper appearance)
-    - [ ] Transform → Scale: (X=0.15, Y=0.15, Z=0.08) (stack of papers)
-  - [ ] Event Graph:
-    - [ ] Override Event On Table Object Clicked:
-      - [ ] Print String ("Letters clicked - messages hub coming in Week 13/21")
-  - [ ] Compile Blueprint
+  - [x] Content Browser → `/Content/FC/World/Blueprints/Interactables/`
+  - [x] Right-click BP_TableObject → Create Child Blueprint Class
+  - [x] Name: `BP_TableObject_Letters`
+  - [x] Open BP_TableObject_Letters
+  - [x] Components:
+    - [x] Select PlaceholderMesh → Details → Material: Set tint color to white/cream (paper appearance)
+    - [x] Transform → Scale: (X=0.15, Y=0.15, Z=0.08) (stack of papers)
+  - [x] Event Graph:
+    - [x] Override Event On Table Object Clicked:
+      - [x] Print String ("Letters clicked - messages hub coming in Week 13/21")
+  - [x] Compile Blueprint
 
-- [ ] **Testing After Step 2.3.3** ✅ CHECKPOINT
-  - [ ] Compile succeeds
-  - [ ] Drag BP_TableObject_Letters into L_Office level
-  - [ ] Position at right side of table
-  - [ ] PIE: Verify letters object visible
-  - [ ] No errors
+- [x] **Testing After Step 2.3.3** ✅ CHECKPOINT
+  - [x] Compile succeeds
+  - [x] Drag BP_TableObject_Letters into L_Office level
+  - [x] Position at right side of table
+  - [x] PIE: Verify letters object visible
+  - [x] No errors
 
 **COMMIT POINT 2.3.3**: `git add -A && git commit -m "feat(interaction): Create BP_TableObject_Letters"`
 
