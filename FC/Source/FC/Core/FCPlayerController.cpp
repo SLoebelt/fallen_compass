@@ -394,22 +394,112 @@ void AFCPlayerController::SetCameraModeLocal(EFCPlayerCameraMode NewMode, float 
 			TargetCamera = MenuCamera;
 			break;
 
-		case EFCPlayerCameraMode::FirstPerson:
-			// Use the pawn's camera (handled by SetViewTargetWithBlend to Pawn)
-			if (GetPawn())
+	case EFCPlayerCameraMode::FirstPerson:
+		// Clean up any temp camera from table view
+		if (bIsInTableView)
+		{
+			AActor* CurrentViewTarget = GetViewTarget();
+			if (CurrentViewTarget && CurrentViewTarget->IsA<ACameraActor>())
 			{
-				SetViewTargetWithBlend(GetPawn(), BlendTime, VTBlend_Cubic);
-				CameraMode = NewMode;
-				LogStateChange(TEXT("Camera switched to FirstPerson"));
-				return;
+				// Destroy the temporary camera actor we spawned for table view
+				CurrentViewTarget->Destroy();
 			}
-			break;
-
-		case EFCPlayerCameraMode::TableView:
-		case EFCPlayerCameraMode::SaveSlotView:
-			// TODO: Implement table view camera (Week 2)
-			UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("TableView/SaveSlotView camera not yet implemented"));
+		}
+		
+		// Use the pawn's camera (handled by SetViewTargetWithBlend to Pawn)
+		if (GetPawn())
+		{
+			SetViewTargetWithBlend(GetPawn(), BlendTime, VTBlend_Cubic);
+			CameraMode = NewMode;
+			bIsInTableView = false; // Exiting table view
+			
+			// Re-enable movement input
+			if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer()))
+			{
+				Subsystem->AddMappingContext(FirstPersonMappingContext, 0);
+			}
+			
+			LogStateChange(TEXT("Camera switched to FirstPerson"));
 			return;
+		}
+		break;	case EFCPlayerCameraMode::TableView:
+	case EFCPlayerCameraMode::SaveSlotView:
+		// Find BP_OfficeDesk in the level to get CameraTargetPoint
+		{
+			TArray<AActor*> FoundDesks;
+			UGameplayStatics::GetAllActorsOfClass(GetWorld(), AActor::StaticClass(), FoundDesks);
+			
+			for (AActor* Actor : FoundDesks)
+			{
+				if (Actor->GetName().Contains(TEXT("BP_OfficeDesk")))
+				{
+					// Find the CameraTargetPoint component
+					USceneComponent* CameraTarget = nullptr;
+					TArray<USceneComponent*> Components;
+					Actor->GetComponents<USceneComponent>(Components);
+					
+					for (USceneComponent* Component : Components)
+					{
+						if (Component->GetName().Contains(TEXT("CameraTargetPoint")))
+						{
+							CameraTarget = Component;
+							break;
+						}
+					}
+					
+					if (CameraTarget)
+					{
+						// Get the world transform of the CameraTargetPoint
+						FVector TargetLocation = CameraTarget->GetComponentLocation();
+						FRotator TargetRotation = CameraTarget->GetComponentRotation();
+						
+						// Debug: Log the rotation values
+						UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("TableView Debug: CameraTargetPoint Rotation = %s"), *TargetRotation.ToString());
+						UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("TableView Debug: CameraTargetPoint Location = %s"), *TargetLocation.ToString());
+						
+						// Spawn a temporary camera actor at the target point's transform
+						FActorSpawnParameters SpawnParams;
+						SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+						
+						ACameraActor* TableCamera = GetWorld()->SpawnActor<ACameraActor>(ACameraActor::StaticClass(), TargetLocation, TargetRotation, SpawnParams);
+						
+						if (TableCamera)
+						{
+							// Debug: Verify spawned camera rotation
+							UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("TableView Debug: Spawned Camera Rotation = %s"), *TableCamera->GetActorRotation().ToString());
+							
+							// Smoothly blend to the table camera
+							SetViewTargetWithBlend(TableCamera, BlendTime, VTBlend_Cubic);
+							
+							CameraMode = NewMode;
+							bIsInTableView = true;
+							
+							// Disable movement input when in table view
+							if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer()))
+							{
+								Subsystem->RemoveMappingContext(FirstPersonMappingContext);
+							}
+							
+							LogStateChange(TEXT("Camera switched to TableView"));
+							UE_LOG(LogFallenCompassPlayerController, Log, TEXT("TableView: Camera smoothly blending to CameraTargetPoint at location %s, rotation %s"), 
+								*TargetLocation.ToString(), *TargetRotation.ToString());
+							
+							// Store reference to clean up later
+							// Note: Camera will be cleaned up when we switch back to FirstPerson
+							return;
+						}
+						else
+						{
+							UE_LOG(LogFallenCompassPlayerController, Error, TEXT("TableView: Failed to spawn camera actor"));
+							return;
+						}
+					}
+				}
+			}
+			
+			UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("TableView: Could not find BP_OfficeDesk or CameraTargetPoint"));
+			return;
+		}
 	}
 
 	if (TargetCamera)

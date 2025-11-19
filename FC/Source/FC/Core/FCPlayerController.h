@@ -119,6 +119,10 @@ protected:
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "State")
 	bool bIsPauseMenuDisplayed;
 
+	/** Tracks whether player is currently in table view mode */
+	UPROPERTY(BlueprintReadOnly, Category = "State")
+	bool bIsInTableView = false;
+
 	/** Current game state (MainMenu, Gameplay, etc.) */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "State")
 	EFCGameState CurrentGameState;

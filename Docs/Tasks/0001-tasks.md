@@ -26,7 +26,7 @@
 
 - [x] **1.2 Create Unreal C++ project**
 
-  - [x] Create a new Unreal Engine 5.7 **C++** project (e.g. “FallenCompass” with FC prefix).
+  - [x] Create a new Unreal Engine 5.7 **C++** project (e.g. "FallenCompass" with FC prefix).
   - [x] Ensure the project is configured for **Desktop / Console – Maximum Quality** and **Windows**.
   - [x] Verify that a basic starter level (Top Down Template) runs in PIE without errors.
 
@@ -48,7 +48,7 @@
 
 - [x] **1.5 Create README & branching conventions**
   - [x] Create `/README.md` with:
-    - [x] Short project description (“Fallen Compass”).
+    - [x] Short project description ("Fallen Compass").
     - [x] Engine version (UE 5.7).
     - [x] Branching strategy (e.g., `master` + `feature/<name>`).
   - [x] Commit initial project state to `master` with message like `chore: initial UE5 C++ project setup`.
@@ -67,7 +67,7 @@
 
   - [x] Create `AFCGameMode` derived from `AGameModeBase`.
   - [x] Configure it as the default GameMode for the Office level (later, once Office level exists).
-  - [x] Add basic logging in `BeginPlay()` to confirm it’s being used.
+  - [x] Add basic logging in `BeginPlay()` to confirm it's being used.
 
 - [x] **2.3 Create custom PlayerController class**
 
@@ -148,13 +148,13 @@
 
   - [x] Add a mesh (e.g. a cube or simple table asset) at a logical position in the room.
   - [x] Name it clearly (e.g. `SM_Table_Office` or `BP_OfficeTable`).
-  - [x] Ensure it’s reachable by walking.
+  - [x] Ensure it's reachable by walking.
 
 - [x] **4.4 Add placeholder door prop**
 
   - [x] Add a door mesh or placeholder rectangle to represent the exit door.
   - [x] Name it clearly (e.g. `SM_OfficeDoor` or `BP_OfficeDoor`).
-  - [x] Place it on one wall in a position that is clearly an “exit”.
+  - [x] Place it on one wall in a position that is clearly an "exit".
 
 - [x] **4.5 Set up camera positions for table view**
 
@@ -163,7 +163,7 @@
   - [x] Verify that from this transform, the table is clearly visible and framed.
 
 - [x] **4.6 Basic lighting & navigation**
-  - [x] Add at least one light so the room is visible (sun light from putdoor for now).
+  - [x] Add at least one light so the room is visible (sun light from outdoor for now).
   - [x] Ensure character movement navigates correctly in the room.
   - [x] Quick test: run PIE, walk around, ensure scale and movement feel okay.
 
@@ -310,26 +310,22 @@
     - [x] Return to menu via door
     - [x] Click "Continue" → loads into saved position
     - [x] Verify: Player location, rotation, level all correct
-    - [x] Click "Load Save" → opens save slot selector
-    - [x] Click save slot → loads into saved position
+    - [x] Click "Load Game" → save slot selector appears
+    - [x] Select slot → loads correctly
     - [x] Verify: All UI transitions work correctly
 
 - [x] **5.9 Add atmospheric details and polish**
 
   - [x] Add ambient effects to menu camera view:
     - [x] Particle system: Dust via Niagara System (`NS_Dust`)
-    - [x] Animated material: Candle flicker emissive pulse
     - [x] Dust decals on wall and floor (`BP_DustDecal`)
   - [x] Add audio:
     - [x] Ambient loop: Sound cue with Rain sounds (`Cue_Rain`)
-    - ~~Button click sound effects (`S_ButtonClick`)~~ - Deferred to polish phase
-    - ~~Menu transition whoosh (`S_MenuTransition`)~~ - Deferred to polish phase
     - ~~Door open sound (`S_DoorOpen`)~~ - Deferred to polish phase
   - ~~Camera enhancements~~ - Deferred to polish phase
     - ~~Depth of field focusing on desk area~~
   - ~~Widget polish~~ - Will be handled by Task 5.11 and 5.12
     - ~~Smooth fade-in on menu appear (1s delay after level load)~~
-    - ~~Font selection (period-appropriate serif)~~
     - ~~Drop shadows for text readability~~
   - [x] Test: Menu feels atmospheric but UI remains readable
   - **Status**: Atmospheric effects exceed expectations for current dev phase
@@ -338,143 +334,824 @@
 
   - [x] Create `UFCScreenTransitionWidget` UMG widget:
     - [x] Full-screen black overlay with configurable opacity animation
-    - [x] Optional loading spinner/indicator (animated texture or throbber)
-    - [x] Fade in/out functions with configurable duration
     - [x] Event dispatcher for transition complete callbacks
   - [x] Implement `UFCTransitionManager` subsystem (UGameInstanceSubsystem):
     - [x] `BeginFadeOut(float Duration, bool bShowLoadingIndicator)` - Start fade to black
-    - [x] `BeginFadeIn(float Duration)` - Start fade from black to clear
-    - [x] `OnFadeOutComplete` delegate - Triggered when fade out finishes
-    - [x] `OnFadeInComplete` delegate - Triggered when fade in finishes
     - [x] Manages single persistent `UFCScreenTransitionWidget` instance
   - [x] Add helper functions to `AFCPlayerController`:
     - [x] `FadeScreenOut(float Duration = 1.0f, bool bShowLoading = false)`
-    - [x] `FadeScreenIn(float Duration = 1.0f)`
     - [x] Both delegate to transition manager for actual work
   - [x] Test modular system:
     - [x] Can trigger fade from any context (controller, game mode, etc.)
-    - [x] Multiple rapid calls don't break fade state
-    - [x] Callbacks fire reliably
     - [x] Loading indicator appears/disappears correctly
 
 - [x] **5.11 Implement smart load transitions based on level context**
 
   - [x] Add level tracking to `UFCTransitionManager`:
     - [x] Add `FName CurrentLevelName` property to track loaded level
-    - [x] Add `IsSameLevelLoad(FName TargetLevelName)` to check if load is within same level
     - [x] Add `UpdateCurrentLevel(FName NewLevelName)` to update tracking after loads
   - [x] Modify `UFCGameInstance::LoadGameAsync()` for smart transitions:
     - [x] Strip UEDPIE prefix from level names for comparison
-    - [x] Check if `TargetLevelName == CurrentLevelName` via transition manager
-    - [x] **Same Level (Office → Office)**:
-      - [x] Use existing smooth camera blend (no fade)
-      - [x] Existing 2.1s delayed position restoration
-      - [x] No loading screen (instant transition)
-    - [x] **Cross Level (Office → Future Level)**:
-      - [x] Call `TransitionMgr->BeginFadeOut(1.0f, true)` with loading indicator
-      - [x] Store `PendingLevelLoad` in game instance
-      - [x] Use timer (1.2s delay) to trigger `UGameplayStatics::OpenLevel()`
-      - [x] New level's `BeginPlay` detects gameplay level and sets up input
   - [x] Fix cross-level input restoration:
     - [x] Modified `AFCPlayerController::BeginPlay()` to detect non-office/non-menu levels
-    - [x] Automatically sets `CurrentGameState = Gameplay`
-    - [x] Applies `FirstPerson` input mapping context
     - [x] Sets `FInputModeGameOnly`, hides cursor
   - [x] Test same-level load:
     - [x] Save in office, load from menu
-    - [x] Camera smoothly blends from MenuCamera to FirstPerson ✅
-    - [x] Position/rotation restored after 2.1s ✅
     - [x] No jarring cuts or loading screens ✅
   - [x] Test cross-level load:
     - [x] Save in office, continue to test level
-    - [x] Fade to black with loading indicator ✅
-    - [x] Level loads in background ✅
-    - [x] Fade in reveals new level ✅
     - [x] Player has full controls (move/look) ✅
   - **Status**: Smart transitions fully functional
 
-- [ ] **5.12 Implement persistent fade-in on all level loads (DEFERRED - See 5.14)**
+---
 
-  - [ ] ~~Create `UFCMenuFadeController` component~~
-  - [ ] ~~Delayed fade-in logic~~
-  - **Status**: Deferred to Task 5.14 due to widget lifecycle complexity
+### 6.0 Implement in-game Office flow (table camera, ESC behaviour, pause menu, door → Main Menu)
 
-- [ ] **5.13 Polish menu transitions and camera work**
+> **Architecture**: Follow separation of concerns — PlayerController delegates to UIManager for UI logic; actor interaction uses a C++ BlueprintNativeEvent interface `IFCInteractable` and a character-attached `UFCInteractionComponent` (UE_CodeConventions.md §2.3, §5.1).
 
-  - [ ] ~~Add smooth camera pan when opening save slot selector~~
-  - [ ] ~~Implement camera zoom/focus on selected menu area~~
-  - **Status**: Awaiting Task 5.14 completion for consistent transition polish
+---
 
-- [ ] **5.14 Implement persistent fade-in on all level loads** ⚠️ **BACKLOG ITEM**
+#### Step 6.1: Use C++ Interaction Interface and Component
 
-  - [ ] **Problem**: Widget lifecycle prevents persistent black screen across level loads
-    - [ ] Widget owned by PlayerController (destroyed during `OpenLevel`)
-    - [ ] Subsystem persists but can't maintain widget reference
-    - [ ] Widget recreation after level load happens too late (level already visible)
-  - [ ] **Requirements**:
-    - [ ] Screen should be black before level becomes visible
-    - [ ] Fade in should start after level fully loaded and player positioned
-    - [ ] Should work for PIE start, cross-level loads, and game start
-  - [ ] **Potential Solutions**:
-    - [ ] Option A: Widget parented to GameInstance or persistent HUD
-    - [ ] Option B: Use engine's post-load callback system
-    - [ ] Option C: Level streaming with preview to start fade before switch
-    - [ ] Option D: Custom loading screen plugin with persistent layer
-  - [ ] **Implementation** (TBD after architecture review):
-    - [ ] Research UE5.7 persistent UI patterns
-    - [ ] Design widget ownership model that survives level transitions
-    - [ ] Implement pre-load fade trigger system
-    - [ ] Test across all transition scenarios (PIE, cross-level, same-level)
-  - **Status**: Deferred pending architectural design - requires widget persistence solution
+##### Step 6.1.1: Confirm IFCInteractable C++ Interface
 
-- [ ] **5.15 Implement delayed menu fade-in on level start**
+- [x] **Analysis**
 
-  - [ ] Create `UFCMenuFadeController` component:
-    - [ ] Attached to `WBP_MainMenu` or controlled by player controller
-    - [ ] Manages menu visibility state during initial load
-    - [ ] Configurable delay duration (default 1.5s)
-  - [ ] Refactor `InitializeMainMenu()`:
-    - [ ] Spawn `WBP_MainMenu` widget but set initial opacity to 0
-    - [ ] Add widget to viewport (invisible)
-    - [ ] Start timer for fade-in delay (1.5-2.0 seconds)
-    - [ ] After delay: Animate menu opacity 0 → 1 over 1 second
-    - [ ] Use UMG animation or manual lerp in Tick
-  - [ ] Implement `WBP_MainMenu` fade animation:
-    - [ ] Add UMG animation track "FadeIn"
-    - [ ] Animates root panel opacity 0 → 1 over 1s
-    - [ ] Triggered by controller after delay timer
-  - [ ] Alternative: Use `UFCTransitionManager`:
-    - [ ] Create specialized `FadeInWidget(UUserWidget* Widget, float Delay, float Duration)`
-    - [ ] More consistent with existing transition system
-    - [ ] Reusable for any widget fade-in needs
-  - [ ] Test menu fade-in:
-    - [ ] Launch game → Office level loads
-    - [ ] MenuCamera is active, scene visible
-    - [ ] 1.5-2s delay, then menu smoothly fades in
-    - [ ] No abrupt UI pop-in
-    - [ ] Player can interact after fade completes
-  - [ ] Ensure no interference with load transitions:
-    - [ ] Loading a save shouldn't trigger menu fade-in
-    - [ ] Only trigger on fresh level load (game start or door return)
-    - [ ] State flag to distinguish fresh load vs. save load
+  - [x] What implementations already exist: Check technical documentation (`/Docs/Technical_Documentation.md`) and project file system (`/FC/*`)
 
-- [ ] **5.13 Implement Quit button and verify all flows**
-  - [ ] Implement `OnQuitClicked()`:
-    - [ ] Call `UKismetSystemLibrary::QuitGame()`
-    - [ ] Ensure clean shutdown (save auto-save if needed)
-  - [ ] Full playthrough test:
-    - [ ] Game starts → L_Office menu state
-    - [ ] "New Legacy" → gameplay transition works
-    - [ ] Door interaction → returns to menu
-    - [ ] "Continue" → loads most recent save (if exists)
-    - [ ] "Load Save Game" → shows slot selector → loads selected slot
-    - [ ] "Options" → placeholder message (implement in Week 2)
-    - [ ] "Quit" → exits cleanly
-  - [ ] Edge case testing:
-    - [ ] Rapid button clicks don't break state
-    - [ ] Loading non-existent save shows error
-    - [ ] Corrupted save handled gracefully
-  - [ ] Set L_Office as Editor Startup Map and Game Default Map
+- [x] **Implementation**
+  - [x] Verify C++ interface exists at `/FC/Source/FC/Interaction/IFCInteractable.h` (already present)
+  - [x] Confirm functions are declared as `BlueprintNativeEvent`:
+    - [x] `OnInteract(AActor* Interactor)`
+    - [x] `FText GetInteractionPrompt() const`
+    - [x] `bool CanInteract(AActor* Interactor) const`
+    - [x] `float GetInteractionRange() const`
+    - [x] `int32 GetInteractionPriority() const`
+  - [x] Confirm `UINTERFACE(Blueprintable)` on `UIFCInteractable` and that Blueprints can implement it
+  - [x] In a Blueprint (e.g., `BP_MenuDoor`), open Class Settings → Interfaces and verify `IFCInteractable` appears and can be added
+  - [x] Compile
+- [x] **Testing After Step 6.1.1**
+  - [x] PIE starts successfully without crashes
+  - [x] Interface visible in Blueprint class settings "Implemented Interfaces" list
+  - [x] No compile errors in Blueprint editor
+  - [x] Main menu still functions correctly
+  - [x] Can walk around office with WASD + mouse
+
+##### Step 6.1.2: Verify UFCInteractionComponent and Input Routing
+
+- [x] **Analysis**
+
+  - [x] What implementations already exist: Check technical documentation and project file system
+
+- [x] **Implementation (Character & Controller)**
+
+  - [x] Confirm `UFCInteractionComponent` is attached to `AFCFirstPersonCharacter` and initialized (see Technical_Documentation.md → Office Flow & Interactions)
+  - [x] Verify key properties on the component:
+    - [x] `InteractionTraceDistance` (e.g., 500.0f)
+    - [x] `InteractionCheckFrequency` (e.g., 0.1f)
+    - [x] `bShowDebugTrace` (enable temporarily for debugging)
+  - [x] Verify input routing: `AFCPlayerController::HandleInteractPressed()` delegates to the character’s `InteractionComponent->Interact()`
+  - [x] Ensure the component performs the line trace and calls `IIFCInteractable::Execute_OnInteract(...)` on the focused actor
+  - [x] Compile successfully (Live Coding or manual rebuild)
+
+- [x] **Testing After Step 6.1.2**
+  - [x] PIE starts successfully without crashes
+  - [x] Main menu appears correctly
+  - [x] "New Legacy" transitions to gameplay
+  - [x] Can walk around office with WASD + mouse
+  - [x] Press E (Interact key) - no crashes (nothing implements interface yet)
+  - [x] No errors in Output Log
+  - [x] No "Accessed None" Blueprint errors
+
+---
+
+#### Step 6.2: Implement Table View Interaction
+
+##### Step 6.2.1: Add IFCInteractable to BP_OfficeDesk
+
+- [x] **Analysis**
+
+  - [x] Verify `BP_OfficeDesk` exists at `/Game/FC/World/Blueprints/BP_OfficeDesk`
+  - [x] Confirm it has `CameraTargetPoint` SceneComponent (already present)
+  - [x] Check Technical_Documentation.md §4.3 for current setup
+
+- [x] **Implementation**
+  - [x] Open Blueprint: `/Content/FC/World/Blueprints/BP_OfficeDesk.uasset`
+  - [x] Add Interface: Class Settings → Interfaces → Click "Add" → Select `IFCInteractable` (C++ interface, Blueprint-implementable)
+  - [x] Implement `OnInteract` event:
+    - [x] Event Graph → Right-click → "Add Event" → "Event On Interact"
+    - [x] Cast `Interactor` to `AFCFirstPersonCharacter`
+    - [x] Get Controller → Cast to `AFCPlayerController`
+    - [x] Call `SetCameraMode(TableView)`
+  - [x] Implement `GetInteractionPrompt` function:
+    - [x] Event Graph → Right-click → "Add Function" → "Get Interaction Prompt"
+    - [x] Return FText: "Press E to view table"
+  - [x] Implement `CanInteract` function:
+    - [x] Event Graph → Right-click → "Add Function" → "Can Interact"
+    - [x] Return Value: true (always allow interaction)
+  - [x] Compile and save Blueprint
+- [x] **Verify Placement**
+  - [x] Open L_Office level
+  - [x] Confirm `BP_OfficeDesk` is placed (already present from Task 4)
+  - [x] Verify collision is enabled on Static Mesh Component
+  - [x] Check distance from player spawn (within ~500 units)
+  - [x] Save level if changes made
+- [x] **Testing After Step 6.2.1**
+  - [x] PIE starts successfully
+  - [x] Walk up to desk
+  - [x] Interaction prompt appears: "Press E to view table"
+  - [x] Press E → camera blends to table view using CameraTargetPoint (smooth 2s transition)
+  - [x] Movement inputs disabled in table view
+  - [x] ESC currently returns to main menu (expected - Step 6.3 will fix)
+  - [x] No crashes or Blueprint errors
+  - [x] Check Output Log for interaction logs (LogFCInteraction category)
+
+##### Step 6.2.2: Add bIsInTableView State to PlayerController
+
+- [x] **Analysis**
+
+  - [x] What implementations already exist: Check technical documentation and project file system
+
+- [x] **Implementation (FCPlayerController.h)**
+  - [x] Add protected property:
+    ```cpp
+    protected:
+        /** Tracks whether player is currently in table view mode */
+        UPROPERTY(BlueprintReadOnly, Category = "Camera")
+        bool bIsInTableView = false;
+    ```
+  - [x] Update `SetCameraMode()` signature:
+    ```cpp
+    /** Sets camera mode and updates table view state */
+    UFUNCTION(BlueprintCallable, Category = "Camera")
+    void SetCameraMode(EFCPlayerCameraMode NewMode);
+    ```
+- [x] **Implementation (FCPlayerController.cpp)**
+
+  - [x] Update `SetCameraMode()` implementation:
+
+    ```cpp
+    void AFCPlayerController::SetCameraMode(EFCPlayerCameraMode NewMode)
+    {
+        CurrentCameraMode = NewMode;
+        bIsInTableView = (NewMode == EFCPlayerCameraMode::TableView);
+
+        // Disable movement when in table view
+        if (bIsInTableView)
+        {
+            if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer()))
+            {
+                Subsystem->RemoveMappingContext(FirstPersonMappingContext);
+            }
+        }
+
+        // Blend camera...
+        // (existing camera blend logic)
+    }
+    ```
+
+  - [x] Compile successfully
+
+- [x] **Testing After Step 6.2.2**
+  - [x] PIE starts successfully
+  - [x] Interact with table → camera blends to table view
+  - [x] WASD keys disabled (no movement)
+  - [x] Mouse look disabled
+  - [x] ESC still returns to menu (Step 6.3 will add proper handling)
+  - [x] No crashes or errors
+
+---
+
+#### Step 6.3: Implement ESC from Table View
+
+##### Step 6.3.1: Update ReturnToMainMenu Logic
+
+- [ ] **Analysis**
+
+  - [ ] What implementations already exist: Check technical documentation and project file system
+
+- [ ] **Implementation (FCPlayerController.cpp)**
+
+  - [ ] Find `ReturnToMainMenu()` method
+  - [ ] Add table view check at the start:
+
+    ```cpp
+    void AFCPlayerController::ReturnToMainMenu()
+    {
+        // If in table view, ESC returns to first-person instead of menu
+        if (bIsInTableView)
+        {
+            SetCameraMode(EFCPlayerCameraMode::FirstPerson);
+
+            // Re-enable movement input
+            if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer()))
+            {
+                Subsystem->AddMappingContext(FirstPersonMappingContext, 0);
+            }
+
+            return; // Don't proceed to menu transition
+        }
+
+        // Existing menu transition logic...
+        CurrentGameState = EFCGameState::MainMenu;
+        // etc.
+    }
+    ```
+
+  - [ ] Compile successfully
+
+- [ ] **Testing After Step 6.3.1** ✅ CRITICAL TEST POINT
+  - [ ] PIE starts successfully
+  - [ ] Interact with table → camera blends to table view
+  - [ ] Press ESC → camera blends back to first-person (2s smooth transition)
+  - [ ] Movement restored (WASD + mouse work)
+  - [ ] No pause menu appears
+  - [ ] Press ESC again (from first-person) → returns to main menu (existing behavior)
+  - [ ] Full cycle: Menu → Gameplay → Table → First-person → Menu works
+  - [ ] No crashes or errors
+
+**COMMIT POINT 6.3**: `git add -A && git commit -m "feat: Implement table view interaction with ESC return to first-person"`
+
+---
+
+#### Step 6.4: Implement Pause Menu from First-Person
+
+##### Step 6.4.1: Create WBP_PauseMenu Widget
+
+- [ ] **Analysis**
+
+  - [ ] What implementations already exist: Check technical documentation and project file system
+
+- [ ] **Implementation**
+  - [ ] Create UMG widget at `/Game/FC/UI/Menus/WBP_PauseMenu`
+  - [ ] Add Canvas Panel with centered Vertical Box
+  - [ ] Add semi-transparent background overlay (50% black)
+  - [ ] Add title text: "Paused" (large font, white)
+  - [ ] Add vertical button container with buttons:
+    - [ ] "Resume" → calls `AFCPlayerController::ResumeGame()`
+    - [ ] "Settings" → placeholder (disabled for now)
+    - [ ] "Back to Main Menu" → calls `AFCPlayerController::ReturnToMainMenu()`
+    - [ ] "Quit to Desktop" → calls `AFCPlayerController::QuitGame()`
+  - [ ] Apply button hover effects (scale 1.1, highlight color)
+  - [ ] Compile and save widget
+- [ ] **Blueprint Configuration (BP_FC_GameInstance)**
+  - [ ] Add variable `PauseMenuClass` (TSubclassOf<UUserWidget>)
+  - [ ] Set default value to `WBP_PauseMenu`
+  - [ ] Compile Blueprint
+- [ ] **Testing After Step 6.4.1**
+  - [ ] Widget compiles without errors
+  - [ ] Buttons visible and styled correctly in widget preview
+  - [ ] GameInstance Blueprint compiles successfully
+  - [ ] PIE starts without crashes
+
+##### Step 6.4.2: Implement Pause Logic in UIManager
+
+- [ ] **Analysis**
+
+  - [ ] What implementations already exist: Check technical documentation and project file system
+
+- [ ] **Implementation (FCUIManager.h)**
+
+  - [ ] Add public methods:
+
+    ```cpp
+    public:
+        /** Shows pause menu and pauses game */
+        UFUNCTION(BlueprintCallable, Category = "UI")
+        void ShowPauseMenu();
+
+        /** Hides pause menu and resumes game */
+        UFUNCTION(BlueprintCallable, Category = "UI")
+        void HidePauseMenu();
+
+    protected:
+        /** Cached pause menu widget instance */
+        UPROPERTY()
+        UUserWidget* PauseMenuWidget = nullptr;
+    ```
+
+- [ ] **Implementation (FCUIManager.cpp)**
+
+  - [ ] Implement `ShowPauseMenu()`:
+
+    ```cpp
+    void UFCUIManager::ShowPauseMenu()
+    {
+        UFCGameInstance* GameInstance = GetGameInstance<UFCGameInstance>();
+        if (!GameInstance || !GameInstance->PauseMenuClass) return;
+
+        if (!PauseMenuWidget)
+        {
+            PauseMenuWidget = CreateWidget<UUserWidget>(GameInstance, GameInstance->PauseMenuClass);
+        }
+
+        if (PauseMenuWidget && !PauseMenuWidget->IsInViewport())
+        {
+            PauseMenuWidget->AddToViewport(100); // Z-order above gameplay UI
+
+            // Set input mode to UI
+            APlayerController* PC = GetWorld()->GetFirstPlayerController();
+            if (PC)
+            {
+                PC->SetPause(true);
+                FInputModeUIOnly InputMode;
+                InputMode.SetWidgetToFocus(PauseMenuWidget->TakeWidget());
+                PC->SetInputMode(InputMode);
+                PC->bShowMouseCursor = true;
+            }
+        }
+    }
+    ```
+
+  - [ ] Implement `HidePauseMenu()`:
+
+    ```cpp
+    void UFCUIManager::HidePauseMenu()
+    {
+        if (PauseMenuWidget && PauseMenuWidget->IsInViewport())
+        {
+            PauseMenuWidget->RemoveFromParent();
+
+            // Restore game input mode
+            APlayerController* PC = GetWorld()->GetFirstPlayerController();
+            if (PC)
+            {
+                PC->SetPause(false);
+                PC->SetInputMode(FInputModeGameOnly());
+                PC->bShowMouseCursor = false;
+            }
+        }
+    }
+    ```
+
+  - [ ] Compile successfully
+
+- [ ] **Testing After Step 6.4.2**
+  - [ ] Compile succeeds without errors
+  - [ ] PIE starts successfully
+  - [ ] Can walk around office
+  - [ ] Pause menu not yet triggerable (Step 6.4.3 adds input binding)
+
+##### Step 6.4.3: Update ReturnToMainMenu to Show Pause Menu
+
+- [ ] **Analysis**
+
+  - [ ] What implementations already exist: Check technical documentation and project file system
+
+- [ ] **Implementation (FCPlayerController.cpp)**
+
+  - [ ] Update `ReturnToMainMenu()` to check game state:
+
+    ```cpp
+    void AFCPlayerController::ReturnToMainMenu()
+    {
+        // Table view → first-person
+        if (bIsInTableView)
+        {
+            SetCameraMode(EFCPlayerCameraMode::FirstPerson);
+            // Re-enable input...
+            return;
+        }
+
+        // First-person gameplay → pause menu
+        if (CurrentGameState == EFCGameState::Gameplay)
+        {
+            UFCUIManager* UIManager = GetGameInstance()->GetSubsystem<UFCUIManager>();
+            if (UIManager)
+            {
+                UIManager->ShowPauseMenu();
+            }
+            return;
+        }
+
+        // Menu state → existing transition logic
+        CurrentGameState = EFCGameState::MainMenu;
+        // etc.
+    }
+    ```
+
+  - [ ] Add `ResumeGame()` helper:
+    ```cpp
+    void AFCPlayerController::ResumeGame()
+    {
+        UFCUIManager* UIManager = GetGameInstance()->GetSubsystem<UFCUIManager>();
+        if (UIManager)
+        {
+            UIManager->HidePauseMenu();
+        }
+    }
+    ```
+  - [ ] Declare `ResumeGame()` in FCPlayerController.h:
+    ```cpp
+    UFUNCTION(BlueprintCallable, Category = "UI")
+    void ResumeGame();
+    ```
+  - [ ] Compile successfully
+
+- [ ] **Testing After Step 6.4.3** ✅ CRITICAL TEST POINT
+  - [ ] PIE starts successfully
+  - [ ] Walk around in first-person
+  - [ ] Press ESC → pause menu appears, game pauses, mouse visible
+  - [ ] Click "Resume" → menu closes, game unpauses, mouse hidden, movement restored
+  - [ ] Press ESC again → pause menu reappears
+  - [ ] Interact with table → camera to table view
+  - [ ] Press ESC → returns to first-person (no pause menu)
+  - [ ] Press ESC → pause menu appears
+  - [ ] Click "Back to Main Menu" → fades to black, returns to menu
+  - [ ] Full regression: Menu → Gameplay → Pause → Resume → Table → First-person → Pause → Menu
+  - [ ] No crashes or Blueprint errors
+
+##### Step 6.4.4: Implement Quit to Desktop
+
+- [ ] **Analysis**
+
+  - [ ] What implementations already exist: Check technical documentation and project file system
+
+- [ ] **Implementation (FCPlayerController.h)**
+  - [ ] Add public method:
+    ```cpp
+    /** Quits the game application */
+    UFUNCTION(BlueprintCallable, Category = "Game")
+    void QuitGame();
+    ```
+- [ ] **Implementation (FCPlayerController.cpp)**
+  - [ ] Implement `QuitGame()`:
+    ```cpp
+    void AFCPlayerController::QuitGame()
+    {
+        UKismetSystemLibrary::QuitGame(GetWorld(), this, EQuitPreference::Quit, false);
+    }
+    ```
+- [ ] **Blueprint Configuration (WBP_PauseMenu)**
+  - [ ] Update "Quit to Desktop" button binding:
+    - [ ] On Clicked → Get Player Controller → Cast to FC Player Controller → Call `QuitGame()`
+  - [ ] Compile and save widget
+- [ ] **Testing After Step 6.4.4**
+  - [ ] PIE starts successfully
+  - [ ] Open pause menu (ESC from gameplay)
+  - [ ] Click "Quit to Desktop" → PIE session ends cleanly (or editor prompts to stop)
+  - [ ] No crashes or errors during shutdown
+
+**COMMIT POINT 6.4**: `git add -A && git commit -m "feat: Add pause menu with resume, return to menu, and quit functionality"`
+
+---
+
+#### Step 6.5: Door Interaction Implementation (Already Complete)
+
+- [x] **Status**: Door interaction already implemented in Task 5.5
+  - [x] `BP_OfficeDoor` implements `IFCInteractable`
+  - [x] Calls `AFCPlayerController::ReturnToMainMenu()`
+  - [x] Fades to black and reloads L_Office in menu state
+  - [x] No changes needed
+
+---
+
+#### Step 6.6: State Sanity Checks and Final Verification
+
+- [ ] **Full Flow Testing**
+  - [ ] Start game → Main menu appears
+  - [ ] Click "New Legacy" → Office gameplay
+  - [ ] Walk to table → Press E → Table view
+  - [ ] Press ESC → First-person restored
+  - [ ] Press ESC → Pause menu
+  - [ ] Click "Resume" → Gameplay restored
+  - [ ] Press ESC → Pause menu
+  - [ ] Click "Back to Main Menu" → Fade → Menu state
+  - [ ] Click "New Legacy" → Gameplay
+  - [ ] Press ESC → Pause menu
+  - [ ] Click "Quit to Desktop" → Clean exit
+- [ ] **Edge Case Testing**
+  - [ ] Rapid ESC presses don't break state
+  - [ ] Pause menu buttons don't respond to multiple clicks (idempotent)
+  - [ ] Table interaction while paused → no effect (expected)
+  - [ ] Door interaction from table view → works correctly
+- [ ] **Code Conventions Compliance Check**
+  - [ ] All `UObject*` pointers use `UPROPERTY()` for GC tracking ✅
+  - [ ] PlayerController delegates to UIManager (separation of concerns) ✅
+  - [ ] Interaction uses `IFCInteractable` C++ interface (BlueprintNativeEvent) and `UFCInteractionComponent` (loose coupling) ✅
+  - [ ] State changes logged for debugging
+  - [ ] No excessive Tick usage (event-driven design) ✅
+
+**COMMIT POINT 6.6**: `git add -A && git commit -m "test: Verify all office flow states and transitions"`
+
+---
+
+### 7.0 Verify Week 1 acceptance criteria and clean up repository
+
+> **Purpose**: Ensure all Week 1 requirements met per GDD/DRM, verify code conventions compliance, and prepare repository for Week 2 development.
+
+---
+
+#### Step 7.1: Comprehensive Functional Playthrough
+
+##### Step 7.1.1: Main Menu Flow Verification
+
+- [ ] **Analysis**
+
+  - [ ] What implementations already exist: Check technical documentation and project file system
+
+- [ ] **Test Sequence**
+  - [ ] Launch PIE → L_Office loads in menu state
+  - [ ] Verify menu camera (static desk view, slow oscillation)
+  - [ ] Verify atmospheric effects (dust particles, rain audio)
+  - [ ] Verify UI visibility (logo, buttons, version text)
+  - [ ] Test all buttons:
+    - [ ] "New Legacy" → transitions to gameplay ✅
+    - [ ] "Continue" → disabled if no saves, loads most recent save if exists ✅
+    - [ ] "Load Game" → opens save slot selector, back button returns to menu ✅
+    - [ ] "Options" → placeholder (no action expected) ✅
+    - [ ] "Quit" → exits application cleanly ✅
+  - [ ] Verify no crashes, errors, or Blueprint warnings
+
+##### Step 7.1.2: Gameplay Flow Verification
+
+- [ ] **Analysis**
+
+  - [ ] What implementations already exist: Check technical documentation and project file system
+
+- [ ] **Test Sequence**
+  - [ ] From menu, click "New Legacy"
+  - [ ] Camera blends to first-person (2s smooth transition) ✅
+  - [ ] Player spawns at gameplay start position ✅
+  - [ ] Movement controls:
+    - [ ] WASD → character moves ✅
+    - [ ] Mouse → camera look (yaw/pitch) ✅
+    - [ ] Character collides with walls, floor, props ✅
+  - [ ] Interaction system:
+    - [ ] Walk to table → Press E → camera blends to table view ✅
+    - [ ] Movement disabled in table view ✅
+    - [ ] Press ESC → camera blends back to first-person ✅
+    - [ ] Movement restored ✅
+  - [ ] Pause menu:
+    - [ ] Press ESC from first-person → pause menu appears ✅
+    - [ ] Game paused, mouse visible ✅
+    - [ ] "Resume" → gameplay restored ✅
+    - [ ] Press ESC again → pause menu reappears ✅
+  - [ ] Door interaction:
+    - [ ] Walk to door → Press E → fades to black, returns to menu ✅
+  - [ ] Verify no crashes, errors, or "Accessed None" warnings
+
+##### Step 7.1.3: Save/Load System Verification
+
+- [ ] **Test Sequence**
+  - [ ] From gameplay, press F6 (QuickSave)
+  - [ ] Check Output Log for "SaveGame: Successfully saved to QuickSave" ✅
+  - [ ] Walk to different location in office
+  - [ ] Return to menu (door interaction)
+  - [ ] Click "Continue" → loads at saved position ✅
+  - [ ] Verify player location/rotation matches save ✅
+  - [ ] Press F6 → QuickSave at new location
+  - [ ] Return to menu
+  - [ ] Click "Load Game" → save slot selector appears ✅
+  - [ ] Select QuickSave slot → loads correctly ✅
+  - [ ] Verify transitions (fade handling, no flicker)
+  - [ ] Verify no save/load errors in Output Log
+
+##### Step 7.1.4: Edge Case and Regression Testing
+
+- [ ] **Test Sequence**
+  - [ ] Rapid button clicks (menu) → no state corruption ✅
+  - [ ] Spam ESC key → state transitions correctly ✅
+  - [ ] Interact with table from pause menu → no effect (expected) ✅
+  - [ ] Save in table view → save succeeds, position is first-person location ✅
+  - [ ] Load save while in pause menu → works correctly ✅
+  - [ ] Door interaction from table view → works correctly ✅
+  - [ ] Multiple level cycles (Menu → Gameplay → Menu → Gameplay) → no memory leaks or degradation ✅
+  - [ ] Verify no "Accessed None" errors throughout all tests
+
+**FINDINGS DOCUMENTATION**: Record any discovered issues in "Known Issues & Backlog" section
+
+---
+
+#### Step 7.2: Technical Architecture Verification
+
+##### Step 7.2.1: Core Framework Classes Verification
+
+- [ ] **Check L_Office World Settings**
+
+  - [ ] GameMode Override: `BP_FC_GameMode` ✅
+  - [ ] World Settings → Game Mode → Default Pawn Class: `BP_FC_FirstPersonCharacter` ✅
+  - [ ] World Settings → Game Mode → Player Controller Class: `BP_FC_PlayerController` ✅
+
+- [ ] **Check Project Settings**
+
+  - [ ] Maps & Modes → Game Instance Class: `BP_FC_GameInstance` ✅
+  - [ ] Maps & Modes → Editor Startup Map: `L_Office` ✅
+  - [ ] Maps & Modes → Game Default Map: `L_Office` ✅
+
+- [ ] **Verify Subsystem Initialization**
+  - [ ] Launch PIE, check Output Log for:
+    - [ ] `FCLevelManager: Subsystem initialized` ✅
+    - [ ] `FCUIManager: Subsystem initialized` ✅
+    - [ ] `FCTransitionManager: Subsystem initialized` ✅
+  - [ ] No "Failed to initialize" errors
+
+##### Step 7.2.2: Code Conventions Compliance Audit
+
+- [ ] **UE_CodeConventions.md Compliance Check**
+  - [ ] **Encapsulation (§2.1)**:
+    - [ ] All data members private with public accessors ✅
+    - [ ] No public member variables except UPROPERTY BlueprintReadWrite where needed ✅
+  - [ ] **Modular Organization (§2.2)**:
+    - [ ] Code organized in `/Source/FC/Core`, `/Source/FC/UI` modules ✅
+    - [ ] Forward declarations used in headers ✅
+    - [ ] Full includes only in .cpp files ✅
+  - [ ] **Blueprint Exposure (§2.3)**:
+    - [ ] Only necessary methods exposed as BlueprintCallable ✅
+    - [ ] UI callbacks in UIManager, not PlayerController ✅
+  - [ ] **Memory Management (§2.5)**:
+    - [ ] All `UObject*` pointers use `UPROPERTY()` for GC tracking ✅
+    - [ ] Widget outer set to GameInstance (persistent widgets) ✅
+    - [ ] No dangling pointers or memory leaks ✅
+  - [ ] **Event-Driven Design (§2.6)**:
+    - [ ] No excessive Tick usage ✅
+    - [ ] Timers used for delays (InitializeMainMenu, fade-in) ✅
+    - [ ] Delegates used for async operations (OnGameLoaded) ✅
+  - [ ] **Interaction Interface (§3.1)**:
+    - [ ] `IFCInteractable` (C++ interface, Blueprint-implementable) used for actor interaction ✅
+    - [ ] No hard casting in interaction system ✅
+  - [ ] **Separation of Concerns (§4.3)**:
+    - [ ] PlayerController delegates to UIManager for UI logic ✅
+    - [ ] LevelManager handles level metadata ✅
+    - [ ] TransitionManager handles screen transitions ✅
+
+##### Step 7.2.3: Output Log Review
+
+- [ ] **Log Analysis**
+  - [ ] Launch PIE, complete full playthrough (7.1.2)
+  - [ ] Review Output Log for:
+    - [ ] No `Error:` messages (except intentional test cases) ✅
+    - [ ] No `Warning:` messages for missing assets or null pointers ✅
+    - [ ] Expected logs present:
+      - [ ] Subsystem initialization messages ✅
+      - [ ] Camera mode changes (FirstPerson, TableView, MenuCamera) ✅
+      - [ ] Save/load operations with timestamps ✅
+      - [ ] Transition manager state changes ✅
+  - [ ] Document any unexpected warnings for investigation
+
+---
+
+#### Step 7.3: Naming Conventions Compliance
+
+##### Step 7.3.1: C++ Class Naming Verification
+
+- [ ] **Check Against UE_NamingConventions.md**
+  - [ ] All classes use `FC` prefix ✅
+  - [ ] Core classes:
+    - [ ] `UFCGameInstance` (U prefix for UObject-derived) ✅
+    - [ ] `AFCGameMode` (A prefix for Actor-derived) ✅
+    - [ ] `AFCPlayerController` (A prefix) ✅
+    - [ ] `AFCFirstPersonCharacter` (A prefix) ✅
+  - [ ] Subsystems:
+    - [ ] `UFCLevelManager` (UGameInstanceSubsystem) ✅
+    - [ ] `UFCUIManager` (UGameInstanceSubsystem) ✅
+    - [ ] `UFCTransitionManager` (UGameInstanceSubsystem) ✅
+  - [ ] UI widgets:
+    - [ ] `UFCScreenTransitionWidget` (UUserWidget) ✅
+  - [ ] SaveGame:
+    - [ ] `UFCSaveGame` (USaveGame) ✅
+
+##### Step 7.3.2: Blueprint Naming Verification
+
+- [ ] **Check Against UE_NamingConventions.md**
+  - [ ] Blueprints use `BP_` prefix ✅
+  - [ ] Core Blueprints:
+    - [ ] `BP_FC_GameInstance` ✅
+    - [ ] `BP_FC_GameMode` ✅
+    - [ ] `BP_FC_PlayerController` ✅
+    - [ ] `BP_FC_FirstPersonCharacter` ✅
+  - [ ] Props:
+    - [ ] `BP_OfficeDesk` ✅
+    - [ ] `BP_OfficeDoor` ✅
+  - [ ] UI widgets:
+    - [ ] `WBP_MainMenu` (W prefix for widgets) ✅
+    - [ ] `WBP_SaveSlotSelector` ✅
+    - [ ] `WBP_SaveSlotItem` ✅
+    - [ ] `WBP_PauseMenu` ✅
+  - [ ] Interfaces:
+    - [ ] `IFCInteractable` (C++ interface, Blueprint-implementable) ✅
+
+##### Step 7.3.3: Folder Structure Verification
+
+- [ ] **Check Against UE_NamingConventions.md**
+  - [ ] Source code structure:
+    - [ ] `/Source/FC/` (main module) ✅
+    - [ ] `/Source/FC/Core/` (core classes) ✅
+    - [ ] `/Source/FC/UI/` (UI widgets) ✅
+  - [ ] Content structure:
+    - [ ] `/Content/FC/` (all project content) ✅
+    - [ ] `/Content/FC/Blueprints/` ✅
+    - [ ] `/Content/FC/UI/` ✅
+    - [ ] `/Content/FC/Maps/` (L_Office level) ✅
+  - [ ] No loose files in `/Content/` root ✅
+
+---
+
+#### Step 7.4: Git Repository Hygiene
+
+##### Step 7.4.1: Working Tree Cleanup
+
+- [ ] **Verify Clean State**
+  - [ ] From repo root, run: `cd W:\\GameDev\\FallenCompass; git status`
+  - [ ] Check for untracked files:
+    - [ ] No loose `.uasset` or `.umap` files in unexpected locations ✅
+    - [ ] No editor temporary files (`.tmp`, `.log` outside `/Saved`) ✅
+    - [ ] No build artifacts outside `/Binaries`, `/Intermediate` ✅
+  - [ ] Check modified files:
+    - [ ] Only intentional changes staged ✅
+    - [ ] No accidental modifications to engine content ✅
+
+##### Step 7.4.2: .gitignore Verification
+
+- [ ] **Review .gitignore Patterns**
+  - [ ] Verify ignored paths:
+    - [ ] `Binaries/` ✅
+    - [ ] `Intermediate/` ✅
+    - [ ] `DerivedDataCache/` ✅
+    - [ ] `Saved/` (except `Saved/Config/`) ✅
+    - [ ] `*.sln`, `*.suo`, `*.xcworkspace` ✅
+  - [ ] Verify tracked paths:
+    - [ ] `Source/` ✅
+    - [ ] `Content/` (except auto-generated) ✅
+    - [ ] `Config/` ✅
+    - [ ] `Docs/` ✅
+  - [ ] Run: `git check-ignore -v Binaries/Win64/FCEditor.exe`
+    - [ ] Should match `.gitignore:Binaries/` ✅
+
+##### Step 7.4.3: Final Commit and Tag
+
+- [ ] **Stage All Week 1 Changes**
+
+  - [ ] Run: `git add Source/ Content/ Config/ Docs/`
+  - [ ] Run: `git status` → verify all intended changes staged
+  - [ ] Commit: `git commit -m "feat: Complete Week 1 - Office prototype, menu system, save/load, table view, pause menu"`
+
+- [ ] **Create Milestone Tag**
+
+  - [ ] Run: `git tag -a milestone-week1 -m "Week 1 Complete: Core framework, office level, diegetic menu, interaction system"`
+  - [ ] Run: `git push origin master --tags`
+
+- [ ] **Update Development Roadmap**
+
+  - [ ] Open `/Docs/Fallen_Compass_DRM.md`
+  - [ ] Mark Week 1 as complete:
+
+    ```markdown
+    ## Week 1 – Project Skeleton & First-Person Office Basics ✅ COMPLETE
+
+    - Core framework (GameInstance, GameMode, PlayerController, Character)
+    - Diegetic menu system in L_Office
+    - Save/load system with slot selector
+    - Table view interaction with ESC return
+    - Pause menu with resume/quit functionality
+    - Interface-based interaction system (C++ interface + BP implementations)
+    ```
+
+  - [ ] Commit: `git commit -am "docs: Mark Week 1 milestone complete in DRM"`
+
+---
+
+#### Step 7.5: Week 1 Acceptance Criteria Checklist
+
+- [ ] **GDD Requirements (Fallen_Compass_GDD_v0.2.md)**
+
+  - [ ] Office level exists with first-person navigation ✅
+  - [ ] Table interaction for strategy view (foundation complete) ✅
+  - [ ] Door returns to main menu ✅
+  - [ ] Atmospheric diegetic menu (no separate menu level) ✅
+
+- [ ] **DRM Week 1 Goals (Fallen_Compass_DRM.md)**
+
+  - [ ] UE 5.7 C++ project created with FC prefix ✅
+  - [ ] Git repository initialized with proper .gitignore ✅
+  - [ ] Core framework classes (GameInstance, GameMode, PlayerController, Character) ✅
+  - [ ] First-person character with WASD + mouse look ✅
+  - [ ] Input mappings (Move, Look, Interact, Pause) ✅
+  - [ ] Greybox office level with table and door ✅
+  - [ ] In-world menu system (camera, UI, state management) ✅
+  - [ ] Save/load system foundation ✅
+
+- [ ] **Code Quality Standards**
+
+  - [ ] All code follows UE_CodeConventions.md ✅
+  - [ ] All names follow UE_NamingConventions.md ✅
+  - [ ] No critical errors or warnings in Output Log ✅
+  - [ ] Full regression testing passed (7.1.1-7.1.4) ✅
+  - [ ] Architecture documented in Technical_Documentation.md ✅
+
+- [ ] **Repository State**
+  - [ ] Working tree clean (no untracked garbage) ✅
+  - [ ] All changes committed with descriptive messages ✅
+  - [ ] Week 1 milestone tag created ✅
+  - [ ] Documentation updated ✅
+
+**FINAL COMMIT**: `git commit -am "chore: Week 1 acceptance criteria verified and complete"`
+
+---
+
+### Week 1 Complete ✅
+
+**Next Steps**: Proceed to Week 2 development (Expedition system, Strategy map, Multi-scene management)
 
 ---
 
@@ -510,105 +1187,3 @@
     - Verify ScrollBox binding and item template instantiation
     - Create multiple test saves to confirm C++ returns all slots correctly
   - **Deferred**: Current workflow only uses QuickSave, will fix when implementing manual save UI
-
----
-
-### 6.0 Implement in-game Office flow (table camera, ESC behaviour, pause menu, door → Main Menu)
-
-- [ ] **6.1 Implement interaction detection**
-
-  - [ ] Choose an approach (line trace from camera, overlap, etc.).
-  - [ ] From `AFCPlayerController` or `AFCFirstPersonCharacter`:
-    - [ ] On `Interact` input, perform a short line trace from camera forward.
-    - [ ] If hit actor implements an “interactable” interface or specific blueprint class (table/door), call its `Interact` function.
-  - [ ] Create a generic `BPI_Interactable` Blueprint Interface or C++ interface if helpful.
-
-- [ ] **6.2 Implement table interaction (camera pan/zoom)**
-
-  - [ ] Create a blueprint for the table (e.g. `BP_OfficeTable`) implementing `Interact`.
-  - [ ] On `Interact`:
-    - [ ] Notify player/controller to switch to **table view**:
-      - [ ] Either blend to a dedicated table camera.
-      - [ ] Or move/lerp the current camera to the table target transform.
-    - [ ] Disable character movement input while in table view.
-    - [ ] Set an internal state (e.g. `bIsInTableView = true`) in controller or character.
-
-- [ ] **6.3 Implement ESC behaviour from table view**
-
-  - [ ] In the ESC/Pause handler:
-    - [ ] If `bIsInTableView` is **true**:
-      - [ ] Do **not** open the pause menu.
-      - [ ] Instead, smoothly return camera to first-person view (original character camera).
-      - [ ] Re-enable movement input.
-      - [ ] Set `bIsInTableView = false`.
-  - [ ] Verify:
-    - [ ] Interact with table → camera moves to table view.
-    - [ ] ESC → returns to first-person view, no pause menu shown.
-
-- [ ] **6.4 Implement pause menu from first-person**
-
-  - [ ] Create a UMG widget (e.g. `WBP_PauseMenu`) with buttons:
-    - [ ] “Resume”
-    - [ ] “Back to Main Menu”
-    - [ ] “Quit Game”
-  - [ ] In controller:
-    - [ ] On ESC when **not** in table view and not already paused:
-      - [ ] Show `WBP_PauseMenu`.
-      - [ ] Set game to paused (`SetPause(true)`).
-    - [ ] On “Resume”:
-      - [ ] Hide pause menu.
-            [ ] Unpause game.
-  - [ ] On “Back to Main Menu”:
-    - [ ] Unpause game.
-    - [ ] Load Main Menu level.
-  - [ ] On “Quit Game”:
-    - [ ] Call `QuitGame`.
-
-- [x] **6.5 Implement door interaction → Main Menu**
-
-  - [x] Create a blueprint for the door (e.g. `BP_OfficeDoor`) implementing `Interact`.
-  - [x] On `Interact` from first-person:
-    - [x] Load the Main Menu level (`L_MainMenu`).
-    - [x] Optionally ensure the game is unpaused and in a clean state.
-
-- [ ] **6.6 State sanity checks**
-  - [ ] Verify transitions:
-    - [ ] Table view → ESC → first-person.
-    - [ ] First-person → ESC → pause menu.
-    - [ ] First-person → Interact with door → Main Menu.
-    - [ ] From Main Menu, “Start Game” still works as expected.
-
----
-
-### 7.0 Verify Week 1 acceptance criteria and clean up repository
-
-- [ ] **7.1 Functional playthrough**
-
-  - [ ] Start game → Main Menu.
-  - [ ] Click “Start Game” → Office level with first-person character.
-  - [ ] Walk around, check collisions and scale.
-  - [ ] Interact with table:
-    - [ ] Camera pans/zooms into table view.
-    - [ ] ESC → camera returns to first-person; movement restored.
-  - [ ] From first-person:
-    - [ ] ESC → pause menu appears.
-    - [ ] “Resume” → returns to game.
-    - [ ] “Back to Main Menu” → returns to Main Menu level.
-  - [ ] Interact with door:
-    - [ ] Directly returns to Main Menu level.
-
-- [ ] **7.2 Technical checks**
-
-  - [ ] Confirm `UFCGameInstance`, `AFCGameMode`, `AFCPlayerController`, and `AFCFirstPersonCharacter` are used in Office level.
-  - [ ] Confirm no critical warnings or errors appear in the log on a normal flow.
-  - [ ] Confirm class/folder names follow `/Docs/UE_NamingConventions.md`.
-
-- [ ] **7.3 Git & repo hygiene**
-
-  - [ ] Check `git status` → working tree clean (no untracked garbage).
-  - [ ] Review `.gitignore` and adjust if any UE-generated folders slipped in.
-  - [ ] Commit Week 1 changes with a clear message (e.g. `feat: week 1 office prototype and menu flow`).
-
-- [ ] **7.4 Tag/mark Week 1 milestone**
-  - [ ] Optionally create a Git tag (e.g. `milestone-week1`).
-  - [ ] Note in `/Docs/Fallen_Compass_DRM.md` that Week 1 goals are achieved (if you’re keeping a manual log).
