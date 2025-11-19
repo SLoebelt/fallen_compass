@@ -10,19 +10,22 @@ Every week aims to leave the game **playable and compiling**. Multi-week feature
 
 - Start in office → plan simple route → Overworld travel → enter camp → simple combat → finish expedition with a basic report.
 
-### Week 1 – Project Skeleton & First-Person Office Basics ✅ COMPLETE - 14.11.-20.11.2025
+### Week 1 – Project Skeleton & First-Person Office Basics ✅ COMPLETE - 14.11.-19.11.2025
 
 - **Feature: Project & Tooling Setup** ✅ **COMPLETE**
+
   - Create UE 5.7 C++ project (top-down + FPS hybrid).
   - Set up source control (Git) and basic branching strategy.
   - Create base `GameInstance`, core `GameMode` and `PlayerController` classes.
 
 - **Feature: First-Person Controller – Part 1** ✅ **COMPLETE**
+
   - Implement simple first-person pawn (WASD + mouse look).
   - Create **L_Office level** (greybox room with full collision, lighting, props).
   - Ensure you can walk around with proper collision and scale.
 
 - **Feature: Office Level & Interactables** ✅ **COMPLETE**
+
   - BP_OfficeDesk with CameraTargetPoint for future camera targeting.
   - SM_Door placeholder for exit interactions.
   - Comprehensive lighting: DirectionalLight, SkyLight, SkyAtmosphere, ExponentialHeightFog.
@@ -39,21 +42,78 @@ Every week aims to leave the game **playable and compiling**. Multi-week feature
 
 ---
 
-### Week 2 – Office Scene & Map Table Interaction (Meta Layer Start) - 21.11.-28.11.2025
+### Week 2 – Office Scene & Map Table Interaction (Meta Layer Start) - 19.11.-26.11.2025
 
-**Note:** Week 1 Task 5 (In-World Main Menu) is in progress and will complete before Week 2 starts.
+- **Feature: Expedition Data Model – Part 1 (Foundation Classes)**
 
-- **Feature: Office Scene – Part 1 (Layout & Navigation)** ✅ **COMPLETE (Task 4)**
+  - Create `UFCExpeditionData` C++ class (UObject):
+    - Properties: ExpeditionName, StartDate, TargetRegion (placeholder string).
+    - Properties: StartingSupplies (int32), ExpeditionStatus (enum: Planning, InProgress, Completed, Failed).
+  - Create `UFCExpeditionManager` subsystem (UGameInstanceSubsystem):
+    - Manages current active expedition data.
+    - Methods: `StartNewExpedition()`, `GetCurrentExpedition()`, `EndExpedition(bool bSuccess)`.
+  - Store expedition data in GameInstance for persistence across level transitions.
 
-  - Refine office greybox: define area, door, main props. **DONE**
-  - Implement interaction system (look at object + key press / click to interact). **DEFERRED to Task 5/6**
+- **Feature: Table Object Interaction System – Part 1 (Foundation)**
 
-- **Feature: Map Table Interaction – Part 1 (Placeholder World Map)**
+  - Create `IFCTableInteractable` C++ interface (BlueprintNativeEvent):
+    - Functions: `OnTableObjectClicked()`, `GetCameraTargetTransform()`, `CanInteract()`.
+  - Create `BP_TableObject` base Blueprint class:
+    - Implements `IFCTableInteractable`.
+    - Has SceneComponent for camera target position.
+    - Clickable via ray trace from first-person view.
+  - Create specific table objects in L_Office:
+    - `BP_TableObject_Map` (world map, positioned on table).
+    - `BP_TableObject_Logbook` (expedition reports book, placeholder).
+    - `BP_TableObject_Letters` (message stack, placeholder).
+    - `BP_TableObject_Glass` (expedition start trigger, placeholder).
 
-  - Add **map table** as interactable (already in place as BP_OfficeDesk with CameraTargetPoint).
-  - On interaction, transition camera to table view (Task 5.1 camera system enables this).
-  - Display a simple **2D world map widget** (placeholder texture).
-  - Add basic button: **"Start Expedition"** → triggers loading Overworld level.
+- **Feature: Map Table Widget – Part 1 (Placeholder UI)**
+
+  - Create `WBP_MapTable` widget at `/Game/FC/UI/MapTable/`:
+    - Canvas with parchment/map background texture.
+    - Placeholder world map image (static, non-interactive).
+    - UI elements:
+      - Text display: "Expedition Planning" (title).
+      - Text display: Current supplies count (reads from GameInstance).
+      - Button: "Start Test Expedition" (enabled when supplies > 0).
+      - Button: "Back" (returns to first-person view).
+  - Implement Blueprint bindings to read/display supplies from GameInstance.
+
+- **Feature: Table Interaction Flow – Part 1 (Widget Integration)**
+
+  - Implement `AFCPlayerController::OnTableObjectClicked(AActor* TableObject)`:
+    - Get camera target from table object.
+    - Blend camera to focus on object (2s, cubic).
+    - Show appropriate widget based on object type.
+    - Set input mode to UI-only.
+  - Implement `AFCPlayerController::CloseTableWidget()`:
+    - Hide current widget.
+    - Blend camera back to first-person.
+    - Restore gameplay input mode.
+  - Wire `BP_TableObject_Map::OnTableObjectClicked()` to show `WBP_MapTable`.
+
+- **Feature: Level Transition Architecture – Part 1 (Loading Framework)**
+
+  - Create `UFCLevelManager` subsystem (UGameInstanceSubsystem) if not exists:
+    - Method: `LoadLevel(FName LevelName, bool bShowLoadingScreen)`.
+    - Delegates to `UFCTransitionManager` for fade/loading effects.
+    - Stores metadata about current level and previous level for back navigation.
+  - Implement "Start Test Expedition" button logic:
+    - Calls `ExpeditionManager->StartNewExpedition()` (sets status to InProgress).
+    - Calls `LevelManager->LoadLevel(TEXT("L_Overworld_Test"), true)`.
+    - Shows loading screen during transition.
+  - **No Overworld level yet** (Week 3) - button shows "Coming Soon" message for now.
+
+- **Feature: Persistent Game State Foundation – Part 1**
+
+  - Extend `UFCGameInstance`:
+    - Add property: `CurrentSupplies` (int32, default: 100 for testing).
+    - Add methods: `AddSupplies(int32 Amount)`, `ConsumeSupplies(int32 Amount, bool& bSuccess)`.
+  - Create `UFCGameStateData` struct (C++):
+    - Fields: Supplies, Money (int32, placeholder), Day (int32, starts at 1).
+  - Store `UFCGameStateData` in GameInstance.
+  - Display current supplies in `WBP_MapTable`.
 
 ---
 
@@ -155,13 +215,26 @@ Every week aims to leave the game **playable and compiling**. Multi-week feature
 
 ---
 
-### Week 8 – MVP Vertical Slice & Stabilization
+### Week 8 – MVP Vertical Slice & Expedition Start Trigger
+
+- **Feature: Expedition Start Trigger – Part 1 (Glass Object)**
+
+  - Implement `BP_TableObject_Glass::OnTableObjectClicked()`:
+    - Show confirmation dialog: `WBP_ExpeditionConfirm`.
+    - Display final summary: Selected region, crew count, total supplies, total cost, risk level.
+    - Buttons: "Begin Expedition" / "Cancel".
+  - On "Begin Expedition":
+    - Deduct transport costs and supplies from GameInstance.
+    - Call `ExpeditionManager->StartNewExpedition()` with full route data.
+    - Trigger Phase A travel event sequence (simple text summary or brief cutscene).
+    - Load Overworld level at selected startpoint.
+  - **Diegetic Design**: Glass represents "final toast before departure" - clear emotional beat.
 
 - **Feature: Expedition Flow – Part 2 (Thin Vertical Slice)**
 
   - Complete basic loop:
 
-    - Office → select “Test Expedition” at map table.
+    - Office → click map object → plan route → click glass → confirm.
     - Overworld: move to a camp POI.
     - Enter camp: optionally trigger a combat.
     - Return to Overworld → return to office → show a simple expedition report.
@@ -190,33 +263,49 @@ Every week aims to leave the game **playable and compiling**. Multi-week feature
 
 ### Week 9 – Route Planning UI Basics
 
-- **Feature: Route Planning UI – Part 1 (Startpoint & Simple Path)**
+- **Feature: Route Planning UI – Part 1 (Two-Phase Route System)**
 
-  - Extend map table UI to select:
-
-    - Expedition **startpoint** (e.g. coast/river).
-    - Very simple route: choose 1–2 intermediate nodes or just a single path.
-
-  - Store a basic **RouteData** struct (start, list of waypoints).
+  - Extend `WBP_MapTable` with interactive world map:
+    - **Phase A UI**: "Travel to Start" section.
+      - Dropdown: Select transport method (Ship, Wagon, River Boat).
+      - Display: Estimated cost, travel time, risk level.
+    - **Phase B UI**: "Expedition Region" section.
+      - Clickable regions on world map (2-3 predefined regions for MVP).
+      - Select startpoint within region (coast, river, known settlement).
+  - Store route data in `UFCRouteData` struct:
+    - TransportMethod (enum), TransportCost (int32), TransportRisk (float).
+    - TargetRegion (FName), StartPoint (FVector or FName).
+    - Estimated expedition supplies needed (calculated).
 
 - **Feature: Office→RouteData→Overworld Integration – Part 1**
 
   - Pass `RouteData` from office to Overworld when starting an expedition.
   - Spawn convoy at the defined expedition startpoint, not a hard-coded location.
+  - Abstract Phase A (Travel to Start) as event summary before Overworld loads.
 
 ---
 
-### Week 10 – Route Risk Model Basics
+### Week 10 – Route Risk Model & Calculation Widget
 
 - **Feature: Route Risk Model – Part 1 (Numeric Risk Score)**
 
   - For each route segment, compute a simple **risk score** (e.g. based on terrain tags).
   - Aggregated risk shown in the route planning UI.
+  - Phase A (Travel to Start) has fixed risk values per transport method.
 
-- **Feature: Route Planning UI – Part 2 (Risk & Cost Display)**
+- **Feature: Route Calculation Widget – Part 1 (Integrated Estimator)**
 
-  - Display **estimated supplies cost** and **overall risk** for the planned route in UI.
-  - Prevent starting expedition if required supplies > currently available.
+  - Create `WBP_RouteCalculator` sub-widget (displayed in `WBP_MapTable`):
+    - **Inputs**: Selected region, transport method, crew size (placeholder: fixed 5).
+    - **Outputs**:
+      - Estimated Provisions (Food): based on crew size × expected days.
+      - Estimated Supplies: tools, medicine, misc.
+      - Transport Cost: money cost for Phase A.
+      - Total Risk Level: color-coded (Green/Yellow/Orange/Red).
+    - **Validation**: "Start Expedition" button disabled if:
+      - Insufficient supplies in GameInstance.
+      - Insufficient money for transport.
+  - Display calculation results clearly with tooltips explaining factors.
 
 ---
 
@@ -265,7 +354,7 @@ Every week aims to leave the game **playable and compiling**. Multi-week feature
 
 ---
 
-### Week 13 – Crew Model & Selection
+### Week 13 – Crew Model & Messages Hub (Part 1)
 
 - **Feature: Crew Data Model – Part 1**
 
@@ -275,12 +364,23 @@ Every week aims to leave the game **playable and compiling**. Multi-week feature
 
   - Store crew in `GameInstance` / persistent manager.
 
+- **Feature: Messages Hub Widget – Part 1 (Crew Applications)**
+
+  - Create `WBP_MessagesHub` widget:
+    - Tab 1: "Applications" (crew recruitment).
+      - List of available crew members for hire.
+      - Each entry: Name, Role, Skills summary, Hiring cost.
+      - Button: "Hire" → add to crew roster, deduct money.
+    - Tabs 2-3 placeholders for contracts and orders (Week 21+).
+  - Wire `BP_TableObject_Letters::OnTableObjectClicked()` to show `WBP_MessagesHub`.
+
 - **Feature: Office Crew Management – Part 1 (Select Crew for Expedition)**
 
-  - In office, add a **Crew Management UI**:
+  - In `WBP_MapTable`, add crew selection section:
 
-    - Show available crew.
-    - Select which crew members join the next expedition.
+    - Show available crew roster.
+    - Checkboxes to select which crew members join next expedition.
+    - Display total crew size in route calculator.
 
   - Pass selected crew into Overworld/camp/combat.
 
@@ -479,12 +579,17 @@ Every week aims to leave the game **playable and compiling**. Multi-week feature
   - On new expedition:
 
     - Show previously explored areas as **known** from office map and Overworld.
+    - `WBP_MapTable` displays fog-of-war: known regions detailed, unknown regions grayed/abstract.
 
-- **Feature: Expedition History – Part 1**
+- **Feature: Expedition Logbook Widget – Part 1**
 
-  - In office, add a **simple log/list of past expeditions**:
-
-    - Outcome, duration, main target, crew losses.
+  - Create `WBP_ExpeditionLog` widget:
+    - List view: all past expeditions (scrollable).
+    - Each entry shows: Date, Region, Outcome (Success/Failure), Duration (days).
+    - Click entry → detail view:
+      - Full expedition summary: crew losses, resources consumed, map coverage, narrative notes.
+  - Wire `BP_TableObject_Logbook::OnTableObjectClicked()` to show `WBP_ExpeditionLog`.
+  - Populate from `UFCExpeditionManager::GetExpeditionHistory()` (array of archived `UFCExpeditionData`).
 
 ---
 
@@ -849,7 +954,9 @@ Every week aims to leave the game **playable and compiling**. Multi-week feature
 
 ## Phase 4 – Post-EA Backlog & Technical Debt
 
-### Known Issues & Technical Backlog (from Week 1 Log Review)
+### Known Issues & Technical Backlog
+
+#### Log Warnings (from Week 1 Log Review)
 
 - [ ] LogTemp: Warning: RestorePlayerPosition: No pending load data (expected if no save exists)
 - [ ] LogRenderer: Warning: [VSM] Non-Nanite Marking Job Queue overflow. Performance may be affected. (large shadow map area, not critical for prototype)
@@ -857,3 +964,34 @@ Every week aims to leave the game **playable and compiling**. Multi-week feature
 - [ ] LogFallenCompassPlayerController: Warning: TableView Debug: CameraTargetPoint Rotation/Location/Spawned Camera Rotation (debug output, not critical)
 
 These should be reviewed and addressed in a future sprint as part of technical debt reduction and polish.
+
+#### Visual Polish
+
+- [ ] **BUG: Camera flicker during save game load transitions**
+  - **Symptom**: Brief flicker/flash visible when camera blends to first-person after loading a save game
+  - **Occurs**: When clicking "Continue" or loading from save slot selector
+  - **Context**:
+    - Fade-in starts at 0.5s delay (when `PendingLoadData` exists)
+    - Camera blend to first-person starts via `TransitionToGameplay()` (2.0s blend)
+    - Timing overlap between fade-in (1.0s) and camera blend (2.0s) causes brief visibility conflict
+  - **Current Impact**: Minor visual artifact, does not affect functionality
+  - **Priority**: Low (polish issue, not a blocker)
+  - **Potential Solutions**:
+    - Option A: Synchronize fade-in timing with camera blend completion (delay fade-in until blend starts)
+    - Option B: Adjust fade-in duration to complete before camera movement is visible
+    - Option C: Use camera cut instead of blend for save loads (instant transition)
+  - **Deferred**: Non-blocking issue, will address during visual polish phase
+
+#### Save System
+
+- [ ] **UI: Save slot selector only shows QuickSave slot**
+  - **Symptom**: `WBP_SaveSlotSelector` widget displays only one save slot even when multiple saves exist
+  - **Logs Confirm**: C++ correctly finds saves (`GetAvailableSaveSlots: Total found: 1` for test case with only QuickSave)
+  - **Root Cause**: Blueprint widget `WBP_SaveSlotSelector` may not be iterating through all returned save slots
+  - **Current Impact**: Cannot view/select multiple manual saves from UI (though only QuickSave exists in current test)
+  - **Priority**: Medium (will become blocker when implementing manual save feature)
+  - **Investigation Needed**:
+    - Check `WBP_SaveSlotSelector` Blueprint logic for save slot list population
+    - Verify ScrollBox binding and item template instantiation
+    - Create multiple test saves to confirm C++ returns all slots correctly
+  - **Deferred**: Current workflow only uses QuickSave, will fix when implementing manual save UI

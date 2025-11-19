@@ -134,19 +134,114 @@ Konflikte werden in **rundenbasierten, gridbasierten Taktik-Kämpfen** ausgetrag
   - Gameplay-Zustand wird gelöscht (Position, Inventar etc.).
 - **Vorteile**: Immersiv, keine Ladebildschirme beim Start, atmosphärische Einführung, nahtloser Übergang zwischen Meta-Ebene und Gameplay.
 
-#### 3.1.2 Routenplanung bis zum Expeditionsstartpunkt
+#### 3.1.2 Kartentisch – Interaktive Planungsoberfläche (Design-Update: November 2025)
 
-- Die Routenplanung beginnt im Büro am **Kartentisch**.
-- Von hier aus wird die **Route bis zum eigentlichen Expeditionsstartpunkt** geplant, z. B.:
-  - Küste,
-  - befahrbarer Fluss,
-  - Rand einer erforschten Region.
-- **Begrenzung durch Kartenwissen**:
-  - Vom Kartentisch aus können **keine Details in unerkundeten Regionen** geplant werden – diese Bereiche sind auf der Karte verborgen.
-  - Erst wenn in einer Region **bereits eine Expedition stattgefunden** hat und Kartendaten vorliegen, können Route und Ressourcenaufwand **tiefer in diese Region hinein** geplant werden (z. B. bekannte Pässe, Dörfer, markante Landmarken, Ressourcenpunkte).
-- Routenplanung und Routenrisiko greifen ineinander (siehe 4.2.4):
-  - Bereits bekannte Routen haben **besser abschätzbare Kosten** (Zeit, Ressourcen, Risiko).
-  - Unbekannte Routen sind riskanter, bieten aber potentiell **größere Entdeckungsgewinne**.
+Der **Kartentisch** ist das zentrale Interface für Expeditionsplanung im Büro. Der Tisch zeigt mehrere **physische Objekte**, die jeweils unterschiedliche Meta-Funktionen repräsentieren. Jedes Objekt ist direkt **anklickbar in der First-Person-Perspektive** (via Raycast/Interaktion).
+
+**Interaction Pattern:**
+
+- Spieler kann sich frei im Büro bewegen (First Person, WASD + Maus).
+- Bei **Klick auf ein Objekt** auf dem Tisch:
+  - Kamera **blendet zum Objekt** (2s, cubic easing, ähnlich wie Table View aus Week 1).
+  - Falls benötigt, erscheint ein **UI-Widget** über/neben dem Objekt.
+  - Spieler interagiert mit UI (Maus + Tastatur).
+  - **ESC** oder "Zurück"-Button schließt Widget und blendet Kamera zurück zu First Person.
+
+**Objekte auf dem Kartentisch:**
+
+1. **Logbuch (Expedition Reports)**
+
+   - **Physisches Objekt**: Aufgeschlagenes Buch mit Ledereinband, sichtbare Schrift/Skizzen.
+   - **Funktion**: Archiv abgeschlossener Expeditionen.
+   - **UI-Widget**: `WBP_ExpeditionLog`
+     - Liste aller vergangenen Expeditionen (Datum, Ziel, Erfolg/Misserfolg).
+     - Detailansicht: Crew-Verluste, Kartendaten, Ressourcenverbrauch, narrative Zusammenfassung.
+   - **Gameplay-Zweck**: Lernen aus Fehlern, Nachschlagen von Routendaten, narrative Persistenz.
+
+2. **Weltkarte (Route Planning)**
+
+   - **Physisches Objekt**: Große Karte mit Gewichten an den Ecken, Kompass, Stift/Lineal daneben.
+   - **Funktion**: Planung der kompletten Expeditionsroute.
+   - **UI-Widget**: `WBP_RouteMap` (Hauptfunktion, siehe 3.1.3)
+     - **Zweigeteilte Planung**:
+       - **A) Anreise zum Expeditionsstartpunkt** (z. B. Schiff zur Küste, Wagen zum Fluss).
+       - **B) Expeditionsgebiet** (wählbare vordefinierte Region/Kontinent für die 3D-Overworld-Expedition).
+     - Zeigt **Fog-of-War**: Bereits erkundete Gebiete sichtbar, unbekannte Regionen verhüllt.
+     - **Kalkulationswidget** (integriert oder als Sidebar):
+       - Geschätzter Bedarf: Proviant, Ressourcen, Transportkosten (Schiffe, Wagen).
+       - Risikostufe (niedrig/mittel/hoch, farbcodiert).
+       - Gesamtkosten in Geld.
+   - **Gameplay-Zweck**: Strategische Vorbereitung, Ressourcenabschätzung, Risikoabwägung.
+
+3. **Briefe & Dokumente (Messages & Contracts)**
+
+   - **Physisches Objekt**: Stapel Umschläge, versiegelte Briefe, Pergamente.
+   - **Funktion**: Kommunikation mit Auftraggebern, Crew-Bewerbungen, Bestellungen.
+   - **UI-Widget**: `WBP_MessagesHub`
+     - **Tabs/Kategorien**:
+       - **Aufträge**: Verfügbare Expeditionsaufträge von Auftraggebern (Belohnung, Ziel, Frist).
+       - **Bewerbungen**: Crew-Mitglieder, die anheuern wollen (Fähigkeiten, Kosten).
+       - **Bestellungen**: Formular zum Bestellen von Ausrüstung, Tieren, Proviant (Lieferzeit, Kosten).
+     - Jede Kategorie zeigt **Liste von Einträgen**, auswählbar für Details/Aktionen.
+   - **Gameplay-Zweck**: Auftragswahl, Crew-Rekrutierung, Logistikplanung.
+
+4. **Glas (Expedition Start Trigger)**
+   - **Physisches Objekt**: Whiskeyglas oder Weinglas (halbvoll), symbolisiert "Ein letzter Drink vor der Abreise".
+   - **Funktion**: Expedition **final starten**.
+   - **Interaction**: Klick auf Glas → **Bestätigungsdialog**:
+     - "Expedition beginnen? [Routenübersicht, Kosten, Crew]"
+     - Buttons: "Ja, aufbrechen" / "Abbrechen".
+   - Bei Bestätigung:
+     - **Fade to Black** (Kameraübergang).
+     - **Lade Overworld-Level** mit gewählter Region und Route.
+     - Expedition startet.
+   - **Gameplay-Zweck**: Klare Schwelle ("Point of No Return"), emotionaler Moment, diegetische Trigger-Metapher.
+
+---
+
+#### 3.1.3 Routenplanung bis zum Expeditionsstartpunkt (Detaillierte Mechanik)
+
+Die Routenplanung über die **Weltkarte** (Objekt 2) erfolgt in **zwei Phasen**:
+
+**Phase A: Anreise zum Expeditionsstartpunkt**
+
+- Wähle **Transportmittel und Route** von der Heimatbasis zum Start der Overworld-Expedition:
+  - Beispiele: Schiff zur Küste, Flussdampfer, Wagen über bekannte Straßen.
+- Diese Phase:
+  - Kostet **Geld** (Charterkosten, Mautgebühren).
+  - Hat ein **Risiko** (Wetter, Piraten, mechanische Ausfälle).
+  - Wird **nicht im 3D-Overworld gespielt**, sondern abstrakt abgehandelt:
+    - Nach Expeditionsstart: kurze **Event-Sequenz** oder **Zusammenfassung**.
+    - Negative Events (Verzögerung, Ressourcenverlust) werden **vor Ankunft am Startpunkt** abgewickelt.
+
+**Phase B: Expeditionsgebiet & Startpunkt**
+
+- Wähle **vordefinierte Region/Kontinent** für die 3D-Expedition (z. B. "Dschungelküste", "Gebirgskette Nord").
+- Wähle **Startpunkt innerhalb dieser Region**:
+  - Muss an bekannter/zugänglicher Stelle liegen (Küste, Fluss, Rand erforschter Gebiete).
+- **Fog-of-War**:
+  - Bereits bereiste Gebiete sind auf der Karte **sichtbar und detailliert** (Dörfer, Landmarken, Ressourcenpunkte).
+  - Unerkundete Gebiete sind **verhüllt/abstrakt** (grauer Nebel, grobe Geländetypen).
+- **Kalkulationswidget** zeigt:
+  - Geschätzter **Proviantbedarf** (basierend auf Crew-Größe, erwarteter Dauer).
+  - **Ressourcenbedarf** (Werkzeuge, Medizin, Munition).
+  - **Risikostufe** (Gelände, bekannte Gefahren, Jahreszeit).
+  - **Transportkosten** (für Phase A).
+
+**Routenrisiko & Kosten-Abschätzung:**
+
+- Bereits bekannte Routen:
+  - Kosten und Risiko sind **genau kalkulierbar**.
+  - Niedrigeres Risiko für negative Events.
+- Unbekannte Routen:
+  - Kosten nur **grob geschätzt** (größere Spanne).
+  - Höheres Risiko, aber potentiell **größere Entdeckungsgewinne** (neue Karten, Ressourcen, Geheimnisse).
+
+**Gameplay-Abwägung:**
+
+- Sichere, teure Anreise vs. riskante, günstige Route.
+- Bekannte Region (planbar) vs. unbekannte Region (risikoreich, aber belohnend).
+- Ressourcen-Puffer einplanen vs. knappes Budget maximieren.
 
 ---
 
