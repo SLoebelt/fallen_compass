@@ -564,18 +564,18 @@ Create `UFCExpeditionData` C++ class (UObject) to store expedition metadata and 
 
 ##### Step 1.3.1: Create Test Blueprint for Expedition Manager
 
-- [ ] **Analysis**
+- [x] **Analysis**
 
-  - [ ] Test flow: Get subsystem → StartNewExpedition → verify CurrentExpedition != nullptr → EndExpedition
-  - [ ] Verify delegate broadcasts (OnExpeditionStateChanged)
-  - [ ] Check Output Log for expected messages
+  - [x] Test flow: Get subsystem → StartNewExpedition → verify CurrentExpedition != nullptr → EndExpedition ✅
+  - [x] Verify delegate broadcasts (OnExpeditionStateChanged) ✅
+  - [x] Check Output Log for expected messages ✅
 
-- [ ] **Implementation (Blueprint)**
+- [x] **Implementation (Blueprint)**
 
-  - [ ] Open L_Office level in Unreal Editor
-  - [ ] Open Level Blueprint (or create test Actor Blueprint)
-  - [ ] Add BeginPlay event
-  - [ ] Add nodes to test expedition manager:
+  - [x] Open L_Office level in Unreal Editor
+  - [x] Open Level Blueprint (or create test Actor Blueprint)
+  - [x] Add BeginPlay event
+  - [x] Add nodes to test expedition manager:
     ```
     BeginPlay → Delay (2.0s)
              → Get Game Instance
@@ -590,17 +590,17 @@ Create `UFCExpeditionData` C++ class (UObject) to store expedition metadata and 
              → Print String ("Expedition ended")
     ```
 
-- [ ] **Testing After Step 1.3.1** ✅ CHECKPOINT
-  - [ ] Compile Blueprint
-  - [ ] PIE in L_Office
-  - [ ] Verify console output:
-    - [ ] `LogFCExpedition: Started expedition: Test Expedition 1 (Supplies: 100)` ✅
-    - [ ] On-screen print: "Test Expedition 1" ✅
-    - [ ] On-screen print: "InProgress" ✅
-    - [ ] `LogFCExpedition: Ended expedition: Test Expedition 1 (Success: true)` ✅
-    - [ ] On-screen print: "Expedition ended" ✅
-  - [ ] No "Accessed None" errors
-  - [ ] No crashes
+- [x] **Testing After Step 1.3.1** ✅ CHECKPOINT
+  - [x] Compile Blueprint
+  - [x] PIE in L_Office
+  - [x] Verify console output:
+    - [x] `LogFCExpedition: Started expedition: Test Expedition 1 (Supplies: 100)` ✅
+    - [x] On-screen print: "Test Expedition 1" ✅
+    - [x] On-screen print: "InProgress" ✅
+    - [x] `LogFCExpedition: Ended expedition: Test Expedition 1 (Success: true)` ✅
+    - [x] On-screen print: "Expedition ended" ✅
+  - [x] No "Accessed None" errors
+  - [x] No crashes
 
 **COMMIT POINT 1.3.1**: `git add -A && git commit -m "test(expedition): Add test Blueprint for expedition manager functionality"`
 
