@@ -397,31 +397,27 @@ Create `UFCExpeditionData` C++ class (UObject) to store expedition metadata and 
 
 ##### Step 1.1.2: Add Expedition Module to Build Configuration
 
-- [ ] **Analysis**
+- [x] **Analysis**
 
-  - [ ] Check if `/Source/FC/Expedition/` module needs explicit registration in `FC.Build.cs`
-  - [ ] Verify include paths are correct for new module folder
+  - [x] Check if `/Source/FC/Expedition/` module needs explicit registration in `FC.Build.cs` ✅
+    - Verified FC.Build.cs uses PublicIncludePaths for module registration
+  - [x] Verify include paths are correct for new module folder ✅
 
-- [ ] **Implementation (FC.Build.cs)**
+- [x] **Implementation (FC.Build.cs)** ✅
 
-  - [ ] Open `/Source/FC/FC.Build.cs`
-  - [ ] Verify `PrivateIncludePaths` or `PublicIncludePaths` includes `"FC/Expedition"` if needed:
-    ```csharp
-    PrivateIncludePaths.AddRange(new string[] {
-        "FC/Core",
-        "FC/Interaction",
-        "FC/SaveGame",
-        "FC/Expedition",  // Add this line
-        // ... other paths
-    });
-    ```
+  - [x] Open `/Source/FC/FC.Build.cs` ✅
+  - [x] Add `"FC/Expedition"`, `"FC/Interaction"`, and `"FC/SaveGame"` to PublicIncludePaths ✅
+    - Added after "FC/Core" for logical organization
+    - Also added FC/Interaction and FC/SaveGame which were missing
 
-- [ ] **Testing After Step 1.1.2** ✅ CHECKPOINT
-  - [ ] Compile succeeds without errors
-  - [ ] PIE starts successfully
-  - [ ] No "cannot find include file" errors in Output Log
+- [x] **Testing After Step 1.1.2** ✅ CHECKPOINT
+  - [x] Compile succeeds without errors ✅
+  - [x] PIE starts successfully ✅
+  - [x] No "cannot find include file" errors in Output Log ✅
+  - [x] Note: Engine warnings (LogStreaming, LogHttp, LogEOSSDK) are harmless and unrelated to project code ✅
+  - [x] Note: LogPlayerController error about "Non-Focusable widget" is from existing Week 1 code and will be addressed in Task 4 ✅
 
-**COMMIT POINT 1.1.2**: `git add -A && git commit -m "build: Add Expedition module to build configuration"`
+**COMMIT POINT 1.1.2**: `git add -A && git commit -m "build(expedition): Add Expedition, Interaction, and SaveGame modules to build configuration"`
 
 ---
 
