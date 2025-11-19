@@ -912,33 +912,33 @@ Create `IFCTableInteractable` C++ interface and `BP_TableObject` base Blueprint 
 
 ##### Step 2.3.2: Create BP_TableObject_Logbook (Logbook Object)
 
-- [ ] **Analysis**
+- [x] **Analysis**
 
-  - [ ] Inherits from BP_TableObject
-  - [ ] Will show WBP_ExpeditionLog widget (Week 22 feature, placeholder for now)
-  - [ ] Visual: Book/journal appearance (placeholder cube with brown tint)
-  - [ ] Position: Left side of table
+  - [x] Inherits from BP_TableObject
+  - [x] Will show WBP_ExpeditionLog widget (Week 22 feature, placeholder for now)
+  - [x] Visual: Book/journal appearance (placeholder cube with brown tint)
+  - [x] Position: Left side of table
 
-- [ ] **Implementation (Blueprint)**
+- [x] **Implementation (Blueprint)**
 
-  - [ ] Content Browser → `/Content/FC/World/Blueprints/Interactables/`
-  - [ ] Right-click BP_TableObject → Create Child Blueprint Class
-  - [ ] Name: `BP_TableObject_Logbook`
-  - [ ] Open BP_TableObject_Logbook
-  - [ ] Components:
-    - [ ] Select PlaceholderMesh → Details → Material: Set tint color to brown (book appearance)
-    - [ ] Transform → Scale: (X=0.15, Y=0.2, Z=0.05) (book-like proportions)
-  - [ ] Event Graph:
-    - [ ] Override Event On Table Object Clicked:
-      - [ ] Print String ("Logbook clicked - expedition log coming in Week 22")
-  - [ ] Compile Blueprint
+  - [x] Content Browser → `/Content/FC/World/Blueprints/Interactables/`
+  - [x] Right-click BP_TableObject → Create Child Blueprint Class
+  - [x] Name: `BP_TableObject_Logbook`
+  - [x] Open BP_TableObject_Logbook
+  - [x] Components:
+    - [x] Select PlaceholderMesh → Details → Material: Set tint color to brown (book appearance)
+    - [x] Transform → Scale: (X=0.15, Y=0.2, Z=0.05) (book-like proportions)
+  - [x] Event Graph:
+    - [x] Override Event On Table Object Clicked:
+      - [x] Print String ("Logbook clicked - expedition log coming in Week 22")
+  - [x] Compile Blueprint
 
-- [ ] **Testing After Step 2.3.2** ✅ CHECKPOINT
-  - [ ] Compile succeeds
-  - [ ] Drag BP_TableObject_Logbook into L_Office level
-  - [ ] Position at left side of table
-  - [ ] PIE: Verify logbook object visible with book proportions
-  - [ ] No errors
+- [x] **Testing After Step 2.3.2** ✅ CHECKPOINT
+  - [x] Compile succeeds
+  - [x] Drag BP_TableObject_Logbook into L_Office level
+  - [x] Position at left side of table
+  - [x] PIE: Verify logbook object visible with book proportions
+  - [x] No errors
 
 **COMMIT POINT 2.3.2**: `git add -A && git commit -m "feat(interaction): Create BP_TableObject_Logbook"`
 
