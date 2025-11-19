@@ -139,42 +139,42 @@
 - [x] **4.2 Build basic greybox geometry**
 
   - [x] Add static meshes or BSP/geometry for:
+    - [x] Floor.
+    - [x] Four walls.
+    - [x] Ceiling.
+  - [x] Confirm that collision is active to prevent falling out.
 
-    - [x] **Verify Clean State**
-      - [x] From repo root, run: `cd W:\GameDev\FallenCompass; git status`
-      - [x] Check for untracked files:
-        - [x] No loose `.uasset` or `.umap` files in unexpected locations ✅
-        - [x] No editor temporary files (`.tmp`, `.log` outside `/Saved`) ✅
-        - [x] No build artifacts outside `/Binaries`, `/Intermediate` ✅
-      - [x] Check modified files:
-        - [x] Only intentional changes staged ✅
-        - [x] No accidental modifications to engine content ✅
+- [x] **4.3 Add placeholder table prop**
 
-    - [x] **Stage All Week 1 Changes**
-      - [x] Run: `git add Source/ Content/ Config/ Docs/`
-      - [x] Run: `git status` → verify all intended changes staged
-      - [x] Commit: `git commit -m "feat: Complete Week 1 - Office prototype, menu system, save/load, table view, pause menu"`
+  - [x] Add a mesh (e.g. a cube or simple table asset) at a logical position in the room.
+  - [x] Name it clearly (e.g. `SM_Table_Office` or `BP_OfficeTable`).
+  - [x] Ensure it's reachable by walking.
 
-    - [x] **Create Milestone Tag**
-      - [x] Run: `git tag -a milestone-week1 -m "Week 1 Complete: Core framework, office level, diegetic menu, interaction system"`
-      - [x] Run: `git push origin master --tags`
+- [x] **4.4 Add placeholder door prop**
 
-    - [x] **Update Development Roadmap**
-      - [x] Open `/Docs/Fallen_Compass_DRM.md`
-      - [x] Mark Week 1 as complete:
+  - [x] Add a door mesh or placeholder rectangle to represent the exit door.
+  - [x] Name it clearly (e.g. `SM_OfficeDoor` or `BP_OfficeDoor`).
+  - [x] Place it on one wall in a position that is clearly an "exit".
 
-        ```markdown
-        ## Week 1 – Project Skeleton & First-Person Office Basics ✅ COMPLETE
+- [x] **4.5 Set up camera positions for table view**
 
-        - Core framework (GameInstance, GameMode, PlayerController, Character)
-        - Diegetic menu system in L_Office
-        - Save/load system with slot selector
-        - Table view interaction with ESC return
-        - Pause menu with resume/quit functionality
-        - Interface-based interaction system (C++ interface + BP implementations)
-        ```
+  - [x] Create a target transform for the **table-focused camera view**:
+    - [x] Either place a `Camera` actor pointing at the table, or define a `SceneComponent` on the table blueprint that acts as camera target.
+  - [x] Verify that from this transform, the table is clearly visible and framed.
 
-      - [x] Commit: `git commit -am "docs: Mark Week 1 milestone complete in DRM"`
+- [x] **4.6 Basic lighting & navigation**
+  - [x] Add at least one light so the room is visible (sun light from outdoor for now).
+  - [x] Ensure character movement navigates correctly in the room.
+  - [x] Quick test: run PIE, walk around, ensure scale and movement feel okay.
+
+---
+
+### 5.0 Implement in-world Main Menu in Office level (Diegetic Menu System)
+
+> **Design:** Menu state within L_Office using static camera on desk + UI overlay. Eliminates separate menu level for immersive experience.  
+> **Reference:** See `/Docs/Tasks/0005-MainMenu-Concept.md` for full technical specification.
+
+- [x] **5.1 Set up Menu Camera system**
 
   - [x] Create `ACameraActor` named "MenuCamera" in L_Office
     - [x] Position ~300-500 units from desk, angled down at desk
@@ -986,32 +986,32 @@
 
 ##### Step 7.4.1: Working Tree Cleanup
 
-- [ ] **Verify Clean State**
+- [x] **Verify Clean State**
 
-  - [ ] From repo root, run: `cd W:\\GameDev\\FallenCompass; git status`
-  - [ ] Check for untracked files:
-    - [ ] No loose `.uasset` or `.umap` files in unexpected locations ✅
-    - [ ] No editor temporary files (`.tmp`, `.log` outside `/Saved`) ✅
-    - [ ] No build artifacts outside `/Binaries`, `/Intermediate` ✅
-  - [ ] Check modified files:
-    - [ ] Only intentional changes staged ✅
-    - [ ] No accidental modifications to engine content ✅
+  - [x] From repo root, run: `cd W:\\GameDev\\FallenCompass; git status`
+  - [x] Check for untracked files:
+    - [x] No loose `.uasset` or `.umap` files in unexpected locations ✅
+    - [x] No editor temporary files (`.tmp`, `.log` outside `/Saved`) ✅
+    - [x] No build artifacts outside `/Binaries`, `/Intermediate` ✅
+  - [x] Check modified files:
+    - [x] Only intentional changes staged ✅
+    - [x] No accidental modifications to engine content ✅
 
-- [ ] **Stage All Week 1 Changes**
+- [x] **Stage All Week 1 Changes**
 
-  - [ ] Run: `git add Source/ Content/ Config/ Docs/`
-  - [ ] Run: `git status` → verify all intended changes staged
-  - [ ] Commit: `git commit -m "feat: Complete Week 1 - Office prototype, menu system, save/load, table view, pause menu"`
+  - [x] Run: `git add Source/ Content/ Config/ Docs/`
+  - [x] Run: `git status` → verify all intended changes staged
+  - [x] Commit: `git commit -m "feat: Complete Week 1 - Office prototype, menu system, save/load, table view, pause menu"`
 
-- [ ] **Create Milestone Tag**
+- [x] **Create Milestone Tag**
 
-  - [ ] Run: `git tag -a milestone-week1 -m "Week 1 Complete: Core framework, office level, diegetic menu, interaction system"`
-  - [ ] Run: `git push origin master --tags`
+  - [x] Run: `git tag -a milestone-week1 -m "Week 1 Complete: Core framework, office level, diegetic menu, interaction system"`
+  - [x] Run: `git push origin master --tags`
 
-- [ ] **Update Development Roadmap**
+- [x] **Update Development Roadmap**
 
-  - [ ] Open `/Docs/Fallen_Compass_DRM.md`
-  - [ ] Mark Week 1 as complete:
+  - [x] Open `/Docs/Fallen_Compass_DRM.md`
+  - [x] Mark Week 1 as complete:
 
     ```markdown
     ## Week 1 – Project Skeleton & First-Person Office Basics ✅ COMPLETE
@@ -1024,7 +1024,7 @@
     - Interface-based interaction system (C++ interface + BP implementations)
     ```
 
-  - [ ] Commit: `git commit -am "docs: Mark Week 1 milestone complete in DRM"`
+  - [x] Commit: `git commit -am "docs: Mark Week 1 milestone complete in DRM"`
 
 ---
 

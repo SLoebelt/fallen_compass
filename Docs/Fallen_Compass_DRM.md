@@ -10,31 +10,25 @@ Every week aims to leave the game **playable and compiling**. Multi-week feature
 
 - Start in office → plan simple route → Overworld travel → enter camp → simple combat → finish expedition with a basic report.
 
-### Week 1 – Project Skeleton & First-Person Office Basics - 14.11.-20.11.2025
-
-**Status: Tasks 1-4 Complete (as of November 15, 2025) | Task 5 In Progress**
+### Week 1 – Project Skeleton & First-Person Office Basics ✅ COMPLETE - 14.11.-20.11.2025
 
 - **Feature: Project & Tooling Setup** ✅ **COMPLETE**
-
   - Create UE 5.7 C++ project (top-down + FPS hybrid).
   - Set up source control (Git) and basic branching strategy.
   - Create base `GameInstance`, core `GameMode` and `PlayerController` classes.
 
 - **Feature: First-Person Controller – Part 1** ✅ **COMPLETE**
-
   - Implement simple first-person pawn (WASD + mouse look).
   - Create **L_Office level** (greybox room with full collision, lighting, props).
   - Ensure you can walk around with proper collision and scale.
 
 - **Feature: Office Level & Interactables** ✅ **COMPLETE**
-
   - BP_OfficeDesk with CameraTargetPoint for future camera targeting.
   - SM_Door placeholder for exit interactions.
   - Comprehensive lighting: DirectionalLight, SkyLight, SkyAtmosphere, ExponentialHeightFog.
   - PlayerStart configured for proper spawn location.
 
-- **Feature: In-World Main Menu System – Part 1** 🔄 **IN PROGRESS (Task 5)**
-
+- **Feature: In-World Main Menu System – Part 1** ✅ **COMPLETE**
   - Implement main menu **within L_Office** (not a separate level).
   - Add MenuCamera (static/slow-moving view focused on desk).
   - Create WBP_MainMenu widget with "New Legacy", "Continue", "Load Save Game", "Options", "Quit".
