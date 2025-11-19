@@ -105,13 +105,6 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Transition")
 	void FadeScreenIn(float Duration = 1.0f);
 
-	// Debug/Testing console commands
-	UFUNCTION(Exec, Category = "Debug")
-	void TestFadeOut();
-
-	UFUNCTION(Exec, Category = "Debug")
-	void TestFadeIn();
-
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "State")
 	EFCPlayerCameraMode CameraMode;
@@ -160,7 +153,7 @@ protected:
 	TObjectPtr<UInputAction> InteractAction;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
-	TObjectPtr<UInputAction> PauseAction;
+	TObjectPtr<UInputAction> EscapeAction;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
 	TObjectPtr<UInputAction> QuickSaveAction;
@@ -173,6 +166,9 @@ protected:
 	void HandleQuickSavePressed();
 	void HandleQuickLoadPressed();
 
+	UFUNCTION(BlueprintCallable, Category = "Game State")
+	void ResumeGame();
+	
 	void EnterTableViewPlaceholder();
 	void ExitTableViewPlaceholder();
 	void ShowPauseMenuPlaceholder();

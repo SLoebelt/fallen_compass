@@ -89,16 +89,6 @@ AFCPlayerController::AFCPlayerController()
 		UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("Failed to load IA_Interact."));
 	}
 
-	static ConstructorHelpers::FObjectFinder<UInputAction> PauseActionFinder(TEXT("/Game/FC/Input/IA_Pause"));
-	if (PauseActionFinder.Succeeded())
-	{
-		PauseAction = PauseActionFinder.Object;
-	}
-	else
-	{
-		UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("Failed to load IA_Pause."));
-	}
-
 	static ConstructorHelpers::FObjectFinder<UInputAction> QuickSaveActionFinder(TEXT("/Game/FC/Input/IA_QuickSave"));
 	if (QuickSaveActionFinder.Succeeded())
 	{
@@ -119,6 +109,17 @@ AFCPlayerController::AFCPlayerController()
 	else
 	{
 		UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("Failed to load IA_QuickLoad."));
+	}
+
+	static ConstructorHelpers::FObjectFinder<UInputAction> EscapeActionFinder(TEXT("/Game/FC/Input/IA_Escape"));
+	if (EscapeActionFinder.Succeeded())
+	{
+		EscapeAction = EscapeActionFinder.Object;
+		UE_LOG(LogFallenCompassPlayerController, Log, TEXT("Loaded IA_Escape"));
+	}
+	else
+	{
+		UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("Failed to load IA_Escape."));
 	}
 }
 
@@ -167,25 +168,31 @@ void AFCPlayerController::BeginPlay()
 		UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("InteractAction not assigned on %s."), *GetName());
 	}
 
-	if (PauseAction)
-	{
-		EnhancedInput->BindAction(PauseAction, ETriggerEvent::Started, this, &AFCPlayerController::HandlePausePressed);
-	}
-	else
-	{
-		UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("PauseAction not assigned on %s."), *GetName());
-	}
-
 	if (QuickSaveAction)
 	{
 		EnhancedInput->BindAction(QuickSaveAction, ETriggerEvent::Started, this, &AFCPlayerController::HandleQuickSavePressed);
-		UE_LOG(LogFallenCompassPlayerController, Log, TEXT("QuickSaveAction bound (F6)"));
+	}
+	else
+	{
+		UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("QuickSaveAction not assigned on %s."), *GetName());
 	}
 
 	if (QuickLoadAction)
 	{
 		EnhancedInput->BindAction(QuickLoadAction, ETriggerEvent::Started, this, &AFCPlayerController::HandleQuickLoadPressed);
-		UE_LOG(LogFallenCompassPlayerController, Log, TEXT("QuickLoadAction bound (F9)"));
+	}
+	else
+	{
+		UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("QuickLoadAction not assigned on %s."), *GetName());
+	}
+
+	if (EscapeAction)
+	{
+		EnhancedInput->BindAction(EscapeAction, ETriggerEvent::Started, this, &AFCPlayerController::HandlePausePressed);
+	}
+	else
+	{
+		UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("EscapeAction not assigned on %s."), *GetName());
 	}
 }
 
@@ -226,25 +233,44 @@ void AFCPlayerController::HandleInteractPressed()
 
 void AFCPlayerController::HandlePausePressed()
 {
+	// If in table view, ESC exits back to first-person
 	if (CameraMode == EFCPlayerCameraMode::TableView)
 	{
-		UE_LOG(LogFallenCompassPlayerController, Log, TEXT("ESC pressed while in table view. Returning to first-person instead of pause menu."));
+		UE_LOG(LogFallenCompassPlayerController, Log, TEXT("ESC pressed while in table view. Returning to first-person."));
 		if (GEngine)
 		{
 			GEngine->AddOnScreenDebugMessage(-1, 3.f, FColor::Cyan, TEXT("ESC: Returning to first-person"));
 		}
-		ExitTableViewPlaceholder();
+		SetCameraModeLocal(EFCPlayerCameraMode::FirstPerson, 2.0f);
 		return;
 	}
 
-	if (bIsPauseMenuDisplayed)
+	// If in gameplay state (first-person, can move), ESC toggles pause menu
+	if (CurrentGameState == EFCGameState::Gameplay)
 	{
-		HidePauseMenuPlaceholder();
+		UFCGameInstance* GI = GetGameInstance<UFCGameInstance>();
+		if (!GI) return;
+		
+		UFCUIManager* UIManager = GI->GetSubsystem<UFCUIManager>();
+		if (!UIManager) return;
+		
+		if (bIsPauseMenuDisplayed)
+		{
+			UIManager->HidePauseMenu();
+			bIsPauseMenuDisplayed = false;
+			UE_LOG(LogFallenCompassPlayerController, Log, TEXT("HandlePausePressed: Pause menu hidden, game unpaused."));
+		}
+		else
+		{
+			UIManager->ShowPauseMenu();
+			bIsPauseMenuDisplayed = true;
+			UE_LOG(LogFallenCompassPlayerController, Log, TEXT("HandlePausePressed: Pause menu displayed, game paused."));
+		}
+		return;
 	}
-	else
-	{
-		ShowPauseMenuPlaceholder();
-	}
+
+	// If in main menu state or other UI states, ESC does nothing (handled by UI widgets)
+	UE_LOG(LogFallenCompassPlayerController, Log, TEXT("ESC pressed in state %d - no action"), static_cast<int32>(CurrentGameState));
 }
 
 void AFCPlayerController::EnterTableViewPlaceholder()
@@ -271,7 +297,7 @@ void AFCPlayerController::ShowPauseMenuPlaceholder()
 {
 	bIsPauseMenuDisplayed = true;
 	SetPause(true);
-	UE_LOG(LogFallenCompassPlayerController, Display, TEXT("TODO: Instantiate pause menu widget."));
+	UE_LOG(LogFallenCompassPlayerController, Log, TEXT("ShowPauseMenuPlaceholder: Pause menu displayed, game paused."));
 	if (GEngine)
 	{
 		GEngine->AddOnScreenDebugMessage(-1, 4.f, FColor::Magenta, TEXT("Pause Menu Requested (TODO: Instantiate widget)"));
@@ -283,7 +309,7 @@ void AFCPlayerController::HidePauseMenuPlaceholder()
 {
 	bIsPauseMenuDisplayed = false;
 	SetPause(false);
-	UE_LOG(LogFallenCompassPlayerController, Display, TEXT("TODO: Dismiss pause menu widget."));
+	UE_LOG(LogFallenCompassPlayerController, Log, TEXT("HidePauseMenuPlaceholder: Pause menu hidden, game unpaused."));
 	if (GEngine)
 	{
 		GEngine->AddOnScreenDebugMessage(-1, 4.f, FColor::Magenta, TEXT("Pause Menu Dismissed (TODO: Remove widget)"));
@@ -291,12 +317,38 @@ void AFCPlayerController::HidePauseMenuPlaceholder()
 	LogStateChange(TEXT("Pause menu dismissed"));
 }
 
+void AFCPlayerController::ResumeGame()
+{
+	// Hide pause menu and unpause game via UIManager
+	UFCGameInstance* GI = GetGameInstance<UFCGameInstance>();
+	if (!GI)
+	{
+		UE_LOG(LogFallenCompassPlayerController, Error, TEXT("ResumeGame: GameInstance is null!"));
+		return;
+	}
+	
+	UFCUIManager* UIManager = GI->GetSubsystem<UFCUIManager>();
+	if (!UIManager)
+	{
+		UE_LOG(LogFallenCompassPlayerController, Error, TEXT("ResumeGame: UIManager is null!"));
+		return;
+	}
+	
+	UIManager->HidePauseMenu();
+	bIsPauseMenuDisplayed = false;
+	
+	UE_LOG(LogFallenCompassPlayerController, Log, TEXT("ResumeGame: Game resumed, pause menu hidden"));
+	LogStateChange(TEXT("Game resumed"));
+}
+
 void AFCPlayerController::SetFallenCompassCameraMode(EFCPlayerCameraMode NewMode)
 {
 	if (CameraMode == NewMode)
 	{
+		UE_LOG(LogFallenCompassPlayerController, Log, TEXT("SetFallenCompassCameraMode: Already in camera mode %d"), static_cast<int32>(NewMode));
 		return;
 	}
+	UE_LOG(LogFallenCompassPlayerController, Log, TEXT("SetFallenCompassCameraMode: Changing camera mode from %d to %d"), static_cast<int32>(CameraMode), static_cast<int32>(NewMode));
 
 	CameraMode = NewMode;
 	LogStateChange(TEXT("Camera mode updated"));
@@ -395,31 +447,41 @@ void AFCPlayerController::SetCameraModeLocal(EFCPlayerCameraMode NewMode, float 
 			break;
 
 	case EFCPlayerCameraMode::FirstPerson:
-		// Clean up any temp camera from table view
-		if (bIsInTableView)
-		{
-			AActor* CurrentViewTarget = GetViewTarget();
-			if (CurrentViewTarget && CurrentViewTarget->IsA<ACameraActor>())
-			{
-				// Destroy the temporary camera actor we spawned for table view
-				CurrentViewTarget->Destroy();
-			}
-		}
-		
-		// Use the pawn's camera (handled by SetViewTargetWithBlend to Pawn)
+		// Use the pawn's camera (smooth blend back from table view)
 		if (GetPawn())
 		{
+			// Start the blend back to first-person (2 seconds cubic blend)
 			SetViewTargetWithBlend(GetPawn(), BlendTime, VTBlend_Cubic);
 			CameraMode = NewMode;
-			bIsInTableView = false; // Exiting table view
 			
-			// Re-enable movement input
+			// Clean up temp camera after blend starts
+			if (bIsInTableView)
+			{
+				AActor* CurrentViewTarget = GetViewTarget();
+				if (CurrentViewTarget && CurrentViewTarget->IsA<ACameraActor>())
+				{
+					// Destroy the temporary camera actor after a delay to allow blend to complete
+					FTimerHandle CleanupTimerHandle;
+					GetWorldTimerManager().SetTimer(CleanupTimerHandle, [CurrentViewTarget]()
+					{
+						if (CurrentViewTarget && CurrentViewTarget->IsValidLowLevel())
+						{
+							CurrentViewTarget->Destroy();
+						}
+					}, BlendTime + 0.1f, false);
+				}
+				bIsInTableView = false; // Exiting table view
+			}
+			
+			// Restore FirstPerson input mapping (movement + ESC)
 			if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer()))
 			{
+				Subsystem->ClearAllMappings();
 				Subsystem->AddMappingContext(FirstPersonMappingContext, 0);
 			}
 			
 			LogStateChange(TEXT("Camera switched to FirstPerson"));
+			UE_LOG(LogFallenCompassPlayerController, Log, TEXT("FirstPerson: Camera smoothly blending back from table view (%.2fs)"), BlendTime);
 			return;
 		}
 		break;	case EFCPlayerCameraMode::TableView:
@@ -474,10 +536,11 @@ void AFCPlayerController::SetCameraModeLocal(EFCPlayerCameraMode NewMode, float 
 							CameraMode = NewMode;
 							bIsInTableView = true;
 							
-							// Disable movement input when in table view
+							// Switch to StaticScene input mapping (disables movement, keeps ESC)
 							if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer()))
 							{
-								Subsystem->RemoveMappingContext(FirstPersonMappingContext);
+								Subsystem->ClearAllMappings();
+								Subsystem->AddMappingContext(StaticSceneMappingContext, 0);
 							}
 							
 							LogStateChange(TEXT("Camera switched to TableView"));
@@ -611,6 +674,21 @@ void AFCPlayerController::ReturnToMainMenu()
 	UE_LOG(LogFallenCompassPlayerController, Log, TEXT("ReturnToMainMenu: Starting fade and reload"));
 
 	CurrentGameState = EFCGameState::Loading;
+	
+	// Hide pause menu if it's open
+	if (bIsPauseMenuDisplayed)
+	{
+		UFCGameInstance* GI = GetGameInstance<UFCGameInstance>();
+		if (GI)
+		{
+			UFCUIManager* UIManager = GI->GetSubsystem<UFCUIManager>();
+			if (UIManager)
+			{
+				UIManager->HidePauseMenu();
+				bIsPauseMenuDisplayed = false;
+			}
+		}
+	}
 
 	// Fade to black
 	PlayerCameraManager->StartCameraFade(0.0f, 1.0f, 1.0f, FLinearColor::Black, false, true);
@@ -759,16 +837,4 @@ void AFCPlayerController::FadeScreenIn(float Duration)
 
 	TransitionMgr->BeginFadeIn(Duration);
 	UE_LOG(LogFallenCompassPlayerController, Log, TEXT("FadeScreenIn: Initiated fade (Duration: %.2fs)"), Duration);
-}
-
-void AFCPlayerController::TestFadeOut()
-{
-	UE_LOG(LogFallenCompassPlayerController, Log, TEXT("TestFadeOut: Console command executed"));
-	FadeScreenOut(1.5f, true);
-}
-
-void AFCPlayerController::TestFadeIn()
-{
-	UE_LOG(LogFallenCompassPlayerController, Log, TEXT("TestFadeIn: Console command executed"));
-	FadeScreenIn(1.0f);
 }

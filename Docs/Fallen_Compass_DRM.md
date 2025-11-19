@@ -850,3 +850,16 @@ Every week aims to leave the game **playable and compiling**. Multi-week feature
     - Plan for first EA patches (hotfixes + QoL).
 
   - Turn this into a **Phase 4 backlog** (post-EA roadmap).
+
+---
+
+## Phase 4 – Post-EA Backlog & Technical Debt
+
+### Known Issues & Technical Backlog (from Week 1 Log Review)
+
+- [ ] LogTemp: Warning: RestorePlayerPosition: No pending load data (expected if no save exists)
+- [ ] LogRenderer: Warning: [VSM] Non-Nanite Marking Job Queue overflow. Performance may be affected. (large shadow map area, not critical for prototype)
+- [ ] LogPlayerController: Error: InputMode:UIOnly - Attempting to focus Non-Focusable widget SObjectWidget [Widget.cpp(990)]! (UI focus issue, not blocking)
+- [ ] LogFallenCompassPlayerController: Warning: TableView Debug: CameraTargetPoint Rotation/Location/Spawned Camera Rotation (debug output, not critical)
+
+These should be reviewed and addressed in a future sprint as part of technical debt reduction and polish.

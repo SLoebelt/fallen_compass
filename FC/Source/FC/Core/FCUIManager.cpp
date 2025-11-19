@@ -82,6 +82,79 @@ void UFCUIManager::HideSaveSlotSelector()
 	UE_LOG(LogFCUIManager, Log, TEXT("HideSaveSlotSelector: Widget removed from viewport"));
 }
 
+void UFCUIManager::ShowPauseMenu()
+{
+	if (!PauseMenuWidgetClass)
+	{
+		UE_LOG(LogFCUIManager, Error, TEXT("ShowPauseMenu: PauseMenuWidgetClass is null!"));
+		return;
+	}
+
+	// Create widget if not already cached
+	if (!PauseMenuWidget)
+	{
+		PauseMenuWidget = CreateWidget<UUserWidget>(GetGameInstance(), PauseMenuWidgetClass);
+		if (!PauseMenuWidget)
+		{
+			UE_LOG(LogFCUIManager, Error, TEXT("ShowPauseMenu: Failed to create PauseMenuWidget!"));
+			return;
+		}
+		UE_LOG(LogFCUIManager, Log, TEXT("ShowPauseMenu: Created PauseMenuWidget"));
+	}
+
+	// Add to viewport with high z-order (above gameplay UI)
+	if (!PauseMenuWidget->IsInViewport())
+	{
+		PauseMenuWidget->AddToViewport(100);
+		UE_LOG(LogFCUIManager, Log, TEXT("ShowPauseMenu: Widget added to viewport"));
+
+		// Set input mode to UI and show cursor
+		UWorld* World = GetWorld();
+		if (World)
+		{
+			APlayerController* PC = World->GetFirstPlayerController();
+			if (PC)
+			{
+				PC->SetPause(true);
+				FInputModeUIOnly InputMode;
+				InputMode.SetWidgetToFocus(PauseMenuWidget->TakeWidget());
+				PC->SetInputMode(InputMode);
+				PC->bShowMouseCursor = true;
+				UE_LOG(LogFCUIManager, Log, TEXT("ShowPauseMenu: Game paused, input mode set to UI"));
+			}
+		}
+	}
+}
+
+void UFCUIManager::HidePauseMenu()
+{
+	if (!PauseMenuWidget)
+	{
+		UE_LOG(LogFCUIManager, Warning, TEXT("HidePauseMenu: PauseMenuWidget is null, nothing to hide"));
+		return;
+	}
+
+	if (PauseMenuWidget->IsInViewport())
+	{
+		PauseMenuWidget->RemoveFromParent();
+		UE_LOG(LogFCUIManager, Log, TEXT("HidePauseMenu: Widget removed from viewport"));
+
+		// Restore game input mode and hide cursor
+		UWorld* World = GetWorld();
+		if (World)
+		{
+			APlayerController* PC = World->GetFirstPlayerController();
+			if (PC)
+			{
+				PC->SetPause(false);
+				PC->SetInputMode(FInputModeGameOnly());
+				PC->bShowMouseCursor = false;
+				UE_LOG(LogFCUIManager, Log, TEXT("HidePauseMenu: Game resumed, input mode set to game only"));
+			}
+		}
+	}
+}
+
 void UFCUIManager::HandleNewLegacyClicked()
 {
 	UE_LOG(LogFCUIManager, Log, TEXT("HandleNewLegacyClicked: Transitioning to gameplay"));

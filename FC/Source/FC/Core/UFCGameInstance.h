@@ -58,6 +58,10 @@ class FC_API UFCGameInstance : public UGameInstance
     /** Widget class for save slot selector (configured in Blueprint, used by UIManager) */
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "UI")
     TSubclassOf<UUserWidget> SaveSlotSelectorWidgetClass;
+    
+    /** Widget class for pause menu (configured in Blueprint, used by UIManager) */
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "UI")
+    TSubclassOf<UUserWidget> PauseMenuWidgetClass;
 
     /** Active expedition identifier; persists across level loads. */
     UPROPERTY(BlueprintReadOnly, Category = "Expedition")

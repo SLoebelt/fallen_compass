@@ -28,6 +28,9 @@ public:
 	
 	UPROPERTY()
 	TSubclassOf<UUserWidget> SaveSlotSelectorWidgetClass;
+	
+	UPROPERTY()
+	TSubclassOf<UUserWidget> PauseMenuWidgetClass;
 
 	// Cached widget instances
 	UPROPERTY()
@@ -35,6 +38,9 @@ public:
 	
 	UPROPERTY()
 	TObjectPtr<UUserWidget> SaveSlotSelectorWidget;
+	
+	UPROPERTY()
+	TObjectPtr<UUserWidget> PauseMenuWidget;
 
 	// Widget lifecycle methods
 	UFUNCTION(BlueprintCallable, Category = "UI")
@@ -48,6 +54,12 @@ public:
 	
 	UFUNCTION(BlueprintCallable, Category = "UI")
 	void HideSaveSlotSelector();
+	
+	UFUNCTION(BlueprintCallable, Category = "UI")
+	void ShowPauseMenu();
+	
+	UFUNCTION(BlueprintCallable, Category = "UI")
+	void HidePauseMenu();
 
 	// Button callback methods (called from Blueprint widgets)
 	UFUNCTION(BlueprintCallable, Category = "UI")
