@@ -639,16 +639,16 @@ Create `IFCTableInteractable` C++ interface and `BP_TableObject` base Blueprint 
 
 ##### Step 2.1.1: Create Interface Header with BlueprintNativeEvent Functions
 
-- [ ] **Analysis**
+- [x] **Analysis**
 
-  - [ ] Check existing interface: `/Source/FC/Interaction/IFCInteractable.h` for pattern reference
-  - [ ] Review GDD §3.1.2 for table interaction requirements (click → camera focus → widget)
-  - [ ] Verify naming: `IFCTableInteractable` follows interface naming (I prefix + FC namespace)
+  - [x] Check existing interface: `/Source/FC/Interaction/IFCInteractable.h` for pattern reference
+  - [x] Review GDD §3.1.2 for table interaction requirements (click → camera focus → widget)
+  - [x] Verify naming: `IFCTableInteractable` follows interface naming (I prefix + FC namespace)
 
-- [ ] **Implementation (IFCTableInteractable.h)**
+- [x] **Implementation (IFCTableInteractable.h)**
 
-  - [ ] Create file at: `/Source/FC/Interaction/IFCTableInteractable.h`
-  - [ ] Add copyright header and includes:
+  - [x] Create file at: `/Source/FC/Interaction/IFCTableInteractable.h`
+  - [x] Add copyright header and includes:
 
     ```cpp
     // Copyright Iron Anchor Interactive. All Rights Reserved.
@@ -660,7 +660,7 @@ Create `IFCTableInteractable` C++ interface and `BP_TableObject` base Blueprint 
     #include "IFCTableInteractable.generated.h"
     ```
 
-  - [ ] Define UInterface class (required by Unreal reflection):
+  - [x] Define UInterface class (required by Unreal reflection):
     ```cpp
     /**
      * UInterface class for table interactable objects (required for Unreal reflection)
@@ -671,7 +671,7 @@ Create `IFCTableInteractable` C++ interface and `BP_TableObject` base Blueprint 
         GENERATED_BODY()
     };
     ```
-  - [ ] Define interface with BlueprintNativeEvent functions:
+  - [x] Define interface with BlueprintNativeEvent functions:
 
     ```cpp
     /**
@@ -721,11 +721,11 @@ Create `IFCTableInteractable` C++ interface and `BP_TableObject` base Blueprint 
     };
     ```
 
-- [ ] **Testing After Step 2.1.1** ✅ CHECKPOINT
-  - [ ] Compile succeeds without errors
-  - [ ] PIE starts successfully
-  - [ ] No errors in Output Log
-  - [ ] Verify interface appears in Blueprint interface list
+- [x] **Testing After Step 2.1.1** ✅ CHECKPOINT
+  - [x] Compile succeeds without errors
+  - [x] PIE starts successfully
+  - [x] No errors in Output Log
+  - [x] Verify interface appears in Blueprint interface list
 
 **COMMIT POINT 2.1.1**: `git add -A && git commit -m "feat(interaction): Add IFCTableInteractable interface"`
 
@@ -733,53 +733,55 @@ Create `IFCTableInteractable` C++ interface and `BP_TableObject` base Blueprint 
 
 ##### Step 2.1.2: Create Interface Implementation File with Default Implementations
 
-- [ ] **Analysis**
+- [x] **Analysis**
 
-  - [ ] BlueprintNativeEvent functions require `_Implementation` methods in .cpp
-  - [ ] Default implementations provide fallback behavior (can be overridden in Blueprint)
+  - [x] BlueprintNativeEvent functions require `_Implementation` methods in .cpp ✅
+  - [x] Default implementations provide fallback behavior (can be overridden in Blueprint) ✅
 
-- [ ] **Implementation (IFCTableInteractable.cpp)**
+- [x] **Implementation (FCTableInteractable.cpp)**
 
-  - [ ] Create file at: `/Source/FC/Interaction/IFCTableInteractable.cpp`
-  - [ ] Add includes and default implementations:
+  - [x] Create file at: `/Source/FC/Interaction/FCTableInteractable.cpp` ✅
+  - [x] Add includes and comments (no implementation needed for BlueprintNativeEvent in interfaces) ✅
 
-    ```cpp
-    // Copyright Iron Anchor Interactive. All Rights Reserved.
+- [x] **Testing After Step 2.1.2** ✅ CHECKPOINT
 
-    #include "Interaction/IFCTableInteractable.h"
-    #include "GameFramework/PlayerController.h"
-    #include "Blueprint/UserWidget.h"
+  ```cpp
+  // Copyright Iron Anchor Interactive. All Rights Reserved.
 
-    // Default implementation: Log interaction (override in Blueprint/C++)
-    void IIFCTableInteractable::OnTableObjectClicked_Implementation(APlayerController* PlayerController)
-    {
-        UE_LOG(LogTemp, Warning, TEXT("IFCTableInteractable::OnTableObjectClicked called but not overridden"));
-    }
+  #include "Interaction/IFCTableInteractable.h"
+  #include "GameFramework/PlayerController.h"
+  #include "Blueprint/UserWidget.h"
 
-    // Default implementation: Return identity transform (override in Blueprint/C++)
-    FTransform IIFCTableInteractable::GetCameraTargetTransform_Implementation() const
-    {
-        UE_LOG(LogTemp, Warning, TEXT("IFCTableInteractable::GetCameraTargetTransform called but not overridden"));
-        return FTransform::Identity;
-    }
+  // Default implementation: Log interaction (override in Blueprint/C++)
+  void IIFCTableInteractable::OnTableObjectClicked_Implementation(APlayerController* PlayerController)
+  {
+      UE_LOG(LogTemp, Warning, TEXT("IFCTableInteractable::OnTableObjectClicked called but not overridden"));
+  }
 
-    // Default implementation: Always allow interaction (override in Blueprint/C++ for conditional logic)
-    bool IIFCTableInteractable::CanInteract_Implementation() const
-    {
-        return true;
-    }
+  // Default implementation: Return identity transform (override in Blueprint/C++)
+  FTransform IIFCTableInteractable::GetCameraTargetTransform_Implementation() const
+  {
+      UE_LOG(LogTemp, Warning, TEXT("IFCTableInteractable::GetCameraTargetTransform called but not overridden"));
+      return FTransform::Identity;
+  }
 
-    // Default implementation: No widget (override in Blueprint/C++)
-    TSubclassOf<UUserWidget> IIFCTableInteractable::GetWidgetClass_Implementation() const
-    {
-        return nullptr;
-    }
-    ```
+  // Default implementation: Always allow interaction (override in Blueprint/C++ for conditional logic)
+  bool IIFCTableInteractable::CanInteract_Implementation() const
+  {
+      return true;
+  }
 
-- [ ] **Testing After Step 2.1.2** ✅ CHECKPOINT
-  - [ ] Compile succeeds without errors
-  - [ ] PIE starts successfully
-  - [ ] No linker errors for \_Implementation methods
+  // Default implementation: No widget (override in Blueprint/C++)
+  TSubclassOf<UUserWidget> IIFCTableInteractable::GetWidgetClass_Implementation() const
+  {
+      return nullptr;
+  }
+  ```
+
+- [x] **Testing After Step 2.1.2** ✅ CHECKPOINT
+  - [x] Compile succeeds without errors
+  - [x] PIE starts successfully
+  - [x] No linker errors for \_Implementation methods
 
 **COMMIT POINT 2.1.2**: `git add -A && git commit -m "feat(interaction): Implement IFCTableInteractable default methods"`
 
