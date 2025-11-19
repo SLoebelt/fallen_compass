@@ -425,13 +425,13 @@ Create `UFCExpeditionData` C++ class (UObject) to store expedition metadata and 
 
 ##### Step 1.2.1: Create Subsystem Header with Log Category
 
-- [ ] **Analysis**
+- [x] **Analysis**
 
-  - [ ] Review UFCLevelManager.h for subsystem pattern (Initialize, GetSubsystem usage)
-  - [ ] Review UFCTransitionManager.h for log category declaration pattern
-  - [ ] Confirm naming: `UFCExpeditionManager` follows subsystem naming convention
+  - [x] Review UFCLevelManager.h for subsystem pattern (Initialize, GetSubsystem usage) ✅
+  - [x] Review UFCTransitionManager.h for log category declaration pattern ✅
+  - [x] Confirm naming: `UFCExpeditionManager` follows subsystem naming convention ✅
 
-- [ ] **Implementation (FCExpeditionManager.h)**
+- [x] **Implementation (FCExpeditionManager.h)**
 
   - [ ] Create file at: `/Source/FC/Expedition/FCExpeditionManager.h`
   - [ ] Add log category declaration and includes:
@@ -520,10 +520,10 @@ Create `UFCExpeditionData` C++ class (UObject) to store expedition metadata and 
     };
     ```
 
-- [ ] **Testing After Step 1.2.1** ✅ CHECKPOINT
-  - [ ] Compile succeeds without errors
-  - [ ] PIE starts successfully
-  - [ ] No errors in Output Log
+- [x] **Testing After Step 1.2.1** ✅ CHECKPOINT
+  - [x] Compile succeeds without errors
+  - [x] PIE starts successfully
+  - [x] No errors in Output Log
 
 **COMMIT POINT 1.2.1**: `git add -A && git commit -m "feat(expedition): Add UFCExpeditionManager subsystem header"`
 
@@ -531,124 +531,30 @@ Create `UFCExpeditionData` C++ class (UObject) to store expedition metadata and 
 
 ##### Step 1.2.2: Implement Subsystem Lifecycle and Methods
 
-- [ ] **Analysis**
+- [x] **Analysis**
 
-  - [ ] Review UFCLevelManager.cpp for Initialize implementation pattern
-  - [ ] Review UFCTransitionManager.cpp for log category definition pattern
-  - [ ] Plan object creation: NewObject<UFCExpeditionData>(this) for GC tracking
+  - [x] Review UFCLevelManager.cpp for Initialize implementation pattern ✅
+  - [x] Review UFCTransitionManager.cpp for log category definition pattern ✅
+  - [x] Plan object creation: NewObject<UFCExpeditionData>(this) for GC tracking ✅
 
-- [ ] **Implementation (FCExpeditionManager.cpp)**
+- [x] **Implementation (FCExpeditionManager.cpp)**
 
-  - [ ] Create file at: `/Source/FC/Expedition/FCExpeditionManager.cpp`
-  - [ ] Add includes and log category definition:
+  - [x] Create file at: `/Source/FC/Expedition/FCExpeditionManager.cpp` ✅
+  - [x] Add includes and log category definition ✅
+  - [x] Implement Initialize ✅
+  - [x] Implement Deinitialize ✅
+  - [x] Implement StartNewExpedition ✅
+  - [x] Implement EndExpedition ✅
+  - [x] Implement IsExpeditionActive ✅
 
-    ```cpp
-    // Copyright Iron Anchor Interactive. All Rights Reserved.
-
-    #include "Expedition/FCExpeditionManager.h"
-    #include "Engine/World.h"
-
-    DEFINE_LOG_CATEGORY(LogFCExpedition);
-    ```
-
-  - [ ] Implement Initialize:
-
-    ```cpp
-    void UFCExpeditionManager::Initialize(FSubsystemCollectionBase& Collection)
-    {
-        Super::Initialize(Collection);
-
-        UE_LOG(LogFCExpedition, Log, TEXT("UFCExpeditionManager initialized"));
-
-        CurrentExpedition = nullptr;
-    }
-    ```
-
-  - [ ] Implement Deinitialize:
-
-    ```cpp
-    void UFCExpeditionManager::Deinitialize()
-    {
-        if (CurrentExpedition)
-        {
-            UE_LOG(LogFCExpedition, Warning, TEXT("Deinitialize called with active expedition: %s"),
-                *CurrentExpedition->ExpeditionName);
-        }
-
-        Super::Deinitialize();
-    }
-    ```
-
-  - [ ] Implement StartNewExpedition:
-
-    ```cpp
-    UFCExpeditionData* UFCExpeditionManager::StartNewExpedition(const FString& ExpeditionName, int32 AllocatedSupplies)
-    {
-        if (CurrentExpedition)
-        {
-            UE_LOG(LogFCExpedition, Warning, TEXT("StartNewExpedition called while expedition already active: %s"),
-                *CurrentExpedition->ExpeditionName);
-            EndExpedition(false);
-        }
-
-        // Create new expedition data object (outer is this subsystem for GC tracking)
-        CurrentExpedition = NewObject<UFCExpeditionData>(this);
-        CurrentExpedition->ExpeditionName = ExpeditionName;
-        CurrentExpedition->StartingSupplies = AllocatedSupplies;
-        CurrentExpedition->StartDate = FString::Printf(TEXT("Day %d"), 1); // Placeholder
-        CurrentExpedition->TargetRegion = TEXT("Unknown Region"); // Placeholder
-        CurrentExpedition->ExpeditionStatus = EFCExpeditionStatus::InProgress;
-
-        UE_LOG(LogFCExpedition, Log, TEXT("Started expedition: %s (Supplies: %d)"),
-            *ExpeditionName, AllocatedSupplies);
-
-        OnExpeditionStateChanged.Broadcast(CurrentExpedition);
-
-        return CurrentExpedition;
-    }
-    ```
-
-  - [ ] Implement EndExpedition:
-
-    ```cpp
-    void UFCExpeditionManager::EndExpedition(bool bSuccess)
-    {
-        if (!CurrentExpedition)
-        {
-            UE_LOG(LogFCExpedition, Warning, TEXT("EndExpedition called with no active expedition"));
-            return;
-        }
-
-        CurrentExpedition->ExpeditionStatus = bSuccess ? EFCExpeditionStatus::Completed : EFCExpeditionStatus::Failed;
-
-        UE_LOG(LogFCExpedition, Log, TEXT("Ended expedition: %s (Success: %s)"),
-            *CurrentExpedition->ExpeditionName,
-            bSuccess ? TEXT("true") : TEXT("false"));
-
-        OnExpeditionStateChanged.Broadcast(CurrentExpedition);
-
-        // Clear current expedition (will be GC'd)
-        CurrentExpedition = nullptr;
-    }
-    ```
-
-  - [ ] Implement IsExpeditionActive:
-    ```cpp
-    bool UFCExpeditionManager::IsExpeditionActive() const
-    {
-        return CurrentExpedition != nullptr &&
-               CurrentExpedition->ExpeditionStatus == EFCExpeditionStatus::InProgress;
-    }
-    ```
-
-- [ ] **Testing After Step 1.2.2** ✅ CHECKPOINT
-  - [ ] Compile succeeds without errors
-  - [ ] PIE starts successfully
-  - [ ] Check Output Log for: `LogFCExpedition: UFCExpeditionManager initialized` ✅
-  - [ ] No "Failed to initialize" errors
-  - [ ] Test subsystem access from Blueprint:
-    - [ ] Open any Blueprint, add node "Get Game Instance" → "Get Subsystem" (select UFCExpeditionManager)
-    - [ ] Verify subsystem is accessible without errors
+- [x] **Testing After Step 1.2.2** ✅ CHECKPOINT
+  - [x] Compile succeeds without errors
+  - [x] PIE starts successfully
+  - [x] Check Output Log for: `LogFCExpedition: UFCExpeditionManager initialized` ✅
+  - [x] No "Failed to initialize" errors
+  - [x] Test subsystem access from Blueprint:
+    - [x] Open any Blueprint, add node "Get Game Instance" → "Get Subsystem" (select UFCExpeditionManager)
+    - [x] Verify subsystem is accessible without errors
 
 **COMMIT POINT 1.2.2**: `git add -A && git commit -m "feat(expedition): Implement UFCExpeditionManager lifecycle and methods"`
 
