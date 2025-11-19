@@ -8,6 +8,8 @@
 
 class UInputAction;
 class UInputMappingContext;
+class ACameraActor;
+class UUserWidget;
 
 DECLARE_LOG_CATEGORY_EXTERN(LogFallenCompassPlayerController, Log, All);
 
@@ -92,6 +94,12 @@ public:
 	 */
 	UFUNCTION(BlueprintCallable, Category = "FC|Table Interaction")
 	void OnTableObjectClicked(AActor* TableObject);
+
+	/**
+	 * Close current table widget and return to table view or first-person
+	 */
+	UFUNCTION(BlueprintCallable, Category = "FC|Table Interaction")
+	void CloseTableWidget();
 
 	/** Dev quick save (F5) */
 	UFUNCTION(BlueprintCallable, Category = "SaveGame")
@@ -191,6 +199,21 @@ protected:
 
 private:
 	void LogStateChange(const FString& Context) const;
+
+	/** Helper method to show widget for a table object */
+	void ShowTableWidget(AActor* TableObject);
+
+	/** Current table widget being displayed */
+	UPROPERTY()
+	TObjectPtr<UUserWidget> CurrentTableWidget;
+
+	/** Camera actor used for table view focus */
+	UPROPERTY()
+	TObjectPtr<ACameraActor> TableViewCamera;
+
+	/** Original view target before table focus (for restoration) */
+	UPROPERTY()
+	TObjectPtr<AActor> OriginalViewTarget;
 };
 
 

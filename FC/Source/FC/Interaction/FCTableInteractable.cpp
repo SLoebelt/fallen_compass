@@ -4,7 +4,5 @@
 #include "GameFramework/PlayerController.h"
 #include "Blueprint/UserWidget.h"
 
-// Interface implementation - no function bodies needed for BlueprintNativeEvent in interfaces.
-// The generated code provides the definition.
-// Implementers (C++ or Blueprint) must override these functions to provide logic.
-
+// Interface implementation - BlueprintNativeEvent functions are defined in the header
+// via GENERATED_BODY() macro. No additional implementations needed here.

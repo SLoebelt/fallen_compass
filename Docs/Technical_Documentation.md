@@ -2922,7 +2922,7 @@ Interface-based design allows easy addition of new interactables without modifyi
 
 Week 2 implements a specialized table interaction system for the office desk, allowing players to click on individual table objects (Map, Logbook, Letters, Compass) when in TableView camera mode. This system extends the interaction framework with cursor-based detection and lays the foundation for UI widgets in Week 3.
 
-**Status**: Task 2 (Interface & Table Objects) complete ✅ | Task 3 (Click Detection) Step 3.1 complete ✅ | Tasks 3.2-3.6 (Camera Focus & Widgets) pending ⏳
+**Status**: Task 2 (Interface & Table Objects) complete ✅ | Task 3 (Player Controller Integration & Widget System) complete ✅ | Task 4 (Additional Widget Features) pending ⏳
 
 ### Architecture Overview
 
@@ -3203,24 +3203,141 @@ void AFCPlayerController::HandleTableObjectClick()
 - **CanInteract validation** allows conditional interaction (e.g., locked objects)
 - **Comprehensive logging** at all stages for debugging (hit detection, interface check, interaction validation)
 
-#### OnTableObjectClicked Stub
+#### OnTableObjectClicked Implementation
 
 ```cpp
 void AFCPlayerController::OnTableObjectClicked(AActor* TableObject)
 {
-    // Implementation pending: Task 3.2 (Camera Focus)
-    UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("OnTableObjectClicked called but not yet implemented for %s"), *GetNameSafe(TableObject));
+    if (!TableObject || !TableObject->Implements<UFCTableInteractable>())
+    {
+        UE_LOG(LogFallenCompassPlayerController, Error, TEXT("OnTableObjectClicked: Invalid table object"));
+        return;
+    }
+
+    // Store original view target for restoration
+    OriginalViewTarget = GetViewTarget();
+
+    // Get camera target transform from table object
+    FTransform CameraTargetTransform = IFCTableInteractable::Execute_GetCameraTargetTransform(TableObject);
+
+    // Create or reuse camera actor at target transform
+    if (!TableViewCamera)
+    {
+        FActorSpawnParameters SpawnParams;
+        SpawnParams.Owner = this;
+        TableViewCamera = GetWorld()->SpawnActor<ACameraActor>(ACameraActor::StaticClass(), CameraTargetTransform, SpawnParams);
+    }
+    else
+    {
+        TableViewCamera->SetActorTransform(CameraTargetTransform);
+    }
+
+    // Blend camera to table view (2s cubic, Week 1 pattern)
+    SetViewTargetWithBlend(TableViewCamera, 2.0f, EViewTargetBlendFunction::VTBlend_Cubic);
+
+    UE_LOG(LogFallenCompassPlayerController, Log, TEXT("Blending camera to table object: %s"), *TableObject->GetName());
+
+    // Show widget after camera blend completes (delay via timer)
+    FTimerHandle ShowWidgetTimerHandle;
+    GetWorldTimerManager().SetTimer(ShowWidgetTimerHandle, [this, TableObject]()
+    {
+        ShowTableWidget(TableObject);
+    }, 2.0f, false);
 }
 ```
 
-**Planned Implementation** (Task 3.2):
+**Implementation Details**:
 
-1. Store original view target for restoration
-2. Get camera target transform from `IFCTableInteractable::GetCameraTargetTransform()`
-3. Spawn or reuse temporary camera actor at target transform
-4. Blend camera to table object focus (2s cubic blend, Week 1 pattern)
-5. After blend completes, show widget from `IFCTableInteractable::GetWidgetClass()`
-6. Set input mode to `FInputModeUIOnly` with mouse cursor
+1. Stores original view target for camera restoration
+2. Gets camera target transform from table object interface
+3. Spawns or reuses temporary camera actor at target position
+4. Blends camera smoothly over 2 seconds using cubic interpolation
+5. Shows appropriate widget after blend completes using timer callback
+6. Widget display handled by `ShowTableWidget()` helper method
+
+#### ShowTableWidget Helper Method
+
+```cpp
+void AFCPlayerController::ShowTableWidget(AActor* TableObject)
+{
+    if (!TableObject || !TableObject->Implements<UFCTableInteractable>())
+    {
+        return;
+    }
+
+    // Get widget class from table object
+    TSubclassOf<UUserWidget> WidgetClass = IFCTableInteractable::Execute_GetWidgetClass(TableObject);
+
+    if (!WidgetClass)
+    {
+        UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("ShowTableWidget: Table object has no widget class"));
+        return;
+    }
+
+    // Create and show widget
+    CurrentTableWidget = CreateWidget<UUserWidget>(this, WidgetClass);
+    if (CurrentTableWidget)
+    {
+        CurrentTableWidget->AddToViewport();
+
+        // Set input mode to GameAndUI so player controller can receive ESC key
+        FInputModeGameAndUI InputMode;
+        InputMode.SetHideCursorDuringCapture(false);
+        SetInputMode(InputMode);
+        bShowMouseCursor = true;
+
+        UE_LOG(LogFallenCompassPlayerController, Log, TEXT("Showing table widget: %s"), *WidgetClass->GetName());
+    }
+}
+```
+
+**Key Design Decision**: Input mode set to `FInputModeGameAndUI` instead of `FInputModeUIOnly` to allow ESC key input to reach the player controller while still enabling UI interactions.
+
+#### CloseTableWidget Method
+
+```cpp
+void AFCPlayerController::CloseTableWidget()
+{
+    // Remove current widget if one is displayed
+    if (CurrentTableWidget)
+    {
+        CurrentTableWidget->RemoveFromParent();
+        CurrentTableWidget = nullptr;
+        UE_LOG(LogFallenCompassPlayerController, Log, TEXT("Closed table widget"));
+
+        // Restore input mode to GameAndUI (keep mouse cursor for clicking other table objects)
+        FInputModeGameAndUI InputMode;
+        InputMode.SetHideCursorDuringCapture(false);
+        SetInputMode(InputMode);
+        bShowMouseCursor = true;
+
+        // Blend camera back to original table view
+        if (OriginalViewTarget)
+        {
+            SetViewTargetWithBlend(OriginalViewTarget, 2.0f, EViewTargetBlendFunction::VTBlend_Cubic);
+            UE_LOG(LogFallenCompassPlayerController, Log, TEXT("Blending camera back to table view"));
+        }
+
+        // Reset state for next interaction
+        OriginalViewTarget = nullptr;
+
+        // Cleanup: Destroy table view camera if exists
+        if (TableViewCamera)
+        {
+            TableViewCamera->Destroy();
+            TableViewCamera = nullptr;
+        }
+    }
+    else
+    {
+        // No widget open, ESC pressed in TableView - return to FirstPerson
+        UE_LOG(LogFallenCompassPlayerController, Log, TEXT("No widget open, returning to first-person"));
+        SetCameraModeLocal(EFCPlayerCameraMode::FirstPerson, 2.0f);
+    }
+}
+```
+
+**Dual ESC Behavior**: Method implements context-aware closing - if a widget is open, it closes the widget and returns to TableView; if no widget is open, it exits TableView and returns to FirstPerson mode.
 
 ### TableView Mode Integration
 
@@ -3266,6 +3383,200 @@ if (NewMode == EFCPlayerCameraMode::TableView)
 3. Ensure object is placed in level (not just blueprint exists)
 4. Confirm interface is added in Blueprint Class Settings
 
+### UFCExpeditionPlanningWidget (C++ Widget Class)
+
+- **Files**: `Source/FC/UI/FCExpeditionPlanningWidget.h/.cpp`
+- **Inheritance**: `UUserWidget`
+- **Purpose**: C++ parent class for expedition planning UI with automatic component binding and button handlers
+
+#### Component Binding with BindWidget
+
+```cpp
+// In FCExpeditionPlanningWidget.h
+UPROPERTY(meta = (BindWidget))
+TObjectPtr<UCanvasPanel> RootCanvas;
+
+UPROPERTY(meta = (BindWidget))
+TObjectPtr<UImage> BackgroundImage;
+
+UPROPERTY(meta = (BindWidget))
+TObjectPtr<UVerticalBox> MainContainer;
+
+UPROPERTY(meta = (BindWidget))
+TObjectPtr<UTextBlock> TitleText;
+
+UPROPERTY(meta = (BindWidget))
+TObjectPtr<UTextBlock> SuppliesLabel;
+
+UPROPERTY(meta = (BindWidget))
+TObjectPtr<UTextBlock> SuppliesValue;
+
+UPROPERTY(meta = (BindWidget))
+TObjectPtr<UBorder> MapContainer;
+
+UPROPERTY(meta = (BindWidget))
+TObjectPtr<UImage> MapPlaceholder;
+
+UPROPERTY(meta = (BindWidget))
+TObjectPtr<UButton> StartExpeditionButton;
+
+UPROPERTY(meta = (BindWidget))
+TObjectPtr<UButton> BackButton;
+
+UPROPERTY(meta = (BindWidget))
+TObjectPtr<UTextBlock> StartButtonText;
+
+UPROPERTY(meta = (BindWidget))
+TObjectPtr<UTextBlock> BackButtonText;
+```
+
+**BindWidget Metadata**: Automatically binds C++ properties to Blueprint widget components by matching names, eliminating manual Blueprint casting.
+
+#### Lifecycle Methods
+
+```cpp
+void UFCExpeditionPlanningWidget::NativeConstruct()
+{
+    Super::NativeConstruct();
+
+    // Bind button click events
+    if (StartExpeditionButton)
+    {
+        StartExpeditionButton->OnClicked.AddDynamic(this, &UFCExpeditionPlanningWidget::OnStartExpeditionClicked);
+    }
+
+    if (BackButton)
+    {
+        BackButton->OnClicked.AddDynamic(this, &UFCExpeditionPlanningWidget::OnBackButtonClicked);
+    }
+
+    // Initialize supplies display
+    UpdateSuppliesDisplay();
+}
+
+void UFCExpeditionPlanningWidget::NativeDestruct()
+{
+    // Unbind button events
+    if (StartExpeditionButton)
+    {
+        StartExpeditionButton->OnClicked.RemoveDynamic(this, &UFCExpeditionPlanningWidget::OnStartExpeditionClicked);
+    }
+
+    if (BackButton)
+    {
+        BackButton->OnClicked.RemoveDynamic(this, &UFCExpeditionPlanningWidget::OnBackButtonClicked);
+    }
+
+    Super::NativeDestruct();
+}
+```
+
+#### Button Handlers
+
+```cpp
+void UFCExpeditionPlanningWidget::OnStartExpeditionClicked()
+{
+    UE_LOG(LogTemp, Log, TEXT("Start Expedition button clicked"));
+
+    // Week 3 feature: Show "Coming Soon" message
+    if (GEngine)
+    {
+        GEngine->AddOnScreenDebugMessage(
+            -1, 
+            3.0f, 
+            FColor::Yellow, 
+            TEXT("Coming Soon - Overworld in Week 3")
+        );
+    }
+}
+
+void UFCExpeditionPlanningWidget::OnBackButtonClicked()
+{
+    UE_LOG(LogTemp, Log, TEXT("Back button clicked"));
+
+    // Get owning player controller and close widget
+    APlayerController* PC = GetOwningPlayer();
+    if (AFCPlayerController* FCPC = Cast<AFCPlayerController>(PC))
+    {
+        FCPC->CloseTableWidget();
+    }
+}
+
+void UFCExpeditionPlanningWidget::UpdateSuppliesDisplay()
+{
+    UFCGameInstance* GameInstance = Cast<UFCGameInstance>(GetWorld()->GetGameInstance());
+    if (GameInstance && SuppliesValue)
+    {
+        int32 CurrentSupplies = GameInstance->GetCurrentSupplies();
+        SuppliesValue->SetText(FText::AsNumber(CurrentSupplies));
+    }
+}
+```
+
+#### WBP_ExpeditionPlanning Blueprint Widget
+
+- **Location**: `/Content/FC/UI/Menus/TableMenu/WBP_ExpeditionPlanning`
+- **Parent Class**: `UFCExpeditionPlanningWidget`
+- **Purpose**: Blueprint child providing visual styling and layout
+
+**Component Hierarchy**:
+```
+WBP_ExpeditionPlanning
+├── RootCanvas (Canvas Panel)
+│   ├── BackgroundImage (Image) - Parchment texture
+│   └── MainContainer (Vertical Box)
+│       ├── TitleText (Text Block) - "Expedition Planning"
+│       ├── SuppliesDisplay (Horizontal Box)
+│       │   ├── SuppliesLabel (Text Block) - "Supplies:"
+│       │   └── SuppliesValue (Text Block) - Bound to GameInstance
+│       ├── MapContainer (Border)
+│       │   └── MapPlaceholder (Image) - World map placeholder
+│       └── ButtonPanel (Horizontal Box)
+│           ├── StartExpeditionButton (Button)
+│           │   └── StartButtonText (Text Block) - "Start Test Expedition"
+│           └── BackButton (Button)
+│               └── BackButtonText (Text Block) - "Back"
+```
+
+**Styling Notes**:
+- Parchment-themed background for immersive table map aesthetic
+- Button hover/pressed states implemented in Blueprint
+- All component names match C++ BindWidget properties exactly
+- No event graph logic needed - all handlers in C++
+
+### ESC Key Binding (Dual Behavior)
+
+**Input Action**: Reuses existing `IA_Escape` from Week 1
+
+**HandlePausePressed Implementation** (lines 256-293 in FCPlayerController.cpp):
+
+```cpp
+void AFCPlayerController::HandlePausePressed()
+{
+    // If viewing a table object with widget, ESC closes widget and returns to table view
+    // If in table view without widget, ESC returns to first-person
+    if (CameraMode == EFCPlayerCameraMode::TableView)
+    {
+        UE_LOG(LogFallenCompassPlayerController, Log, TEXT("ESC pressed in table view mode"));
+        CloseTableWidget(); // Handles both widget close and table view exit
+        return;
+    }
+
+    // If in gameplay state (first-person, can move), ESC toggles pause menu
+    if (CurrentGameState == EFCGameState::Gameplay)
+    {
+        // ... existing pause menu logic
+    }
+}
+```
+
+**Dual ESC Behavior Flow**:
+1. **Widget Open**: ESC → Close widget → Return to TableView (mouse cursor remains, can click other objects)
+2. **TableView (no widget)**: ESC → Exit TableView → Return to FirstPerson
+3. **FirstPerson**: ESC → Toggle pause menu
+
+**Key Integration**: `HandlePausePressed` checks `CameraMode` to determine context, then delegates to `CloseTableWidget()` which implements the dual behavior based on `CurrentTableWidget` state.
+
 ### File Structure
 
 ```
@@ -3274,14 +3585,20 @@ FC/
 │   ├── FCTableInteractable.h (Interface definition)
 │   └── FCTableInteractable.cpp (Default implementations)
 ├── Source/FC/Core/
-│   ├── FCPlayerController.h (ClickAction property, HandleTableObjectClick declaration)
-│   └── FCPlayerController.cpp (Click detection logic, OnTableObjectClicked stub)
+│   ├── FCPlayerController.h (ClickAction, OnTableObjectClicked, CloseTableWidget, ShowTableWidget)
+│   └── FCPlayerController.cpp (Click detection, camera focus, widget management)
+├── Source/FC/UI/
+│   ├── FCExpeditionPlanningWidget.h (C++ widget class with BindWidget components)
+│   └── FCExpeditionPlanningWidget.cpp (NativeConstruct, button handlers, supplies display)
 ├── Content/FC/Input/
 │   ├── Actions/IA_Click (Input Action asset)
-│   └── IMC_FC_StaticScene (Mapping context with IA_Click → Left Mouse Button)
+│   ├── Actions/IA_Escape (Reused for ESC key binding)
+│   └── IMC_FC_StaticScene (Mapping context with IA_Click → Left Mouse Button, IA_Escape → ESC)
+├── Content/FC/UI/Menus/TableMenu/
+│   └── WBP_ExpeditionPlanning (Blueprint widget with parchment styling, parent: UFCExpeditionPlanningWidget)
 └── Content/FC/World/Blueprints/Interactables/
     ├── BP_TableObject (Base class with interface implementation)
-    ├── BP_TableObject_Map
+    ├── BP_TableObject_Map (GetWidgetClass returns WBP_ExpeditionPlanning)
     ├── BP_TableObject_Logbook
     ├── BP_TableObject_Letters
     └── BP_TableObject_Compass
@@ -3292,19 +3609,40 @@ FC/
 **Implemented & Tested** ✅:
 
 - IA_Click input action creation and mapping
-- Cursor visibility in TableView mode
+- Cursor visibility in TableView mode (fixed with GameAndUI input mode)
 - Cursor-based click detection via `GetHitResultUnderCursor`
 - Interface validation for all 4 table objects
 - Logging at all detection stages
 - Collision configuration for all table objects
+- Camera focus/blend on table object click (2s cubic blend)
+- Widget display after camera blend (timer-based delay)
+- UFCExpeditionPlanningWidget C++ class with BindWidget components
+- WBP_ExpeditionPlanning Blueprint widget with parchment styling
+- CloseTableWidget method with dual ESC behavior
+- ESC key binding reusing IA_Escape (HandlePausePressed integration)
+- Back button closes widget and returns to TableView
+- Input mode fix: FInputModeGameAndUI allows ESC key to reach player controller
+- Widget wired to BP_TableObject_Map via GetWidgetClass
+- Supplies display reading from UFCGameInstance
+- Start Expedition button shows "Coming Soon" placeholder message
 
-**Pending Implementation** ⏳:
+**Known Issues & Fixes** 🔧:
 
-- Camera focus/blend on table object click (Task 3.2)
-- Widget display after camera blend (Task 3.2)
-- CloseTableWidget method (Task 3.3)
-- ESC key binding to close widgets (Task 3.5)
-- End-to-end interaction flow testing (Task 3.6)
+- **Issue**: ESC key not closing widget when pressed
+  - **Root Cause**: Input mode set to `FInputModeUIOnly` in `ShowTableWidget`, blocking player controller input
+  - **Fix**: Changed to `FInputModeGameAndUI` to allow both UI and game input
+  - **Lines**: FCPlayerController.cpp:972 (ShowTableWidget method)
+  - **Impact**: ESC key now properly triggers HandlePausePressed → CloseTableWidget
+
+**End-to-End Flow Verified** ✅:
+
+1. Click BP_TableObject_Map → Camera blends to focus (2s)
+2. WBP_ExpeditionPlanning widget appears with supplies display
+3. Mouse cursor visible, UI responsive
+4. Back button closes widget → Camera blends to TableView (2s)
+5. ESC key closes widget → Returns to TableView
+6. ESC key (no widget) → Returns to FirstPerson
+7. Supplies display updates correctly from GameInstance
 
 ### Design Rationale
 
@@ -3432,4 +3770,4 @@ w:\GameDev\FallenCompass\Engine\Build\BatchFiles\Build.bat FCEditor Win64 Develo
 
 ---
 
-_Last updated: November 16, 2025 (Tasks 3.1-3.5, 4.1-4.6, 5.5-5.8, and 6.5 complete; main menu system with full save/load integration, interaction system fully documented and tested)_
+_Last updated: November 19, 2025 (Week 2 Task 3 complete: Table interaction system with camera focus, expedition planning widget, ESC key binding, and input mode fixes fully implemented and tested)_

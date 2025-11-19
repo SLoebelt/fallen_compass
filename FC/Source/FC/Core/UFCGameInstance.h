@@ -75,6 +75,10 @@ class FC_API UFCGameInstance : public UGameInstance
     UPROPERTY(BlueprintReadOnly, Category = "Meta")
     int32 ExpeditionsCounter = 1;
 
+    /** Current supplies available for expeditions (Week 2 feature) */
+    UPROPERTY(BlueprintReadOnly, Category = "Resources")
+    int32 CurrentSupplies = 100;
+
     /** Marks whether unsaved changes exist (crew edits, loadout tweaks, etc.). */
     UPROPERTY(BlueprintReadOnly, Category = "Meta")
     bool bIsSessionDirty = false;
@@ -86,6 +90,18 @@ class FC_API UFCGameInstance : public UGameInstance
     /** Returns the current game version string */
     UFUNCTION(BlueprintPure, Category = "Version")
     FString GetGameVersion() const;
+
+    /** Get current supplies (Week 2 resource system) */
+    UFUNCTION(BlueprintPure, Category = "Resources")
+    int32 GetCurrentSupplies() const { return CurrentSupplies; }
+
+    /** Add supplies to the pool */
+    UFUNCTION(BlueprintCallable, Category = "Resources")
+    void AddSupplies(int32 Amount);
+
+    /** Consume supplies if available (returns success) */
+    UFUNCTION(BlueprintCallable, Category = "Resources")
+    bool ConsumeSupplies(int32 Amount);
 
     /** Save current game state to specified slot */
     UFUNCTION(BlueprintCallable, Category = "SaveGame")

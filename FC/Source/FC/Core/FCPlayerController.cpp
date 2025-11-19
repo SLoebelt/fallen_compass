@@ -255,15 +255,12 @@ void AFCPlayerController::HandleInteractPressed()
 
 void AFCPlayerController::HandlePausePressed()
 {
-	// If in table view, ESC exits back to first-person
+	// If viewing a table object with widget, ESC closes widget and returns to table view
+	// If in table view without widget, ESC returns to first-person
 	if (CameraMode == EFCPlayerCameraMode::TableView)
 	{
-		UE_LOG(LogFallenCompassPlayerController, Log, TEXT("ESC pressed while in table view. Returning to first-person."));
-		if (GEngine)
-		{
-			GEngine->AddOnScreenDebugMessage(-1, 3.f, FColor::Cyan, TEXT("ESC: Returning to first-person"));
-		}
-		SetCameraModeLocal(EFCPlayerCameraMode::FirstPerson, 2.0f);
+		UE_LOG(LogFallenCompassPlayerController, Log, TEXT("ESC pressed in table view mode"));
+		CloseTableWidget(); // Handles both widget close and table view exit
 		return;
 	}
 
@@ -900,6 +897,123 @@ void AFCPlayerController::HandleTableObjectClick()
 
 void AFCPlayerController::OnTableObjectClicked(AActor* TableObject)
 {
-	// Implementation in next step
-	UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("OnTableObjectClicked called but not yet implemented for %s"), *GetNameSafe(TableObject));
+	if (!TableObject || !TableObject->Implements<UFCTableInteractable>())
+	{
+		UE_LOG(LogFallenCompassPlayerController, Error, TEXT("OnTableObjectClicked: Invalid table object"));
+		return;
+	}
+
+	// Store original view target ONLY if not already set (first table object click)
+	if (!OriginalViewTarget || OriginalViewTarget == this)
+	{
+		OriginalViewTarget = GetViewTarget();
+		UE_LOG(LogFallenCompassPlayerController, Log, TEXT("Stored original view target: %s"), *GetNameSafe(OriginalViewTarget));
+	}
+
+	// Close current widget if one is open (switching between table objects)
+	if (CurrentTableWidget)
+	{
+		CurrentTableWidget->RemoveFromParent();
+		CurrentTableWidget = nullptr;
+		UE_LOG(LogFallenCompassPlayerController, Log, TEXT("Closed previous table widget"));
+	}
+
+	// Get camera target transform from table object
+	FTransform CameraTargetTransform = IFCTableInteractable::Execute_GetCameraTargetTransform(TableObject);
+
+	// Create or reuse camera actor at target transform
+	if (!TableViewCamera)
+	{
+		FActorSpawnParameters SpawnParams;
+		SpawnParams.Owner = this;
+		TableViewCamera = GetWorld()->SpawnActor<ACameraActor>(ACameraActor::StaticClass(), CameraTargetTransform, SpawnParams);
+	}
+	else
+	{
+		TableViewCamera->SetActorTransform(CameraTargetTransform);
+	}
+
+	// Always blend camera to table view (2s cubic, Week 1 pattern) - ensures smooth transition between objects
+	SetViewTargetWithBlend(TableViewCamera, 2.0f, EViewTargetBlendFunction::VTBlend_Cubic);
+
+	UE_LOG(LogFallenCompassPlayerController, Log, TEXT("Blending camera to table object: %s"), *TableObject->GetName());
+
+	// Show widget after camera blend completes (delay via timer)
+	FTimerHandle ShowWidgetTimerHandle;
+	GetWorldTimerManager().SetTimer(ShowWidgetTimerHandle, [this, TableObject]()
+	{
+		ShowTableWidget(TableObject);
+	}, 2.0f, false);
+}
+
+void AFCPlayerController::ShowTableWidget(AActor* TableObject)
+{
+	if (!TableObject || !TableObject->Implements<UFCTableInteractable>())
+	{
+		return;
+	}
+
+	// Get widget class from table object
+	TSubclassOf<UUserWidget> WidgetClass = IFCTableInteractable::Execute_GetWidgetClass(TableObject);
+
+	if (!WidgetClass)
+	{
+		UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("ShowTableWidget: Table object has no widget class"));
+		return;
+	}
+
+	// Create and show widget
+	CurrentTableWidget = CreateWidget<UUserWidget>(this, WidgetClass);
+	if (CurrentTableWidget)
+	{
+		CurrentTableWidget->AddToViewport();
+
+		// Set input mode to GameAndUI so player controller can receive ESC key
+		FInputModeGameAndUI InputMode;
+		InputMode.SetHideCursorDuringCapture(false);
+		SetInputMode(InputMode);
+		bShowMouseCursor = true;
+
+		UE_LOG(LogFallenCompassPlayerController, Log, TEXT("Showing table widget: %s"), *WidgetClass->GetName());
+	}
+}
+
+void AFCPlayerController::CloseTableWidget()
+{
+	// Remove current widget if one is displayed
+	if (CurrentTableWidget)
+	{
+		CurrentTableWidget->RemoveFromParent();
+		CurrentTableWidget = nullptr;
+		UE_LOG(LogFallenCompassPlayerController, Log, TEXT("Closed table widget"));
+
+		// Restore input mode to GameAndUI (keep mouse cursor for clicking other table objects)
+		FInputModeGameAndUI InputMode;
+		InputMode.SetHideCursorDuringCapture(false);
+		SetInputMode(InputMode);
+		bShowMouseCursor = true;
+
+		// Blend camera back to original table view
+		if (OriginalViewTarget)
+		{
+			SetViewTargetWithBlend(OriginalViewTarget, 2.0f, EViewTargetBlendFunction::VTBlend_Cubic);
+			UE_LOG(LogFallenCompassPlayerController, Log, TEXT("Blending camera back to table view"));
+		}
+
+		// Reset state for next interaction
+		OriginalViewTarget = nullptr;
+
+		// Cleanup: Destroy table view camera if exists
+		if (TableViewCamera)
+		{
+			TableViewCamera->Destroy();
+			TableViewCamera = nullptr;
+		}
+	}
+	else
+	{
+		// No widget open, ESC pressed in TableView - return to FirstPerson
+		UE_LOG(LogFallenCompassPlayerController, Log, TEXT("No widget open, returning to first-person"));
+		SetCameraModeLocal(EFCPlayerCameraMode::FirstPerson, 2.0f);
+	}
 }

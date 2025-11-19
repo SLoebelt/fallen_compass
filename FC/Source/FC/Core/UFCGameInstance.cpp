@@ -85,6 +85,41 @@ FString UFCGameInstance::GetGameVersion() const
     return ProjectVersion;
 }
 
+void UFCGameInstance::AddSupplies(int32 Amount)
+{
+    if (Amount <= 0)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("AddSupplies: Invalid amount %d"), Amount);
+        return;
+    }
+
+    CurrentSupplies += Amount;
+    bIsSessionDirty = true;
+    
+    UE_LOG(LogTemp, Log, TEXT("AddSupplies: Added %d, Total now: %d"), Amount, CurrentSupplies);
+}
+
+bool UFCGameInstance::ConsumeSupplies(int32 Amount)
+{
+    if (Amount <= 0)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("ConsumeSupplies: Invalid amount %d"), Amount);
+        return false;
+    }
+
+    if (CurrentSupplies < Amount)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("ConsumeSupplies: Insufficient supplies (Need: %d, Have: %d)"), Amount, CurrentSupplies);
+        return false;
+    }
+
+    CurrentSupplies -= Amount;
+    bIsSessionDirty = true;
+    
+    UE_LOG(LogTemp, Log, TEXT("ConsumeSupplies: Consumed %d, Remaining: %d"), Amount, CurrentSupplies);
+    return true;
+}
+
 bool UFCGameInstance::SaveGame(const FString& SlotName)
 {
     UE_LOG(LogTemp, Log, TEXT("UFCGameInstance::SaveGame - Saving to slot: %s"), *SlotName);
