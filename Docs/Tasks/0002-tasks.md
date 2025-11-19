@@ -16,7 +16,7 @@ Primary Files Affected:
   - Content/FC/World/Blueprints/Interactables/BP_TableObject_Map.uasset
   - Content/FC/World/Blueprints/Interactables/BP_TableObject_Logbook.uasset
   - Content/FC/World/Blueprints/Interactables/BP_TableObject_Letters.uasset
-  - Content/FC/World/Blueprints/Interactables/BP_TableObject_Glass.uasset
+  - Content/FC/World/Blueprints/Interactables/BP_TableObject_Compass.uasset
   - Content/FC/UI/MapTable/WBP_MapTable.uasset
   - Source/FC/Core/FCLevelManager.h/.cpp (extension)
   - Source/FC/Core/UFCGameInstance.h/.cpp (extension)
@@ -74,7 +74,7 @@ Establish foundational architecture for the map table interaction system, includ
 - `/Content/FC/World/Blueprints/Interactables/BP_TableObject_Map.uasset` - Map object (inherits BP_TableObject)
 - `/Content/FC/World/Blueprints/Interactables/BP_TableObject_Logbook.uasset` - Logbook object (inherits BP_TableObject)
 - `/Content/FC/World/Blueprints/Interactables/BP_TableObject_Letters.uasset` - Letters object (inherits BP_TableObject)
-- `/Content/FC/World/Blueprints/Interactables/BP_TableObject_Glass.uasset` - Glass object (inherits BP_TableObject)
+- `/Content/FC/World/Blueprints/Interactables/BP_TableObject_Compass.uasset` - Glass object (inherits BP_TableObject)
 - `/Content/FC/UI/MapTable/WBP_MapTable.uasset` - Map table widget (placeholder UI)
 
 #### Data Assets
@@ -301,7 +301,7 @@ Establish foundational architecture for the map table interaction system, includ
   - BP_TableObject_Map at /Content/FC/World/Blueprints/Interactables/BP_TableObject_Map.uasset
   - BP_TableObject_Logbook at /Content/FC/World/Blueprints/Interactables/BP_TableObject_Logbook.uasset
   - BP_TableObject_Letters at /Content/FC/World/Blueprints/Interactables/BP_TableObject_Letters.uasset
-  - BP_TableObject_Glass at /Content/FC/World/Blueprints/Interactables/BP_TableObject_Glass.uasset
+  - BP_TableObject_Compass at /Content/FC/World/Blueprints/Interactables/BP_TableObject_Compass.uasset
   - WBP_MapTable at /Content/FC/UI/MapTable/WBP_MapTable.uasset
 
   Modified Classes:
@@ -630,7 +630,7 @@ Create `IFCTableInteractable` C++ interface and `BP_TableObject` base Blueprint 
 
 - `IFCTableInteractable` interface with BlueprintNativeEvent functions: OnTableObjectClicked(), GetCameraTargetTransform(), CanInteract()
 - `BP_TableObject` base class with SceneComponent for camera targeting and raycast collision
-- Four table objects: BP_TableObject_Map, BP_TableObject_Logbook, BP_TableObject_Letters, BP_TableObject_Glass
+- Four table objects: BP_TableObject_Map, BP_TableObject_Logbook, BP_TableObject_Letters, BP_TableObject_Compass
 - Table objects placed on table mesh in L_Office with proper transforms
 
 ---
@@ -978,37 +978,37 @@ Create `IFCTableInteractable` C++ interface and `BP_TableObject` base Blueprint 
 
 ---
 
-##### Step 2.3.4: Create BP_TableObject_Glass (Expedition Start Trigger)
+##### Step 2.3.4: Create BP_TableObject_Compass (Expedition Start Trigger)
 
-- [ ] **Analysis**
+- [x] **Analysis**
 
-  - [ ] Inherits from BP_TableObject
-  - [ ] Triggers expedition start (Week 8 feature: shows expedition confirmation dialog)
-  - [ ] Visual: Magnifying glass appearance (placeholder cube with glass tint)
-  - [ ] Position: Upper edge of table
+  - [x] Inherits from BP_TableObject
+  - [x] Triggers expedition start (Week 8 feature: shows expedition confirmation dialog)
+  - [x] Visual: Magnifying glass appearance (placeholder cube with glass tint)
+  - [x] Position: Upper edge of table
 
-- [ ] **Implementation (Blueprint)**
+- [x] **Implementation (Blueprint)**
 
-  - [ ] Content Browser → `/Content/FC/World/Blueprints/Interactables/`
-  - [ ] Right-click BP_TableObject → Create Child Blueprint Class
-  - [ ] Name: `BP_TableObject_Glass`
-  - [ ] Open BP_TableObject_Glass
-  - [ ] Components:
-    - [ ] Select PlaceholderMesh → Details → Material: Set tint color to cyan/transparent (glass appearance)
-    - [ ] Transform → Scale: (X=0.12, Y=0.12, Z=0.02) (magnifying glass handle shape)
-  - [ ] Event Graph:
-    - [ ] Override Event On Table Object Clicked:
-      - [ ] Print String ("Glass clicked - expedition start trigger coming in Week 8")
-  - [ ] Compile Blueprint
+  - [x] Content Browser → `/Content/FC/World/Blueprints/Interactables/`
+  - [x] Right-click BP_TableObject → Create Child Blueprint Class
+  - [x] Name: `BP_TableObject_Compass`
+  - [x] Open BP_TableObject_Compass
+  - [x] Components:
+    - [x] Select PlaceholderMesh → Details → Material: Set tint color to cyan/transparent (glass appearance)
+    - [x] Transform → Scale: (X=0.12, Y=0.12, Z=0.02) (magnifying glass handle shape)
+  - [x] Event Graph:
+    - [x] Override Event On Table Object Clicked:
+      - [x] Print String ("Glass clicked - expedition start trigger coming in Week 8")
+  - [x] Compile Blueprint
 
-- [ ] **Testing After Step 2.3.4** ✅ CHECKPOINT
-  - [ ] Compile succeeds
-  - [ ] Drag BP_TableObject_Glass into L_Office level
-  - [ ] Position at upper edge of table (away from other objects)
-  - [ ] PIE: Verify all 4 table objects visible with distinct appearances
-  - [ ] No errors
+- [x] **Testing After Step 2.3.4** ✅ CHECKPOINT
+  - [x] Compile succeeds
+  - [x] Drag BP_TableObject_Compass into L_Office level
+  - [x] Position at upper edge of table (away from other objects)
+  - [x] PIE: Verify all 4 table objects visible with distinct appearances
+  - [x] No errors
 
-**COMMIT POINT 2.3.4**: `git add -A && git commit -m "feat(interaction): Create BP_TableObject_Glass"`
+**COMMIT POINT 2.3.4**: `git add -A && git commit -m "feat(interaction): Create BP_TableObject_Compass"`
 
 ---
 
@@ -1030,7 +1030,7 @@ Create `IFCTableInteractable` C++ interface and `BP_TableObject` base Blueprint 
     - [ ] BP_TableObject_Map: Center of table, slightly toward player
     - [ ] BP_TableObject_Logbook: Left side, angled toward player
     - [ ] BP_TableObject_Letters: Right side, angled toward player
-    - [ ] BP_TableObject_Glass: Upper center, between map and far edge
+    - [ ] BP_TableObject_Compass: Upper center, between map and far edge
   - [ ] Verify collision spheres don't overlap (use Show → Collision in viewport)
   - [ ] Adjust CameraTargetPoint positions in each Blueprint if needed for better camera angles
 
@@ -1097,7 +1097,7 @@ Create `IFCTableInteractable` C++ interface and `BP_TableObject` base Blueprint 
 - [x] `IFCTableInteractable` interface created with BlueprintNativeEvent functions
 - [x] `BP_TableObject` base class created with camera target and collision components
 - [x] Interface functions implemented (GetCameraTargetTransform, CanInteract, OnTableObjectClicked, GetWidgetClass)
-- [x] Four table objects created: BP_TableObject_Map, BP_TableObject_Logbook, BP_TableObject_Letters, BP_TableObject_Glass
+- [x] Four table objects created: BP_TableObject_Map, BP_TableObject_Logbook, BP_TableObject_Letters, BP_TableObject_Compass
 - [x] All objects placed in L_Office with distinct appearances and positions
 - [x] Interface validation test confirms all objects implement IFCTableInteractable correctly
 - [x] Collision and camera target points configured properly
@@ -2718,7 +2718,7 @@ After completing Tasks 1-6, conduct comprehensive verification to ensure all Wee
   - [ ] Test Other Table Objects:
     - [ ] Click BP_TableObject_Logbook → Verify camera focus, no widget (Week 3 feature) ✅
     - [ ] Click BP_TableObject_Letters → Verify camera focus, no widget ✅
-    - [ ] Click BP_TableObject_Glass → Verify camera focus, no widget ✅
+    - [ ] Click BP_TableObject_Compass → Verify camera focus, no widget ✅
   - [ ] Test Game State System:
     - [ ] Console: `GetGameInstance()->AddSupplies(50)` → Verify Output Log ✅
     - [ ] Click BP_TableObject_Map → Verify supplies: "Supplies: 150" ✅
