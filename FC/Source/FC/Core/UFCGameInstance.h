@@ -8,6 +8,38 @@
 class UFCSaveGame;
 
 /**
+ * FFCGameStateData
+ *
+ * Persistent game state data that survives level transitions.
+ * Stores resources, economy, and time progression.
+ */
+USTRUCT(BlueprintType)
+struct FFCGameStateData
+{
+    GENERATED_BODY()
+
+    /** Current supplies available */
+    UPROPERTY(BlueprintReadWrite, Category = "Game State")
+    int32 Supplies = 100;
+
+    /** Current money/gold available */
+    UPROPERTY(BlueprintReadWrite, Category = "Game State")
+    int32 Money = 500;
+
+    /** Current day in campaign (starts at 1) */
+    UPROPERTY(BlueprintReadWrite, Category = "Game State")
+    int32 Day = 1;
+
+    /** Default constructor */
+    FFCGameStateData()
+        : Supplies(100)
+        , Money(500)
+        , Day(1)
+    {
+    }
+};
+
+/**
  * UFCGameInstance centralizes long-lived expedition context per GDD §3.1.
  * Fields are placeholders for Week 1; they become real once meta-systems land.
  */
@@ -75,7 +107,11 @@ class FC_API UFCGameInstance : public UGameInstance
     UPROPERTY(BlueprintReadOnly, Category = "Meta")
     int32 ExpeditionsCounter = 1;
 
-    /** Current supplies available for expeditions (Week 2 feature) */
+    /** Current game state data (Week 2 feature) */
+    UPROPERTY(BlueprintReadOnly, Category = "Game State")
+    FFCGameStateData GameStateData;
+
+    /** Current supplies available for expeditions (Week 2 feature) - DEPRECATED: Use GameStateData.Supplies */
     UPROPERTY(BlueprintReadOnly, Category = "Resources")
     int32 CurrentSupplies = 100;
 
@@ -91,17 +127,21 @@ class FC_API UFCGameInstance : public UGameInstance
     UFUNCTION(BlueprintPure, Category = "Version")
     FString GetGameVersion() const;
 
+    /** Get current game state data (read-only access) */
+    UFUNCTION(BlueprintCallable, Category = "Game State")
+    const FFCGameStateData& GetGameStateData() const { return GameStateData; }
+
     /** Get current supplies (Week 2 resource system) */
     UFUNCTION(BlueprintPure, Category = "Resources")
-    int32 GetCurrentSupplies() const { return CurrentSupplies; }
+    int32 GetCurrentSupplies() const { return GameStateData.Supplies; }
 
     /** Add supplies to the pool */
     UFUNCTION(BlueprintCallable, Category = "Resources")
     void AddSupplies(int32 Amount);
 
-    /** Consume supplies if available (returns success) */
+    /** Consume supplies if available (returns success and remaining supplies) */
     UFUNCTION(BlueprintCallable, Category = "Resources")
-    bool ConsumeSupplies(int32 Amount);
+    int32 ConsumeSupplies(int32 Amount, bool& bSuccess);
 
     /** Save current game state to specified slot */
     UFUNCTION(BlueprintCallable, Category = "SaveGame")

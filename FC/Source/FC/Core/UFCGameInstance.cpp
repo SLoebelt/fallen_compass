@@ -87,37 +87,42 @@ FString UFCGameInstance::GetGameVersion() const
 
 void UFCGameInstance::AddSupplies(int32 Amount)
 {
-    if (Amount <= 0)
-    {
-        UE_LOG(LogTemp, Warning, TEXT("AddSupplies: Invalid amount %d"), Amount);
-        return;
-    }
-
-    CurrentSupplies += Amount;
+    GameStateData.Supplies += Amount;
     bIsSessionDirty = true;
     
-    UE_LOG(LogTemp, Log, TEXT("AddSupplies: Added %d, Total now: %d"), Amount, CurrentSupplies);
+    UE_LOG(LogTemp, Log, TEXT("AddSupplies: %d (New Total: %d)"), Amount, GameStateData.Supplies);
+    
+    // Broadcast state change event
+    OnExpeditionContextChanged.Broadcast();
 }
 
-bool UFCGameInstance::ConsumeSupplies(int32 Amount)
+int32 UFCGameInstance::ConsumeSupplies(int32 Amount, bool& bSuccess)
 {
-    if (Amount <= 0)
+    if (Amount < 0)
     {
-        UE_LOG(LogTemp, Warning, TEXT("ConsumeSupplies: Invalid amount %d"), Amount);
-        return false;
+        UE_LOG(LogTemp, Warning, TEXT("ConsumeSupplies: Negative amount (%d), ignoring"), Amount);
+        bSuccess = false;
+        return GameStateData.Supplies;
     }
 
-    if (CurrentSupplies < Amount)
+    if (GameStateData.Supplies >= Amount)
     {
-        UE_LOG(LogTemp, Warning, TEXT("ConsumeSupplies: Insufficient supplies (Need: %d, Have: %d)"), Amount, CurrentSupplies);
-        return false;
+        GameStateData.Supplies -= Amount;
+        bSuccess = true;
+        bIsSessionDirty = true;
+        
+        UE_LOG(LogTemp, Log, TEXT("ConsumeSupplies: %d (Remaining: %d)"), Amount, GameStateData.Supplies);
+        
+        // Broadcast state change event
+        OnExpeditionContextChanged.Broadcast();
     }
-
-    CurrentSupplies -= Amount;
-    bIsSessionDirty = true;
+    else
+    {
+        UE_LOG(LogTemp, Warning, TEXT("ConsumeSupplies: Insufficient supplies (Have: %d, Need: %d)"), GameStateData.Supplies, Amount);
+        bSuccess = false;
+    }
     
-    UE_LOG(LogTemp, Log, TEXT("ConsumeSupplies: Consumed %d, Remaining: %d"), Amount, CurrentSupplies);
-    return true;
+    return GameStateData.Supplies;
 }
 
 bool UFCGameInstance::SaveGame(const FString& SlotName)
