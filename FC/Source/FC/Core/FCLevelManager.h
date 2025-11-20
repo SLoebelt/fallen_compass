@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Subsystems/GameInstanceSubsystem.h"
+#include "Engine/DataTable.h"
 #include "FCLevelManager.generated.h"
 
 DECLARE_LOG_CATEGORY_EXTERN(LogFCLevelManager, Log, All);
@@ -28,6 +29,64 @@ enum class EFCLevelType : uint8
 	Combat      UMETA(DisplayName = "Combat"),
 	POI         UMETA(DisplayName = "Point of Interest"),
 	Village     UMETA(DisplayName = "Village")
+};
+
+/**
+ * FFCLevelMetadata
+ * 
+ * Data-driven metadata for a level. Allows designers to configure level behavior
+ * without C++ changes. Used as a row in the DT_LevelMetadata DataTable.
+ * 
+ * Properties:
+ * - LevelType: Category/type of level (MainMenu, Office, Overworld, etc.)
+ * - DefaultInputMode: Input mode to use when entering this level (UIOnly, GameAndUI, GameOnly)
+ * - bRequiresFadeTransition: Whether level loads should use fade transitions
+ * - bShowCursor: Whether to show mouse cursor in this level
+ * - bRequiresLoadingScreen: Whether to show loading screen for this level (future)
+ * - DisplayName: Human-readable name for UI/debug purposes
+ * - Description: Optional description for designers
+ */
+USTRUCT(BlueprintType)
+struct FFCLevelMetadata : public FTableRowBase
+{
+	GENERATED_BODY()
+
+	/** Level type/category */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Level")
+	EFCLevelType LevelType = EFCLevelType::Unknown;
+
+	/** Default input mode for this level (UIOnly=0, GameAndUI=1, GameOnly=2) */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Level")
+	uint8 DefaultInputMode = 1; // GameAndUI
+
+	/** Whether this level requires fade transitions */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Level")
+	bool bRequiresFadeTransition = true;
+
+	/** Whether to show cursor in this level */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Level")
+	bool bShowCursor = true;
+
+	/** Whether to show loading screen for this level (future feature) */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Level")
+	bool bRequiresLoadingScreen = false;
+
+	/** Human-readable display name */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Level")
+	FText DisplayName;
+
+	/** Optional description for designers */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Level", meta = (MultiLine = true))
+	FText Description;
+
+	/** Default constructor */
+	FFCLevelMetadata()
+		: LevelType(EFCLevelType::Unknown)
+		, DefaultInputMode(1) // GameAndUI
+		, bRequiresFadeTransition(true)
+		, bShowCursor(true)
+		, bRequiresLoadingScreen(false)
+	{}
 };
 
 /**
@@ -74,6 +133,23 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "FC|Level")
 	bool IsGameplayLevel() const;
 
+	/** 
+	 * Get metadata for a specific level from the DataTable
+	 * @param LevelName Name of the level (will be normalized)
+	 * @param OutMetadata Output parameter containing the metadata if found
+	 * @return True if metadata was found, false otherwise
+	 */
+	UFUNCTION(BlueprintCallable, Category = "FC|Level")
+	bool GetLevelMetadata(FName LevelName, FFCLevelMetadata& OutMetadata) const;
+
+	/** 
+	 * Get metadata for the current level
+	 * @param OutMetadata Output parameter containing the metadata if found
+	 * @return True if metadata was found, false otherwise
+	 */
+	UFUNCTION(BlueprintCallable, Category = "FC|Level")
+	bool GetCurrentLevelMetadata(FFCLevelMetadata& OutMetadata) const;
+
 	/** Update the current level (called after level transitions) */
 	void UpdateCurrentLevel(const FName& NewLevelName);
 
@@ -107,7 +183,16 @@ private:
 	/** Level name pending load (used by LoadLevel callback) */
 	FName LevelToLoad;
 
+	/** Level metadata DataTable (set via Blueprint in BP_FC_GameInstance) */
+	UPROPERTY()
+	TObjectPtr<UDataTable> LevelMetadataTable;
+
 	/** Callback when fade out completes before level load */
 	UFUNCTION()
 	void OnFadeOutCompleteForLevelLoad();
+
+public:
+	/** Set the level metadata DataTable (called from GameInstance initialization) */
+	UFUNCTION(BlueprintCallable, Category = "FC|Level")
+	void SetLevelMetadataTable(UDataTable* InMetadataTable);
 };

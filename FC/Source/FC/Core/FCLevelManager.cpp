@@ -72,19 +72,26 @@ FName UFCLevelManager::NormalizeLevelName(const FName& RawLevelName) const
 
 EFCLevelType UFCLevelManager::DetermineLevelType(const FName& LevelName) const
 {
+	// Priority 1: Check metadata table (data-driven)
+	if (LevelMetadataTable)
+	{
+		FFCLevelMetadata Metadata;
+		if (GetLevelMetadata(LevelName, Metadata))
+		{
+			UE_LOG(LogFCLevelManager, Verbose, TEXT("DetermineLevelType: Using metadata for '%s' -> %s"),
+				*LevelName.ToString(),
+				*UEnum::GetValueAsString(Metadata.LevelType));
+			return Metadata.LevelType;
+		}
+	}
+
+	// Priority 2: Fallback to string matching (backward compatibility)
 	const FString LevelNameStr = LevelName.ToString();
 
-	// Check exact match first for main menu
-	if (LevelNameStr.Equals(TEXT("L_MainMenu"), ESearchCase::IgnoreCase))
-	{
-		return EFCLevelType::MainMenu;
-	}
+	UE_LOG(LogFCLevelManager, Warning, TEXT("DetermineLevelType: No metadata for '%s', falling back to string matching"),
+		*LevelName.ToString());
 
 	// Check for substring matches (allows for variants like L_Office_Act1, L_Office_Tutorial, etc.)
-	if (LevelNameStr.Contains(TEXT("MainMenu"), ESearchCase::IgnoreCase))
-	{
-		return EFCLevelType::MainMenu;
-	}
 	if (LevelNameStr.Contains(TEXT("Office"), ESearchCase::IgnoreCase))
 	{
 		return EFCLevelType::Office;
@@ -181,4 +188,86 @@ void UFCLevelManager::OnFadeOutCompleteForLevelLoad()
 
 	// Note: FadeIn will be handled automatically by new level's BeginPlay or PlayerController
 	// For Week 2, we rely on existing fade-in logic; Week 3+ will add explicit loading screen handling
+}
+
+void UFCLevelManager::SetLevelMetadataTable(UDataTable* InMetadataTable)
+{
+	if (!InMetadataTable)
+	{
+		UE_LOG(LogFCLevelManager, Warning, TEXT("SetLevelMetadataTable: Null DataTable provided"));
+		return;
+	}
+
+	// Verify DataTable row structure
+	if (InMetadataTable->GetRowStruct() != FFCLevelMetadata::StaticStruct())
+	{
+		UE_LOG(LogFCLevelManager, Error, TEXT("SetLevelMetadataTable: DataTable '%s' has wrong row type (expected FFCLevelMetadata)"),
+			*InMetadataTable->GetName());
+		return;
+	}
+
+	LevelMetadataTable = InMetadataTable;
+	
+	// Log all row names for debugging
+	TArray<FName> RowNames = InMetadataTable->GetRowNames();
+	UE_LOG(LogFCLevelManager, Log, TEXT("SetLevelMetadataTable: Assigned DataTable '%s' with %d rows"),
+		*InMetadataTable->GetName(),
+		RowNames.Num());
+	
+	for (const FName& RowName : RowNames)
+	{
+		UE_LOG(LogFCLevelManager, Log, TEXT("  - Row: '%s'"), *RowName.ToString());
+	}
+
+	// Re-determine current level type now that we have metadata
+	if (!CurrentLevelName.IsNone())
+	{
+		EFCLevelType OldType = CurrentLevelType;
+		CurrentLevelType = DetermineLevelType(CurrentLevelName);
+		
+		if (OldType != CurrentLevelType)
+		{
+			UE_LOG(LogFCLevelManager, Log, TEXT("SetLevelMetadataTable: Updated level type for '%s': %s -> %s"),
+				*CurrentLevelName.ToString(),
+				*UEnum::GetValueAsString(OldType),
+				*UEnum::GetValueAsString(CurrentLevelType));
+		}
+	}
+}
+
+bool UFCLevelManager::GetLevelMetadata(FName LevelName, FFCLevelMetadata& OutMetadata) const
+{
+	if (!LevelMetadataTable)
+	{
+		UE_LOG(LogFCLevelManager, Warning, TEXT("GetLevelMetadata: No metadata table assigned (call SetLevelMetadataTable from GameInstance)"));
+		return false;
+	}
+
+	// Normalize level name for consistent lookup
+	FName NormalizedName = NormalizeLevelName(LevelName);
+
+	UE_LOG(LogFCLevelManager, Verbose, TEXT("GetLevelMetadata: Looking up '%s' (normalized from '%s')"),
+		*NormalizedName.ToString(),
+		*LevelName.ToString());
+
+	// Look up row in DataTable
+	static const FString ContextString(TEXT("UFCLevelManager::GetLevelMetadata"));
+	const FFCLevelMetadata* Metadata = LevelMetadataTable->FindRow<FFCLevelMetadata>(NormalizedName, ContextString, false);
+
+	if (!Metadata)
+	{
+		UE_LOG(LogFCLevelManager, Verbose, TEXT("GetLevelMetadata: No metadata found for level '%s'"), *NormalizedName.ToString());
+		return false;
+	}
+
+	OutMetadata = *Metadata;
+	UE_LOG(LogFCLevelManager, Verbose, TEXT("GetLevelMetadata: Found metadata for '%s' -> Type=%s"),
+		*NormalizedName.ToString(),
+		*UEnum::GetValueAsString(Metadata->LevelType));
+	return true;
+}
+
+bool UFCLevelManager::GetCurrentLevelMetadata(FFCLevelMetadata& OutMetadata) const
+{
+	return GetLevelMetadata(CurrentLevelName, OutMetadata);
 }

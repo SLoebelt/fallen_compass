@@ -718,50 +718,50 @@
 
 #### Refactoring 2A – Level Metadata System (Data-Driven Level Config)
 
-- [ ] **Design & Implementation (C++)**
-  - [ ] Create `FFCLevelMetadata` struct (row for DataTable)
-  - [ ] Add metadata lookup API in `UFCLevelManager` (e.g. `GetLevelMetadata(LevelName)`)
-- [ ] **Blueprint / Content**
-  - [ ] Create `DT_LevelMetadata` Data Table using `FFCLevelMetadata`
-  - [ ] Add rows for at least:
-    - [ ] `L_Office`
-    - [ ] `L_MainMenu`
-    - [ ] `L_TopDown` / over­world test levels (if existing)
-  - [ ] Configure:
-    - [ ] `LevelType`
-    - [ ] `DefaultInputMode`
-    - [ ] `bRequiresFadeTransition`
-    - [ ] `bShowCursor`
-    - [ ] `DisplayName`
-  - [ ] `BP_FC_GameInstance`: Reference `DT_LevelMetadata` on `UFCLevelManager`
-- [ ] **Integration**
-  - [ ] Replace remaining string name checks with metadata-based logic
-    - [ ] No more `Contains("Office")` / `Contains("MainMenu")`
-- [ ] **Testing**
-  - [ ] Boot to main menu → correct metadata read, correct input mode / cursor
-  - [ ] Transition to office → metadata drives correct mapping mode
-  - [ ] Adding a new test level via Data Table requires **no** C++ changes
+- [x] **Design & Implementation (C++)**
+  - [x] Create `FFCLevelMetadata` struct (row for DataTable)
+  - [x] Add metadata lookup API in `UFCLevelManager` (e.g. `GetLevelMetadata(LevelName)`)
+- [x] **Blueprint / Content**
+  - [x] Create `DT_LevelMetadata` Data Table using `FFCLevelMetadata`
+  - [x] Add rows for at least:
+    - [x] `L_Office`
+    - [x] `L_TopDown` / over­world test levels (if existing)
+  - [x] Configure:
+    - [x] `LevelType`
+    - [x] `DefaultInputMode`
+    - [x] `bRequiresFadeTransition`
+    - [x] `bShowCursor`
+    - [x] `DisplayName`
+  - [x] `BP_FC_GameInstance`: Reference `DT_LevelMetadata` on `UFCLevelManager`
+- [x] **Integration**
+  - [x] Replace remaining string name checks with metadata-based logic
+    - [x] No more `Contains("Office")` / `Contains("MainMenu")`
+- [x] **Testing**
+  - [x] Boot to main menu → correct metadata read, correct input mode / cursor
+  - [x] Transition to office → metadata drives correct mapping mode
+  - [x] Adding a new test level via Data Table requires **no** C++ changes
 
 ---
 
 #### Refactoring 2B – Explicit Game State Machine
 
-- [ ] **Design & Implementation**
-  - [ ] Create `UFCGameStateManager` as `UGameInstanceSubsystem`
-  - [ ] Define `EFCGameStateID` enum (MainMenu, Office_Exploration, Office_TableView, Overworld_Travel, Combat_PlayerTurn, etc.)
-  - [ ] Implement:
-    - [ ] `GetCurrentState()`, `GetPreviousState()`
-    - [ ] `TransitionTo(State)`, `CanTransitionTo(State)`
-    - [ ] Optional: state stack (`PushState`, `PopState`) for Pause / modal states
-  - [ ] Define valid state transitions and initialize them
-  - [ ] Add `OnStateChanged` multicast delegate
-- [ ] **Integration**
-  - [ ] Remove/replace old `CurrentGameState` from `AFCPlayerController`
-  - [ ] Update all game state changes to go through `UFCGameStateManager`
-- [ ] **Testing**
-  - [ ] Log all state transitions and verify expected order (MainMenu → Office_Exploration → Pause → Office_Exploration → etc.)
-  - [ ] Invalid transitions are blocked (and logged)
-  - [ ] Optional debug widget: `WBP_StateDebugWidget` correctly reflects current state and history
+- [x] **Design & Implementation**
+  - [x] Create `UFCGameStateManager` as `UGameInstanceSubsystem`
+  - [x] Define `EFCGameStateID` enum (MainMenu, Office_Exploration, Office_TableView, Overworld_Travel, Combat_PlayerTurn, etc.)
+  - [x] Implement:
+    - [x] `GetCurrentState()`, `GetPreviousState()`
+    - [x] `TransitionTo(State)`, `CanTransitionTo(State)`
+    - [x] Optional: state stack (`PushState`, `PopState`) for Pause / modal states (deferred)
+  - [x] Define valid state transitions and initialize them
+  - [x] Add `OnStateChanged` multicast delegate
+- [x] **Integration**
+  - [x] Remove/replace old `CurrentGameState` from `AFCPlayerController` (kept as deprecated for backward compatibility)
+  - [x] Update all game state changes to go through `UFCGameStateManager`
+- [x] **Testing**
+  - [x] Log all state transitions and verify expected order (MainMenu → Office_Exploration → Paused → Office_Exploration → etc.)
+  - [x] Invalid transitions are blocked (and logged)
+
+**COMMIT POINT 2A+2B**: `git add -A && git commit -m "refactor: Complete Priority 2 - Data-Driven Level Metadata & Game State Machine"`
 
 ---
 

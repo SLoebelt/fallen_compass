@@ -63,11 +63,7 @@ class FC_API UFCGameInstance : public UGameInstance
     void MarkSessionSaved();
 
 	public:
-    /** Editor-configurable map for boot (Main Menu until more flow states exist). */
-    UPROPERTY(EditDefaultsOnly, Category = "Boot")
-    FName StartupMap = TEXT("L_MainMenu");
-
-    /** Editor-configurable office map used after Start Game. */
+    /** Editor-configurable office map (contains main menu and gameplay). */
     UPROPERTY(EditDefaultsOnly, Category = "Boot")
     FName OfficeMap = TEXT("L_Office");
 
@@ -94,6 +90,10 @@ class FC_API UFCGameInstance : public UGameInstance
     /** Widget class for pause menu (configured in Blueprint, used by UIManager) */
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "UI")
     TSubclassOf<UUserWidget> PauseMenuWidgetClass;
+
+    /** Level metadata DataTable (data-driven level configuration) */
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Level")
+    TObjectPtr<UDataTable> LevelMetadataTable;
 
     /** Active expedition identifier; persists across level loads. */
     UPROPERTY(BlueprintReadOnly, Category = "Expedition")

@@ -13,9 +13,27 @@ void UFCGameInstance::Init()
 {
     Super::Init();
 
-    UE_LOG(LogTemp, Log, TEXT("UFCGameInstance Init | StartupMap=%s OfficeMap=%s"),
-        *StartupMap.ToString(),
+    UE_LOG(LogTemp, Log, TEXT("UFCGameInstance Init | OfficeMap=%s"),
         *OfficeMap.ToString());
+
+    // Configure LevelManager subsystem with metadata table
+    UFCLevelManager* LevelManager = GetSubsystem<UFCLevelManager>();
+    if (LevelManager && LevelMetadataTable)
+    {
+        LevelManager->SetLevelMetadataTable(LevelMetadataTable);
+        UE_LOG(LogTemp, Log, TEXT("UFCGameInstance: LevelManager configured with metadata table"));
+    }
+    else
+    {
+        if (!LevelManager)
+        {
+            UE_LOG(LogTemp, Warning, TEXT("UFCGameInstance: Failed to get LevelManager subsystem"));
+        }
+        if (!LevelMetadataTable)
+        {
+            UE_LOG(LogTemp, Warning, TEXT("UFCGameInstance: LevelMetadataTable not set in Blueprint"));
+        }
+    }
 
     // Configure UIManager subsystem with widget classes
     UFCUIManager* UIManager = GetSubsystem<UFCUIManager>();

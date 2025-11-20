@@ -20,6 +20,7 @@
 #include "FCTransitionManager.h"
 #include "Core/FCLevelManager.h"
 #include "Core/FCUIManager.h"
+#include "Core/FCGameStateManager.h"
 #include "../Interaction/FCTableInteractable.h"
 #include "GameFramework/Character.h"
 
@@ -31,7 +32,7 @@ AFCPlayerController::AFCPlayerController()
 	bIsPauseMenuDisplayed = false;
 	bShowMouseCursor = false;
 	CurrentMappingMode = EFCInputMappingMode::FirstPerson;
-	CurrentGameState = EFCGameState::MainMenu; // Start in MainMenu state
+	CurrentGameState = EFCGameState::MainMenu; // DEPRECATED: Use GameStateManager instead
 
 	// Load FirstPerson mapping context
 	static ConstructorHelpers::FObjectFinder<UInputMappingContext> FirstPersonContextFinder(TEXT("/Game/FC/Input/IMC_FC_FirstPerson"));
@@ -265,14 +266,37 @@ void AFCPlayerController::HandlePausePressed()
 	}
 
 	// If in gameplay state (first-person, can move), ESC toggles pause menu
-	if (CurrentGameState == EFCGameState::Gameplay)
+	// Check GameStateManager for current state
+	UFCGameInstance* GI = GetGameInstance<UFCGameInstance>();
+	if (!GI) return;
+
+	UFCGameStateManager* StateMgr = GI->GetSubsystem<UFCGameStateManager>();
+	UFCUIManager* UIManager = GI->GetSubsystem<UFCUIManager>();
+	
+	if (StateMgr && StateMgr->GetCurrentState() == EFCGameStateID::Office_Exploration)
 	{
-		UFCGameInstance* GI = GetGameInstance<UFCGameInstance>();
-		if (!GI) return;
-		
-		UFCUIManager* UIManager = GI->GetSubsystem<UFCUIManager>();
 		if (!UIManager) return;
 		
+		if (bIsPauseMenuDisplayed)
+		{
+			UIManager->HidePauseMenu();
+			bIsPauseMenuDisplayed = false;
+			StateMgr->TransitionTo(EFCGameStateID::Office_Exploration); // Return from paused
+			UE_LOG(LogFallenCompassPlayerController, Log, TEXT("HandlePausePressed: Pause menu hidden, game unpaused."));
+		}
+		else
+		{
+			StateMgr->TransitionTo(EFCGameStateID::Paused);
+			UIManager->ShowPauseMenu();
+			bIsPauseMenuDisplayed = true;
+			UE_LOG(LogFallenCompassPlayerController, Log, TEXT("HandlePausePressed: Pause menu displayed, game paused."));
+		}
+		return;
+	}
+
+	// Fallback: Use deprecated CurrentGameState for backward compatibility
+	if (CurrentGameState == EFCGameState::Gameplay && UIManager)
+	{
 		if (bIsPauseMenuDisplayed)
 		{
 			UIManager->HidePauseMenu();
@@ -600,7 +624,18 @@ void AFCPlayerController::InitializeMainMenu()
 {
 	UE_LOG(LogFallenCompassPlayerController, Log, TEXT("InitializeMainMenu: Setting up main menu state"));
 
-	CurrentGameState = EFCGameState::MainMenu;
+	// Transition to MainMenu state via GameStateManager
+	UFCGameInstance* GI = Cast<UFCGameInstance>(GetGameInstance());
+	if (GI)
+	{
+		UFCGameStateManager* StateMgr = GI->GetSubsystem<UFCGameStateManager>();
+		if (StateMgr)
+		{
+			StateMgr->TransitionTo(EFCGameStateID::MainMenu);
+		}
+	}
+
+	CurrentGameState = EFCGameState::MainMenu; // DEPRECATED: Keep for backward compatibility (Week 3 cleanup)
 
 	// Clear all input contexts
 	if (ULocalPlayer* LocalPlayer = GetLocalPlayer())
@@ -620,8 +655,7 @@ void AFCPlayerController::InitializeMainMenu()
 	// Set camera to MenuCamera
 	SetCameraModeLocal(EFCPlayerCameraMode::MainMenu, 0.0f); // No blend on initial load
 
-	// Get UIManager and show main menu
-	UFCGameInstance* GI = Cast<UFCGameInstance>(GetGameInstance());
+	// Get UIManager and show main menu (reuse GI from above)
 	if (GI)
 	{
 		UFCUIManager* UIManager = GI->GetSubsystem<UFCUIManager>();
@@ -652,12 +686,17 @@ void AFCPlayerController::TransitionToGameplay()
 {
 	UE_LOG(LogFallenCompassPlayerController, Log, TEXT("TransitionToGameplay: Starting transition from MainMenu to Gameplay"));
 
-	CurrentGameState = EFCGameState::Gameplay;
-
-	// Get UIManager and hide main menu
+	// Transition to Office_Exploration state via GameStateManager
 	UFCGameInstance* GI = Cast<UFCGameInstance>(GetGameInstance());
 	if (GI)
 	{
+		UFCGameStateManager* StateMgr = GI->GetSubsystem<UFCGameStateManager>();
+		if (StateMgr)
+		{
+			StateMgr->TransitionTo(EFCGameStateID::Office_Exploration);
+		}
+
+		// Get UIManager and hide main menu
 		UFCUIManager* UIManager = GI->GetSubsystem<UFCUIManager>();
 		if (UIManager)
 		{
@@ -669,6 +708,8 @@ void AFCPlayerController::TransitionToGameplay()
 			UE_LOG(LogFallenCompassPlayerController, Error, TEXT("TransitionToGameplay: Failed to get UIManager subsystem"));
 		}
 	}
+
+	CurrentGameState = EFCGameState::Gameplay; // DEPRECATED: Keep for backward compatibility (Week 3 cleanup)
 
 	// Spawn player character if not already present
 	if (!GetPawn())
@@ -692,13 +733,18 @@ void AFCPlayerController::ReturnToMainMenu()
 {
 	UE_LOG(LogFallenCompassPlayerController, Log, TEXT("ReturnToMainMenu: Starting fade and reload"));
 
-	CurrentGameState = EFCGameState::Loading;
-	
-	// Hide pause menu if it's open
-	if (bIsPauseMenuDisplayed)
+	// Transition to Loading state via GameStateManager
+	UFCGameInstance* GI = Cast<UFCGameInstance>(GetGameInstance());
+	if (GI)
 	{
-		UFCGameInstance* GI = GetGameInstance<UFCGameInstance>();
-		if (GI)
+		UFCGameStateManager* StateMgr = GI->GetSubsystem<UFCGameStateManager>();
+		if (StateMgr)
+		{
+			StateMgr->TransitionTo(EFCGameStateID::Loading);
+		}
+
+		// Hide pause menu if it's open
+		if (bIsPauseMenuDisplayed)
 		{
 			UFCUIManager* UIManager = GI->GetSubsystem<UFCUIManager>();
 			if (UIManager)
@@ -708,6 +754,8 @@ void AFCPlayerController::ReturnToMainMenu()
 			}
 		}
 	}
+
+	CurrentGameState = EFCGameState::Loading; // DEPRECATED: Keep for backward compatibility (Week 3 cleanup)
 
 	// Fade to black
 	PlayerCameraManager->StartCameraFade(0.0f, 1.0f, 1.0f, FLinearColor::Black, false, true);

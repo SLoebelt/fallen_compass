@@ -124,8 +124,7 @@ FC/
 │   │   └── WBP_InteractionPrompt
 │   ├── World/
 │   │   ├── Levels/
-│   │   │   ├── L_Office (Main menu & gameplay hub)
-│   │   │   └── L_MainMenu (future)
+│   │   │   └── L_Office (Main menu state & gameplay hub)
 │   │   ├── Blueprints/
 │   │   │   └── Interactables/
 │   │   │       ├── BP_TableObject (Week 2: Base class)
