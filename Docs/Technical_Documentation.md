@@ -13,8 +13,11 @@
 5. [Main Menu System (Task 5)](#main-menu-system-task-5)
 6. [Office Flow & Interactions (Task 6)](#office-flow--interactions-task-6)
 7. [Table Interaction System (Week 2)](#table-interaction-system-week-2)
-8. [Logging & Debugging](#logging--debugging)
-9. [Build & Configuration](#build--configuration)
+8. [Game State Management (Week 2)](#game-state-management-week-2)
+9. [Level Management & Transitions (Week 2)](#level-management--transitions-week-2)
+10. [Expedition System (Week 2)](#expedition-system-week-2)
+11. [Logging & Debugging](#logging--debugging)
+12. [Build & Configuration](#build--configuration)
 
 ---
 
@@ -79,25 +82,65 @@ flowchart TB
 FC/
 ├── Source/FC/Core
 │   ├── UFCGameInstance.h/cpp
+│   │   └── FFCGameStateData (struct: Supplies, Money, Day)
 │   ├── UFCLevelManager.h/cpp (Game Instance Subsystem)
+│   │   └── LoadLevel(), PreviousLevelName tracking
+│   ├── UFCExpeditionManager.h/cpp (Game Instance Subsystem - Week 2)
+│   │   └── EFCExpeditionStatus, CreateExpedition(), CompleteExpedition()
 │   ├── UFCUIManager.h/cpp (Game Instance Subsystem)
 │   ├── UFCTransitionManager.h/cpp (Game Instance Subsystem)
 │   ├── UFCScreenTransitionWidget.h/cpp (UUserWidget)
+│   ├── UFCExpeditionPlanningWidget.h/cpp (UUserWidget - Week 2)
 │   ├── FCGameMode.h/cpp
 │   ├── FCPlayerController.h/cpp
 │   ├── FCFirstPersonCharacter.h/cpp
 │   └── FCCharacter.h/cpp (top-down variant)
 ├── Source/FC/Interaction
 │   ├── IFCInteractable.h/cpp
+│   ├── IFCTableInteractable.h/cpp (Week 2)
 │   └── FCInteractionComponent.h/cpp
 ├── Source/FC/SaveGame
 │   └── FCSaveGame.h/cpp
 ├── Content/FC/
 │   ├── Input/
-│   │   ├── IMC_FC_Default
-│   │   ├── IA_Interact
-│   │   └── IA_Pause
-│   └── (future: UI/, Levels/, Characters/)
+│   │   ├── Contexts/
+│   │   │   ├── IMC_FC_Default (FirstPerson movement/look)
+│   │   │   └── IMC_FC_StaticScene (Week 2: TableView cursor clicks)
+│   │   └── Actions/
+│   │       ├── IA_Interact
+│   │       ├── IA_Pause (ESC key)
+│   │       ├── IA_Click (Week 2: Left mouse button)
+│   │       ├── IA_QuickSave (F6)
+│   │       └── IA_QuickLoad (F9)
+│   ├── UI/
+│   │   ├── Menus/
+│   │   │   ├── WBP_MainMenu
+│   │   │   ├── WBP_MainMenuButton
+│   │   │   ├── TableMenu/
+│   │   │   │   └── WBP_ExpeditionPlanning (Week 2)
+│   │   │   └── SaveMenu/
+│   │   │       ├── WBP_SaveSlotSelector
+│   │   │       └── WBP_SaveSlotItem
+│   │   └── WBP_InteractionPrompt
+│   ├── World/
+│   │   ├── Levels/
+│   │   │   ├── L_Office (Main menu & gameplay hub)
+│   │   │   └── L_MainMenu (future)
+│   │   ├── Blueprints/
+│   │   │   └── Interactables/
+│   │   │       ├── BP_TableObject (Week 2: Base class)
+│   │   │       ├── BP_TableObject_Map (Week 2)
+│   │   │       ├── BP_TableObject_Logbook (Week 2)
+│   │   │       ├── BP_TableObject_Letters (Week 2)
+│   │   │       └── BP_TableObject_Compass (Week 2)
+│   │   └── Props/
+│   │       ├── SM_Desk_01
+│   │       ├── SM_Door_01
+│   │       └── Cursor/
+│   │           ├── M_Cursor (Week 2)
+│   │           └── FX_Cursor (Week 2)
+│   └── Characters/
+│       └── Mannequins/ (UE5 default assets)
 └── Config/
     ├── DefaultEngine.ini
     ├── DefaultGame.ini
@@ -106,17 +149,26 @@ FC/
 
 ---
 
-## Core Framework (Task 2)
+## Core Framework (Task 2 & Week 2)
 
 ### Overview
 
 Established the foundational runtime classes that every downstream system depends on:
+
+**Task 2 (Week 1)**:
 
 - `UFCGameInstance` (2.1) – global lifecycle and session state owner
 - `UFCLevelManager` (2.1.5) – level name normalization and type detection subsystem
 - `UFCUIManager` (2.1.6) – centralized UI widget lifecycle management and button callback handling
 - `AFCGameMode` (2.2) – map-specific authority, pawn/controller registration, logging
 - `AFCPlayerController` (2.3) – player input handling, camera state, pause/interact scaffolding
+
+**Week 2 Extensions**:
+
+- `UFCGameInstance` – added `FFCGameStateData` struct (Supplies, Money, Day), `AddSupplies()`, `ConsumeSupplies()` methods
+- `UFCLevelManager` – added `LoadLevel()` method with fade integration, `PreviousLevelName` tracking, `GetPreviousLevelName()`
+- `UFCExpeditionManager` (new) – expedition lifecycle management, `EFCExpeditionStatus` enum, `CreateExpedition()`, `CompleteExpedition()`, `CancelExpedition()`
+- `IFCTableInteractable` (new) – interface for table objects in TableView mode with cursor click detection
 
 ### Class Interaction Flow
 
@@ -147,16 +199,17 @@ sequenceDiagram
     Controller->>Pawn: Possess
 ```
 
-### UFCGameInstance (2.1)
+### UFCGameInstance (2.1 & Week 2)
 
-- **Files**: `Source/FC/UFCGameInstance.h/.cpp`
+- **Files**: `Source/FC/Core/UFCGameInstance.h/.cpp`
 - **Inheritance**: `UGameInstance`
 - **Registration**: Project Settings → Maps & Modes → Game Instance Class
-- **Purpose**: Manages global state across map transitions; houses session flags, expedition metadata, data asset references, and game version information.
+- **Purpose**: Manages global state across map transitions; houses session flags, expedition metadata, data asset references, and game version information. **Week 2 added persistent game state data (FFCGameStateData) with supplies, money, and day tracking.**
 
 #### Key Members
 
 ```cpp
+// Session Configuration
 UPROPERTY(EditDefaultsOnly, Category = "Session")
 FString StartupExpeditionName;
 
@@ -169,19 +222,92 @@ int32 StartupDifficulty;
 UPROPERTY(BlueprintReadOnly, Category = "Session")
 bool bTutorialCompleted;
 
+// Game State Data (Week 2)
+UPROPERTY(BlueprintReadOnly, Category = "Game State")
+FFCGameStateData GameStateData;
+
+UPROPERTY()
+bool bIsSessionDirty = false;
+
+// Version Info
 UFUNCTION(BlueprintPure, Category = "Version")
 FString GetGameVersion() const;
 
+// Delegates
 DECLARE_MULTICAST_DELEGATE_OneParam(FOnExpeditionAboutToStart, const FString&);
 FOnExpeditionAboutToStart OnExpeditionAboutToStart;
 
 DECLARE_MULTICAST_DELEGATE_TwoParams(FOnExpeditionCompleted, bool, int32);
 FOnExpeditionCompleted OnExpeditionCompleted;
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnExpeditionContextChanged);
+UPROPERTY(BlueprintAssignable, Category = "Expedition")
+FOnExpeditionContextChanged OnExpeditionContextChanged;
 ```
+
+#### FFCGameStateData Struct (Week 2)
+
+Persistent campaign state that survives level transitions:
+
+```cpp
+USTRUCT(BlueprintType)
+struct FFCGameStateData
+{
+    GENERATED_BODY()
+
+    /** Current supplies available */
+    UPROPERTY(BlueprintReadWrite, Category = "Game State")
+    int32 Supplies = 100;
+
+    /** Current money/gold available */
+    UPROPERTY(BlueprintReadWrite, Category = "Game State")
+    int32 Money = 500;
+
+    /** Current day in campaign (starts at 1) */
+    UPROPERTY(BlueprintReadWrite, Category = "Game State")
+    int32 Day = 1;
+
+    FFCGameStateData()
+        : Supplies(100)
+        , Money(500)
+        , Day(1)
+    {}
+};
+```
+
+#### Supply Management Methods (Week 2)
+
+```cpp
+/** Get current supplies from game state */
+UFUNCTION(BlueprintCallable, Category = "Game State")
+int32 GetCurrentSupplies() const { return GameStateData.Supplies; }
+
+/** Add supplies to game state */
+UFUNCTION(BlueprintCallable, Category = "Game State")
+void AddSupplies(int32 Amount);
+
+/** Consume supplies from game state
+ * @param Amount Amount to consume
+ * @param bSuccess Output parameter indicating if consumption succeeded
+ * @return Current supplies amount after operation
+ */
+UFUNCTION(BlueprintCallable, Category = "Game State")
+int32 ConsumeSupplies(int32 Amount, bool& bSuccess);
+
+/** Get full game state data */
+UFUNCTION(BlueprintCallable, Category = "Game State")
+FFCGameStateData GetGameStateData() const { return GameStateData; }
+```
+
+**Implementation Notes**:
+
+- `AddSupplies()`: Adds to `GameStateData.Supplies`, sets `bIsSessionDirty = true`, broadcasts `OnExpeditionContextChanged`
+- `ConsumeSupplies()`: Validates amount and availability, deducts on success, logs warnings on failure, returns current supplies with success flag
+- All state changes trigger `OnExpeditionContextChanged` for reactive UI updates
 
 #### Lifecycle Methods
 
-- `Init()`: Logs startup with `LogFallenCompassGameInstance`; calls stub `CacheDefaultLoadouts()`.
+- `Init()`: Logs startup with `LogFallenCompassGameInstance`; calls stub `CacheDefaultLoadouts()`; configures UIManager widget classes.
 - `Shutdown()`: Logs cleanup and future telemetry flush point.
 - Placeholders: `BootstrapExpeditionAsync`, `CacheDefaultLoadouts`, `FlushSessionData`.
 
@@ -189,14 +315,16 @@ FOnExpeditionCompleted OnExpeditionCompleted;
 
 Keeping systemic state in one place avoids circular dependencies once Tasks 5–6 introduce Main Menu ↔ Office transitions. Future save/load systems will hook directly into the GameInstance delegates.
 
+**Week 2 Addition**: `FFCGameStateData` provides a single source of truth for campaign progression data, eliminating the need for scattered state variables. The struct-based approach allows for easy serialization in future save/load systems and ensures all state changes are properly logged and broadcast.
+
 ---
 
-### UFCLevelManager (2.1.5)
+### UFCLevelManager (2.1.5 & Week 2)
 
-- **Files**: `Source/FC/Core/FCLevelManager.h/.cpp`
+- **Files**: `Source/FC/Core/UFCLevelManager.h/.cpp`
 - **Inheritance**: `UGameInstanceSubsystem`
 - **Registration**: Automatic (subsystem registered via UE module system)
-- **Purpose**: Centralized level name normalization and type detection to eliminate duplicate string matching and PIE prefix handling across the codebase.
+- **Purpose**: Centralized level name normalization, type detection, and transition management. **Week 2 added LoadLevel() method with fade integration and PreviousLevelName tracking.**
 
 #### Key Members
 
@@ -219,9 +347,19 @@ enum class EFCLevelType : uint8
 UPROPERTY(VisibleAnywhere, Category = "Level")
 FName CurrentLevelName;
 
+/** Previous level name (normalized, no PIE prefix) - Week 2 */
+UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Level Management")
+FName PreviousLevelName;
+
 /** Current level type based on name pattern matching */
 UPROPERTY(VisibleAnywhere, Category = "Level")
 EFCLevelType CurrentLevelType;
+
+/** Pending level name for load operation - Week 2 */
+FName PendingLevelName;
+
+/** Whether to use fade transition for pending load - Week 2 */
+bool bUseFadeForPendingLoad = false;
 ```
 
 #### Public API
@@ -230,6 +368,10 @@ EFCLevelType CurrentLevelType;
 /** Get the current level name (normalized, PIE prefix stripped) */
 UFUNCTION(BlueprintPure, Category = "Level")
 FName GetCurrentLevelName() const { return CurrentLevelName; }
+
+/** Get the previous level name (Week 2) */
+UFUNCTION(BlueprintCallable, Category = "Level Management")
+FName GetPreviousLevelName() const { return PreviousLevelName; }
 
 /** Get the current level type */
 UFUNCTION(BlueprintPure, Category = "Level")
@@ -243,12 +385,78 @@ bool IsMenuLevel() const;
 UFUNCTION(BlueprintPure, Category = "Level")
 bool IsGameplayLevel() const;
 
+/** Load a new level with optional fade transition (Week 2)
+ * @param LevelName Name of the level to load (e.g., "L_Expedition", "L_Office")
+ * @param bUseFade Whether to use fade out/in transition (requires UFCTransitionManager)
+ */
+UFUNCTION(BlueprintCallable, Category = "Level Management")
+void LoadLevel(const FName& LevelName, bool bUseFade = true);
+
 /** Update current level tracking (called on level transitions) */
 void UpdateCurrentLevel(const FName& NewLevelName);
 
 /** Normalize a level name (strip PIE prefix) */
 FName NormalizeLevelName(const FName& LevelName) const;
 ```
+
+#### LoadLevel Implementation (Week 2)
+
+```cpp
+void UFCLevelManager::LoadLevel(const FName& LevelName, bool bUseFade)
+{
+    if (LevelName == NAME_None)
+    {
+        UE_LOG(LogFCLevelManager, Warning, TEXT("LoadLevel: Invalid level name"));
+        return;
+    }
+
+    PendingLevelName = LevelName;
+    bUseFadeForPendingLoad = bUseFade;
+
+    if (bUseFade)
+    {
+        UFCTransitionManager* TransitionManager = GetGameInstance()->GetSubsystem<UFCTransitionManager>();
+        if (TransitionManager)
+        {
+            // Bind to fade complete delegate
+            TransitionManager->OnFadeOutComplete.AddDynamic(this, &UFCLevelManager::OnFadeOutCompleteForLevelLoad);
+            TransitionManager->BeginFadeOut(1.0f, FLinearColor::Black);
+
+            UE_LOG(LogFCLevelManager, Log, TEXT("LoadLevel: Starting fade to %s"), *LevelName.ToString());
+        }
+        else
+        {
+            UE_LOG(LogFCLevelManager, Warning, TEXT("LoadLevel: TransitionManager not found, loading without fade"));
+            UGameplayStatics::OpenLevel(this, LevelName);
+        }
+    }
+    else
+    {
+        UE_LOG(LogFCLevelManager, Log, TEXT("LoadLevel: Loading %s (no fade)"), *LevelName.ToString());
+        UGameplayStatics::OpenLevel(this, LevelName);
+    }
+}
+
+void UFCLevelManager::OnFadeOutCompleteForLevelLoad()
+{
+    UFCTransitionManager* TransitionManager = GetGameInstance()->GetSubsystem<UFCTransitionManager>();
+    if (TransitionManager)
+    {
+        TransitionManager->OnFadeOutComplete.RemoveDynamic(this, &UFCLevelManager::OnFadeOutCompleteForLevelLoad);
+    }
+
+    if (PendingLevelName != NAME_None)
+    {
+        UE_LOG(LogFCLevelManager, Log, TEXT("OnFadeOutComplete: Loading level %s"), *PendingLevelName.ToString());
+        UGameplayStatics::OpenLevel(this, PendingLevelName);
+
+        PendingLevelName = NAME_None;
+        bUseFadeForPendingLoad = false;
+    }
+}
+```
+
+**Flow**: LoadLevel → BeginFadeOut → OnFadeOutComplete → OpenLevel → Initialize (new level) → BeginFadeIn
 
 #### Level Type Detection
 
@@ -3661,19 +3869,929 @@ FC/
 
 ---
 
+## Game State Management (Week 2)
+
+### Overview
+
+The game state management system provides persistent data storage across level transitions through the `UFCGameInstance` class. Week 2 implemented the `FFCGameStateData` struct to hold core campaign progression data (supplies, money, day counter).
+
+### Architecture
+
+```mermaid
+classDiagram
+    class UFCGameInstance {
+        +FFCGameStateData GameStateData
+        +GetGameStateData() FFCGameStateData
+        +GetCurrentSupplies() int32
+        +AddSupplies(int32)
+        +ConsumeSupplies(int32, bool&) int32
+        +OnExpeditionContextChanged
+    }
+
+    class FFCGameStateData {
+        +int32 Supplies
+        +int32 Money
+        +int32 Day
+        +FFCGameStateData()
+    }
+
+    class UUserWidget {
+        <<Blueprint>>
+        +GetGameInstance()
+        +ReadSupplies()
+    }
+
+    UFCGameInstance *-- FFCGameStateData : contains
+    UUserWidget --> UFCGameInstance : reads from
+
+    style UFCGameInstance fill:#4a90e6
+    style FFCGameStateData fill:#50c878
+```
+
+### FFCGameStateData Struct
+
+- **Files**: `Source/FC/Core/UFCGameInstance.h`
+- **Type**: `USTRUCT(BlueprintType)`
+- **Purpose**: Persistent campaign state data that survives level transitions
+
+#### Structure Definition
+
+```cpp
+/**
+ * Persistent game state data that survives level transitions.
+ * Stores resources, economy, and time progression.
+ */
+USTRUCT(BlueprintType)
+struct FFCGameStateData
+{
+    GENERATED_BODY()
+
+    /** Current supplies available */
+    UPROPERTY(BlueprintReadWrite, Category = "Game State")
+    int32 Supplies = 100;
+
+    /** Current money/gold available */
+    UPROPERTY(BlueprintReadWrite, Category = "Game State")
+    int32 Money = 500;
+
+    /** Current day in campaign (starts at 1) */
+    UPROPERTY(BlueprintReadWrite, Category = "Game State")
+    int32 Day = 1;
+
+    /** Default constructor */
+    FFCGameStateData()
+        : Supplies(100)
+        , Money(500)
+        , Day(1)
+    {
+    }
+};
+```
+
+#### Default Values
+
+- **Supplies**: 100 (starting supplies for expeditions)
+- **Money**: 500 (starting gold/currency)
+- **Day**: 1 (campaign begins on day 1)
+
+### UFCGameInstance Game State Properties
+
+```cpp
+/** Persistent game state data */
+UPROPERTY(BlueprintReadOnly, Category = "Game State")
+FFCGameStateData GameStateData;
+
+/** Session dirty flag for save system */
+UPROPERTY()
+bool bIsSessionDirty = false;
+
+/** Delegate broadcast when expedition context changes */
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnExpeditionContextChanged);
+UPROPERTY(BlueprintAssignable, Category = "Expedition")
+FOnExpeditionContextChanged OnExpeditionContextChanged;
+```
+
+### Supply Management Methods
+
+#### GetCurrentSupplies
+
+```cpp
+/**
+ * Get current supplies from game state
+ * @return Current supplies amount
+ */
+UFUNCTION(BlueprintCallable, Category = "Game State")
+int32 GetCurrentSupplies() const { return GameStateData.Supplies; }
+```
+
+#### AddSupplies
+
+```cpp
+/**
+ * Add supplies to game state
+ * @param Amount Amount to add (must be positive)
+ */
+UFUNCTION(BlueprintCallable, Category = "Game State")
+void AddSupplies(int32 Amount);
+```
+
+**Implementation Details**:
+
+- Adds `Amount` to `GameStateData.Supplies`
+- Sets `bIsSessionDirty = true` for save system
+- Broadcasts `OnExpeditionContextChanged` delegate
+- Logs the operation with new total
+
+**Example**:
+
+```cpp
+void UFCGameInstance::AddSupplies(int32 Amount)
+{
+    GameStateData.Supplies += Amount;
+    bIsSessionDirty = true;
+
+    UE_LOG(LogTemp, Log, TEXT("AddSupplies: %d (New Total: %d)"), Amount, GameStateData.Supplies);
+
+    // Broadcast state change event
+    OnExpeditionContextChanged.Broadcast();
+}
+```
+
+#### ConsumeSupplies
+
+```cpp
+/**
+ * Consume supplies from game state
+ * @param Amount Amount to consume
+ * @param bSuccess Output parameter indicating if consumption succeeded
+ * @return Current supplies amount after operation
+ */
+UFUNCTION(BlueprintCallable, Category = "Game State")
+int32 ConsumeSupplies(int32 Amount, bool& bSuccess);
+```
+
+**Implementation Details**:
+
+- Validates `Amount >= 0` (negative amounts are rejected)
+- Checks if sufficient supplies available (`GameStateData.Supplies >= Amount`)
+- If successful: deducts amount, sets `bIsSessionDirty`, broadcasts delegate
+- If failed: logs warning with current supplies vs requested amount
+- Returns current supplies amount (post-consumption if successful)
+- Sets `bSuccess` output parameter to indicate result
+
+**Example**:
+
+```cpp
+int32 UFCGameInstance::ConsumeSupplies(int32 Amount, bool& bSuccess)
+{
+    if (Amount < 0)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("ConsumeSupplies: Negative amount (%d), ignoring"), Amount);
+        bSuccess = false;
+        return GameStateData.Supplies;
+    }
+
+    if (GameStateData.Supplies >= Amount)
+    {
+        GameStateData.Supplies -= Amount;
+        bSuccess = true;
+        bIsSessionDirty = true;
+
+        UE_LOG(LogTemp, Log, TEXT("ConsumeSupplies: %d (Remaining: %d)"), Amount, GameStateData.Supplies);
+
+        OnExpeditionContextChanged.Broadcast();
+    }
+    else
+    {
+        UE_LOG(LogTemp, Warning, TEXT("ConsumeSupplies: Insufficient supplies (Have: %d, Need: %d)"),
+            GameStateData.Supplies, Amount);
+        bSuccess = false;
+    }
+
+    return GameStateData.Supplies;
+}
+```
+
+### Blueprint Integration
+
+**Reading Game State in Widgets**:
+
+```
+Get Game Instance → Cast to FCGameInstance → Get Current Supplies → Set Text (Format: "Supplies: {0}")
+```
+
+**Widget Binding Example** (WBP_ExpeditionPlanning):
+
+- Text block bound to `GetCurrentSupplies()` via Blueprint function
+- Updates automatically when widget is opened (reads fresh data)
+- Manual refresh available via `OnExpeditionContextChanged` delegate
+
+**Console Testing**:
+
+```cpp
+// Add supplies (Blueprint callable from console)
+GetGameInstance()->AddSupplies(25)
+
+// Consume supplies (Blueprint callable from console)
+bool bSuccess;
+GetGameInstance()->ConsumeSupplies(50, bSuccess)
+```
+
+### Data Flow
+
+```mermaid
+sequenceDiagram
+    participant BP as Blueprint Widget
+    participant GI as UFCGameInstance
+    participant GS as FFCGameStateData
+
+    BP->>GI: GetCurrentSupplies()
+    GI->>GS: Read GameStateData.Supplies
+    GS-->>GI: Return Supplies value
+    GI-->>BP: Return int32
+
+    Note over BP: User clicks "Start Expedition"
+
+    BP->>GI: ConsumeSupplies(50, bSuccess)
+    GI->>GS: Check GameStateData.Supplies >= 50
+    alt Sufficient Supplies
+        GS->>GS: GameStateData.Supplies -= 50
+        GI->>GI: bIsSessionDirty = true
+        GI->>GI: OnExpeditionContextChanged.Broadcast()
+        GI-->>BP: Return new Supplies, bSuccess=true
+    else Insufficient Supplies
+        GI-->>BP: Return current Supplies, bSuccess=false
+    end
+```
+
+### Future Extensions
+
+**Planned for Later Weeks**:
+
+- Money/economy system integration
+- Day progression and time management
+- Save/load serialization of FFCGameStateData
+- Additional state fields (reputation, relationships, etc.)
+- Event-driven state change notifications
+
+---
+
+## Level Management & Transitions (Week 2)
+
+### Overview
+
+The `UFCLevelManager` subsystem provides level name normalization, transition orchestration, and previous level tracking. Week 2 added the `LoadLevel` method with fade transition integration.
+
+### Architecture
+
+```mermaid
+classDiagram
+    class UGameInstanceSubsystem {
+        <<Unreal>>
+        +Initialize()
+        +Deinitialize()
+    }
+
+    class UFCLevelManager {
+        -FName CurrentLevelName
+        -FName PreviousLevelName
+        +GetCurrentLevelName() FName
+        +GetPreviousLevelName() FName
+        +LoadLevel(FName, bool)
+        #UpdateCurrentLevel(FName)
+        #OnFadeOutCompleteForLevelLoad()
+    }
+
+    class UFCTransitionManager {
+        +BeginFadeOut(float, LinearColor)
+        +OnFadeOutComplete
+    }
+
+    class UFCGameInstance {
+        +GetSubsystem<UFCLevelManager>()
+    }
+
+    UGameInstanceSubsystem <|-- UFCLevelManager
+    UFCLevelManager --> UFCTransitionManager : uses for fades
+    UFCGameInstance --> UFCLevelManager : owns subsystem
+
+    style UFCLevelManager fill:#9b59b6
+    style UFCTransitionManager fill:#3498db
+```
+
+### UFCLevelManager
+
+- **Files**: `Source/FC/Core/UFCLevelManager.h/.cpp`
+- **Inheritance**: `UGameInstanceSubsystem`
+- **Purpose**: Centralized level name tracking, normalization, and transition management
+
+#### Key Properties
+
+```cpp
+/** Current level name (normalized, no PIE prefix) */
+UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Level Management")
+FName CurrentLevelName;
+
+/** Previous level name (normalized, no PIE prefix) */
+UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Level Management")
+FName PreviousLevelName;
+
+/** Pending level name for load operation */
+FName PendingLevelName;
+
+/** Whether to use fade transition for pending load */
+bool bUseFadeForPendingLoad = false;
+```
+
+#### Key Methods
+
+##### GetPreviousLevelName
+
+```cpp
+/**
+ * Get the name of the previous level (before current)
+ * @return Previous level name (normalized, no PIE prefix)
+ */
+UFUNCTION(BlueprintCallable, Category = "Level Management")
+FName GetPreviousLevelName() const { return PreviousLevelName; }
+```
+
+**Use Cases**:
+
+- "Return to Previous Location" buttons
+- Breadcrumb navigation
+- Level transition validation
+
+##### LoadLevel
+
+```cpp
+/**
+ * Load a new level with optional fade transition
+ * @param LevelName Name of the level to load (e.g., "L_Expedition", "L_Office")
+ * @param bUseFade Whether to use fade out/in transition (requires UFCTransitionManager)
+ */
+UFUNCTION(BlueprintCallable, Category = "Level Management")
+void LoadLevel(const FName& LevelName, bool bUseFade = true);
+```
+
+**Implementation Flow**:
+
+1. **Validation**: Checks if `LevelName` is valid (not NAME_None)
+2. **State Storage**: Saves `LevelName` to `PendingLevelName` and `bUseFade` to `bUseFadeForPendingLoad`
+3. **Fade Integration** (if `bUseFade = true`):
+   - Gets `UFCTransitionManager` subsystem
+   - Calls `BeginFadeOut(1.0f, Black)`
+   - Binds `OnFadeOutCompleteForLevelLoad` to `OnFadeOutComplete` delegate
+   - Waits for fade to complete before loading
+4. **Direct Load** (if `bUseFade = false`):
+   - Immediately calls `UGameplayStatics::OpenLevel`
+
+**Code Example**:
+
+```cpp
+void UFCLevelManager::LoadLevel(const FName& LevelName, bool bUseFade)
+{
+    if (LevelName == NAME_None)
+    {
+        UE_LOG(LogFCLevelManager, Warning, TEXT("LoadLevel: Invalid level name"));
+        return;
+    }
+
+    PendingLevelName = LevelName;
+    bUseFadeForPendingLoad = bUseFade;
+
+    if (bUseFade)
+    {
+        UFCTransitionManager* TransitionManager = GetGameInstance()->GetSubsystem<UFCTransitionManager>();
+        if (TransitionManager)
+        {
+            // Bind to fade complete delegate
+            TransitionManager->OnFadeOutComplete.AddDynamic(this, &UFCLevelManager::OnFadeOutCompleteForLevelLoad);
+            TransitionManager->BeginFadeOut(1.0f, FLinearColor::Black);
+
+            UE_LOG(LogFCLevelManager, Log, TEXT("LoadLevel: Starting fade to %s"), *LevelName.ToString());
+        }
+        else
+        {
+            UE_LOG(LogFCLevelManager, Warning, TEXT("LoadLevel: TransitionManager not found, loading without fade"));
+            UGameplayStatics::OpenLevel(this, LevelName);
+        }
+    }
+    else
+    {
+        UE_LOG(LogFCLevelManager, Log, TEXT("LoadLevel: Loading %s (no fade)"), *LevelName.ToString());
+        UGameplayStatics::OpenLevel(this, LevelName);
+    }
+}
+```
+
+##### OnFadeOutCompleteForLevelLoad
+
+```cpp
+/**
+ * Callback when fade out completes, triggers actual level load
+ */
+UFUNCTION()
+void OnFadeOutCompleteForLevelLoad();
+```
+
+**Implementation**:
+
+- Unbinds itself from `OnFadeOutComplete` delegate (prevents re-triggering)
+- Calls `UGameplayStatics::OpenLevel` with `PendingLevelName`
+- Logs the level transition
+- Clears `PendingLevelName` and `bUseFadeForPendingLoad` flags
+
+**Code Example**:
+
+```cpp
+void UFCLevelManager::OnFadeOutCompleteForLevelLoad()
+{
+    UFCTransitionManager* TransitionManager = GetGameInstance()->GetSubsystem<UFCTransitionManager>();
+    if (TransitionManager)
+    {
+        // Unbind to prevent re-triggering
+        TransitionManager->OnFadeOutComplete.RemoveDynamic(this, &UFCLevelManager::OnFadeOutCompleteForLevelLoad);
+    }
+
+    if (PendingLevelName != NAME_None)
+    {
+        UE_LOG(LogFCLevelManager, Log, TEXT("OnFadeOutComplete: Loading level %s"), *PendingLevelName.ToString());
+        UGameplayStatics::OpenLevel(this, PendingLevelName);
+
+        PendingLevelName = NAME_None;
+        bUseFadeForPendingLoad = false;
+    }
+}
+```
+
+##### UpdateCurrentLevel
+
+```cpp
+/**
+ * Update current level name and track previous
+ * @param NewLevelName Normalized level name (called by Initialize and world change events)
+ */
+void UpdateCurrentLevel(const FName& NewLevelName);
+```
+
+**Implementation**:
+
+- Called automatically by `Initialize()` and world change events
+- Stores `CurrentLevelName` as `PreviousLevelName` before updating
+- Sets `NewLevelName` as new `CurrentLevelName`
+- Logs the transition
+
+**Code Example**:
+
+```cpp
+void UFCLevelManager::UpdateCurrentLevel(const FName& NewLevelName)
+{
+    if (CurrentLevelName != NAME_None)
+    {
+        PreviousLevelName = CurrentLevelName;
+        UE_LOG(LogFCLevelManager, Log, TEXT("UpdateCurrentLevel: %s -> %s (Previous: %s)"),
+            *CurrentLevelName.ToString(), *NewLevelName.ToString(), *PreviousLevelName.ToString());
+    }
+
+    CurrentLevelName = NewLevelName;
+}
+```
+
+### Integration with UFCTransitionManager
+
+**Fade Transition Flow**:
+
+```mermaid
+sequenceDiagram
+    participant BP as Blueprint/Code
+    participant LM as UFCLevelManager
+    participant TM as UFCTransitionManager
+    participant Engine as UGameplayStatics
+
+    BP->>LM: LoadLevel("L_Expedition", true)
+    LM->>LM: Store PendingLevelName
+    LM->>TM: BeginFadeOut(1.0, Black)
+    TM->>TM: Animate fade widget
+
+    Note over TM: Fade animation completes (1 second)
+
+    TM->>LM: OnFadeOutComplete.Broadcast()
+    LM->>LM: OnFadeOutCompleteForLevelLoad()
+    LM->>TM: RemoveDynamic (unbind delegate)
+    LM->>Engine: OpenLevel(PendingLevelName)
+
+    Note over Engine: Level loads, new world created
+
+    Engine->>LM: Initialize() called on new level
+    LM->>LM: UpdateCurrentLevel()
+    LM->>TM: BeginFadeIn() (automatic in new level)
+```
+
+### Blueprint Usage
+
+**Load Level with Fade**:
+
+```
+Get Game Instance → Get Subsystem (FCLevelManager) → Load Level
+  ├─ Level Name: "L_Expedition"
+  └─ Use Fade: true
+```
+
+**Get Previous Level Name**:
+
+```
+Get Game Instance → Get Subsystem (FCLevelManager) → Get Previous Level Name → Print String
+```
+
+**Example: "Return to Office" Button**:
+
+```
+OnClicked (Button)
+  └─ Get Game Instance → Get Subsystem (FCLevelManager) → Load Level
+      ├─ Level Name: "L_Office"
+      └─ Use Fade: true
+```
+
+### Testing
+
+**Week 2 Testing Verified**:
+
+- ✅ LoadLevel method called from "Start Test Expedition" button (shows placeholder message)
+- ✅ PreviousLevel tracking verified via logs
+- ✅ Fade integration verified (BeginFadeOut → OnFadeOutComplete → OpenLevel flow)
+- ✅ Delegate binding/unbinding prevents memory leaks
+- ✅ Direct load (no fade) fallback tested
+
+**Console Commands**:
+
+```cpp
+// Test level load with fade
+GetGameInstance()->GetSubsystem<UFCLevelManager>()->LoadLevel(FName("L_Expedition"), true)
+
+// Test level load without fade
+GetGameInstance()->GetSubsystem<UFCLevelManager>()->LoadLevel(FName("L_Office"), false)
+
+// Check previous level
+GetGameInstance()->GetSubsystem<UFCLevelManager>()->GetPreviousLevelName()
+```
+
+### Design Notes
+
+**Subsystem Pattern**: `UFCLevelManager` extends `UGameInstanceSubsystem` for automatic lifecycle management and persistent state across levels.
+
+**Fade Integration**: Delegates to `UFCTransitionManager` for visual polish, ensuring consistent transition experience throughout the game.
+
+**Previous Level Tracking**: Essential for "Back" navigation patterns (e.g., Expedition → Office, Office → Main Menu).
+
+**PIE Prefix Normalization**: Strips "UEDPIE*0*" prefix from level names during Play-In-Editor sessions for consistent level name references.
+
+---
+
+## Expedition System (Week 2)
+
+### Overview
+
+The `UFCExpeditionManager` subsystem manages expedition lifecycle, status tracking, and context management. Week 2 implemented the foundation with expedition creation, status queries, and GameInstance integration.
+
+### Architecture
+
+```mermaid
+classDiagram
+    class UGameInstanceSubsystem {
+        <<Unreal>>
+        +Initialize()
+        +Deinitialize()
+    }
+
+    class UFCExpeditionManager {
+        -FName CurrentExpeditionName
+        -EFCExpeditionStatus CurrentExpeditionStatus
+        +HasActiveExpedition() bool
+        +GetExpeditionStatus() EFCExpeditionStatus
+        +CreateExpedition(FName)
+        +CompleteExpedition()
+        +CancelExpedition()
+    }
+
+    class EFCExpeditionStatus {
+        <<enumeration>>
+        NotStarted
+        Planning
+        InProgress
+        Completed
+        Failed
+    }
+
+    class UFCGameInstance {
+        +GetSubsystem<UFCExpeditionManager>()
+        +OnExpeditionContextChanged
+    }
+
+    UGameInstanceSubsystem <|-- UFCExpeditionManager
+    UFCExpeditionManager --> EFCExpeditionStatus : uses
+    UFCGameInstance --> UFCExpeditionManager : owns subsystem
+
+    style UFCExpeditionManager fill:#e91e63
+    style EFCExpeditionStatus fill:#50c878
+```
+
+### EFCExpeditionStatus Enum
+
+- **Files**: `Source/FC/Core/UFCExpeditionManager.h`
+- **Type**: `UENUM(BlueprintType)`
+- **Purpose**: Track expedition lifecycle states
+
+#### Enum Values
+
+```cpp
+UENUM(BlueprintType)
+enum class EFCExpeditionStatus : uint8
+{
+    /** No expedition currently active */
+    NotStarted = 0 UMETA(DisplayName = "Not Started"),
+
+    /** Expedition is being planned (in table view) */
+    Planning UMETA(DisplayName = "Planning"),
+
+    /** Expedition is currently in progress (gameplay) */
+    InProgress UMETA(DisplayName = "In Progress"),
+
+    /** Expedition completed successfully */
+    Completed UMETA(DisplayName = "Completed"),
+
+    /** Expedition failed or was abandoned */
+    Failed UMETA(DisplayName = "Failed")
+};
+```
+
+**State Transitions**:
+
+- `NotStarted` → `Planning` (player clicks map in Office)
+- `Planning` → `InProgress` (player confirms expedition start)
+- `InProgress` → `Completed` (expedition objectives met)
+- `InProgress` → `Failed` (player retreats or loses)
+- `Completed`/`Failed` → `NotStarted` (player returns to Office)
+
+### UFCExpeditionManager
+
+- **Files**: `Source/FC/Core/UFCExpeditionManager.h/.cpp`
+- **Inheritance**: `UGameInstanceSubsystem`
+- **Purpose**: Centralized expedition state management and lifecycle orchestration
+
+#### Key Properties
+
+```cpp
+/** Name of the current expedition (e.g., "FirstExpedition", "MountainPass") */
+UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Expedition")
+FName CurrentExpeditionName;
+
+/** Current status of the active expedition */
+UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Expedition")
+EFCExpeditionStatus CurrentExpeditionStatus;
+```
+
+#### Key Methods
+
+##### HasActiveExpedition
+
+```cpp
+/**
+ * Check if an expedition is currently active
+ * @return True if status is Planning or InProgress, false otherwise
+ */
+UFUNCTION(BlueprintCallable, Category = "Expedition")
+bool HasActiveExpedition() const;
+```
+
+**Implementation**:
+
+```cpp
+bool UFCExpeditionManager::HasActiveExpedition() const
+{
+    return CurrentExpeditionStatus == EFCExpeditionStatus::Planning
+        || CurrentExpeditionStatus == EFCExpeditionStatus::InProgress;
+}
+```
+
+**Use Cases**:
+
+- Disable "New Expedition" button if expedition already active
+- Block level transitions during active expeditions
+- Validate expedition-specific actions
+
+##### GetExpeditionStatus
+
+```cpp
+/**
+ * Get the current expedition status
+ * @return Current expedition status enum value
+ */
+UFUNCTION(BlueprintCallable, Category = "Expedition")
+EFCExpeditionStatus GetExpeditionStatus() const { return CurrentExpeditionStatus; }
+```
+
+##### CreateExpedition
+
+```cpp
+/**
+ * Create and start planning a new expedition
+ * @param ExpeditionName Name/ID of the expedition to create
+ */
+UFUNCTION(BlueprintCallable, Category = "Expedition")
+void CreateExpedition(const FName& ExpeditionName);
+```
+
+**Implementation**:
+
+- Checks if expedition already active (logs warning if so)
+- Sets `CurrentExpeditionName` to `ExpeditionName`
+- Sets `CurrentExpeditionStatus` to `Planning`
+- Broadcasts `OnExpeditionContextChanged` delegate (via GameInstance)
+- Logs the expedition creation
+
+**Code Example**:
+
+```cpp
+void UFCExpeditionManager::CreateExpedition(const FName& ExpeditionName)
+{
+    if (HasActiveExpedition())
+    {
+        UE_LOG(LogFCExpedition, Warning, TEXT("CreateExpedition: Expedition already active (%s)"),
+            *CurrentExpeditionName.ToString());
+        return;
+    }
+
+    CurrentExpeditionName = ExpeditionName;
+    CurrentExpeditionStatus = EFCExpeditionStatus::Planning;
+
+    UE_LOG(LogFCExpedition, Log, TEXT("CreateExpedition: %s (Status: Planning)"), *ExpeditionName.ToString());
+
+    // Notify GameInstance of context change
+    UFCGameInstance* GameInstance = GetGameInstance<UFCGameInstance>();
+    if (GameInstance)
+    {
+        GameInstance->OnExpeditionContextChanged.Broadcast();
+    }
+}
+```
+
+##### CompleteExpedition
+
+```cpp
+/**
+ * Mark the current expedition as completed successfully
+ */
+UFUNCTION(BlueprintCallable, Category = "Expedition")
+void CompleteExpedition();
+```
+
+**Implementation**:
+
+- Validates expedition is active
+- Sets `CurrentExpeditionStatus` to `Completed`
+- Broadcasts `OnExpeditionContextChanged` delegate
+- Logs the completion
+- Future: Trigger rewards, unlock next expedition, update campaign progress
+
+##### CancelExpedition
+
+```cpp
+/**
+ * Cancel/abandon the current expedition
+ */
+UFUNCTION(BlueprintCallable, Category = "Expedition")
+void CancelExpedition();
+```
+
+**Implementation**:
+
+- Validates expedition is active
+- Sets `CurrentExpeditionStatus` to `Failed`
+- Clears `CurrentExpeditionName`
+- Broadcasts `OnExpeditionContextChanged` delegate
+- Logs the cancellation
+- Future: Apply failure penalties (lost supplies, morale, etc.)
+
+### Integration with Table Interaction System
+
+**Expedition Creation Flow**:
+
+```mermaid
+sequenceDiagram
+    participant Player
+    participant PC as AFCPlayerController
+    participant TO as BP_TableObject_Map
+    participant EM as UFCExpeditionManager
+    participant Widget as WBP_ExpeditionPlanning
+
+    Player->>PC: Click BP_TableObject_Map
+    PC->>TO: OnTableObjectClicked()
+    TO->>EM: CreateExpedition("TestExpedition")
+    EM->>EM: CurrentExpeditionStatus = Planning
+    EM->>Widget: OnExpeditionContextChanged.Broadcast()
+    Widget->>Widget: Update UI (show planning interface)
+    PC->>Widget: ShowTableWidget()
+
+    Note over Widget: Player reviews supplies, selects route
+
+    Player->>Widget: Click "Start Expedition"
+    Widget->>EM: SetExpeditionStatus(InProgress)
+    Widget->>PC: LoadLevel("L_Expedition", true)
+```
+
+### Blueprint Usage
+
+**Create Expedition** (L_Office Level Blueprint BeginPlay):
+
+```
+Get Game Instance → Get Subsystem (FCExpeditionManager) → Create Expedition
+  └─ Expedition Name: "TestExpedition"
+```
+
+**Check Active Expedition**:
+
+```
+Get Game Instance → Get Subsystem (FCExpeditionManager) → Has Active Expedition
+  ├─ True → Show "Resume Expedition" button
+  └─ False → Show "New Expedition" button
+```
+
+**Get Expedition Status**:
+
+```
+Get Game Instance → Get Subsystem (FCExpeditionManager) → Get Expedition Status
+  ├─ Planning → Enable table interaction
+  ├─ InProgress → Show expedition UI
+  └─ NotStarted → Show office idle state
+```
+
+### Testing & Validation
+
+**Week 2 Testing Verified** ✅:
+
+- ✅ CreateExpedition called from L_Office Level Blueprint BeginPlay
+- ✅ HasActiveExpedition returns `true` after creation
+- ✅ GetExpeditionStatus returns `Planning` status
+- ✅ OnExpeditionContextChanged delegate broadcasts successfully
+- ✅ Widget displays correct status
+- ✅ "Start Test Expedition" button shows placeholder message (no actual transition yet)
+- ✅ Logging at all lifecycle points
+
+**Console Testing**:
+
+```cpp
+// Create expedition
+GetGameInstance()->GetSubsystem<UFCExpeditionManager>()->CreateExpedition(FName("TestExpedition"))
+
+// Check active status
+GetGameInstance()->GetSubsystem<UFCExpeditionManager>()->HasActiveExpedition()
+
+// Get status
+GetGameInstance()->GetSubsystem<UFCExpeditionManager>()->GetExpeditionStatus()
+
+// Complete expedition
+GetGameInstance()->GetSubsystem<UFCExpeditionManager>()->CompleteExpedition()
+
+// Cancel expedition
+GetGameInstance()->GetSubsystem<UFCExpeditionManager>()->CancelExpedition()
+```
+
+### Design Notes
+
+**Subsystem Pattern**: Extends `UGameInstanceSubsystem` for automatic lifecycle management and global access without singleton boilerplate.
+
+**Status Enum**: `EFCExpeditionStatus` provides clear state machine for expedition lifecycle, enabling UI state binding and validation logic.
+
+**Delegate Integration**: Uses `UFCGameInstance::OnExpeditionContextChanged` for loose coupling between systems (widgets don't need direct manager references).
+
+**Week 2 Scope**: Foundation only—actual expedition gameplay (level loading, encounter system, failure conditions) deferred to later weeks.
+
+**Future Extensions**:
+
+- Expedition data structures (route, objectives, participants)
+- Resource consumption during planning
+- Save/load expedition state
+- Expedition templates and procedural generation
+- Failure condition handling (retreat, death, time limits)
+
+---
+
 ## Logging & Debugging
 
 ### Log Categories
 
 All FC-specific categories use the prefix `LogFallenCompass*`:
 
-| Category                           | Verbosity  | Purpose                                                  |
-| ---------------------------------- | ---------- | -------------------------------------------------------- |
-| `LogFallenCompassGameInstance`     | `Log, All` | Lifecycle events, session state changes                  |
-| `LogFallenCompassGameMode`         | `Log, All` | Pawn/controller registration, map startup                |
-| `LogFallenCompassPlayerController` | `Log, All` | Input handling, camera transitions, state dumps          |
-| `LogFallenCompassCharacter`        | `Log, All` | First-person character spawning, camera config, movement |
-| `LogFCInteraction`                 | `Log, All` | Interaction detection, prompt updates, interface calls   |
+| Category                           | Verbosity  | Purpose                                                      |
+| ---------------------------------- | ---------- | ------------------------------------------------------------ |
+| `LogFallenCompassGameInstance`     | `Log, All` | Lifecycle events, session state changes                      |
+| `LogFallenCompassGameMode`         | `Log, All` | Pawn/controller registration, map startup                    |
+| `LogFallenCompassPlayerController` | `Log, All` | Input handling, camera transitions, state dumps              |
+| `LogFallenCompassCharacter`        | `Log, All` | First-person character spawning, camera config, movement     |
+| `LogFCInteraction`                 | `Log, All` | Interaction detection, prompt updates, interface calls       |
+| `LogFCLevelManager`                | `Log, All` | Level transitions, previous level tracking, fade integration |
+| `LogFCExpedition`                  | `Log, All` | Expedition lifecycle, status changes, context updates        |
 
 ### Enabling Categories at Runtime
 
@@ -3685,6 +4803,8 @@ Log LogFallenCompassPlayerController VeryVerbose
 Log LogFallenCompassGameInstance VeryVerbose
 Log LogFallenCompassCharacter VeryVerbose
 Log LogFCInteraction VeryVerbose
+Log LogFCLevelManager VeryVerbose
+Log LogFCExpedition VeryVerbose
 ```
 
 ### Common Issues
@@ -3773,4 +4893,4 @@ w:\GameDev\FallenCompass\Engine\Build\BatchFiles\Build.bat FCEditor Win64 Develo
 
 ---
 
-_Last updated: November 19, 2025 (Week 2 Task 3 complete: Table interaction system with camera focus, expedition planning widget, ESC key binding, and input mode fixes fully implemented and tested)_
+_Last updated: November 20, 2025 (Week 2 complete: Table interaction system, game state management with FFCGameStateData struct, level transitions with fade integration, and expedition system foundation fully implemented and documented)_

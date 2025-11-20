@@ -1265,87 +1265,267 @@ class AFCPlayerController : public APlayerController
 };
 ```
 
+**UPDATED ANALYSIS (Week 2 - November 20, 2025):**
+
+**Current Status:**
+
+```cpp
+// AFCPlayerController.h - 220 lines
+// AFCPlayerController.cpp - 1020 lines (grew from ~223 in Week 1)
+// Total: 1240 lines across 2 files
+// Public methods: 30+
+// State properties: 15+
+```
+
+**Current Responsibilities After Priority 1 Refactorings:**
+
+```cpp
+class AFCPlayerController : public APlayerController
+{
+    // 1. Input Management ✅ APPROPRIATE
+    void SetupInputComponent();
+    void SetInputMappingMode(EFCInputMappingMode NewMode);
+    void HandleInteractPressed();
+    void HandlePausePressed();
+    void HandleQuickSavePressed();
+    void HandleQuickLoadPressed();
+    void HandleTableObjectClick();
+
+    // 2. Camera State & View Management ⚠️ GROWING (167 lines in SetCameraModeLocal alone)
+    void SetCameraModeLocal(EFCPlayerCameraMode NewMode, float BlendTime);
+    EFCPlayerCameraMode CameraMode;
+    ACameraActor* MenuCamera;
+    ACameraActor* TableViewCamera;  // NEW in Week 2
+    AActor* OriginalViewTarget;     // NEW in Week 2
+    bool bIsInTableView;            // NEW in Week 2
+
+    // 3. UI Widget Lifecycle 🔄 PARTIALLY REFACTORED
+    // ✅ Main menu widgets → UFCUIManager (Week 1)
+    // ✅ Pause menu widgets → UFCUIManager (Week 1)
+    // ❌ Table widgets → STILL IN PlayerController (Week 2)
+    void OnTableObjectClicked(AActor* TableObject);      // NEW in Week 2 (120 lines total)
+    void ShowTableWidget(AActor* TableObject);           // NEW in Week 2
+    void CloseTableWidget();                             // NEW in Week 2
+    UUserWidget* CurrentTableWidget;                     // NEW in Week 2
+
+    // 4. Game State Management ✅ APPROPRIATE
+    void InitializeMainMenu();
+    void TransitionToGameplay();
+    void ReturnToMainMenu();
+    void ResumeGame();
+    EFCGameState CurrentGameState;
+    bool bIsPauseMenuDisplayed;
+
+    // 5. Transition Coordination ✅ CORRECTLY DELEGATED
+    void FadeScreenOut(float Duration, bool bShowLoading);  // Delegates to UFCTransitionManager
+    void FadeScreenIn(float Duration);                      // Delegates to UFCTransitionManager
+
+    // 6. Save/Load Integration ✅ APPROPRIATE DELEGATION
+    void DevQuickSave();                    // Delegates to UFCGameInstance
+    void DevQuickLoad();                    // Delegates to UFCGameInstance
+    void RestorePlayerPositionDeferred();
+
+    // 7. Timer Management ⚠️ MULTIPLE TIMER PATTERNS
+    void RestoreInputAfterBlend();
+    // Inline lambda timers in:
+    // - SetCameraModeLocal (line 467): Camera cleanup
+    // - OnTableObjectClicked (line 940): Widget show delay
+    // - ReturnToMainMenu (line 715): Level reload delay
+};
+```
+
+**Week 2 Changes - Growth Analysis:**
+
+**Removed (via Priority 1 refactorings):**
+
+- ✅ Level name parsing logic → UFCLevelManager (~30 lines)
+- ✅ Main menu widget lifecycle → UFCUIManager (~50 lines)
+- ✅ Pause menu widget lifecycle → UFCUIManager (~40 lines)
+- ✅ Transition widget management → UFCTransitionManager (~30 lines)
+  **Total Removed: ~150 lines**
+
+**Added (Week 2 - Table Interaction System):**
+
+- ❌ Table interaction system (OnTableObjectClicked, ShowTableWidget, CloseTableWidget): ~120 lines
+- ❌ Complex camera blending for table view (SetCameraModeLocal expansion): ~167 lines
+- ❌ Widget-per-table-object management pattern
+  **Total Added: ~287 lines**
+
+**Net Growth: +137 lines** (from ~883 to 1020 lines)
+
+**Problems Identified:**
+
+1. **Camera Management Complexity** (Lines 431-598, 167 lines)
+
+   - Handles 4 camera modes: FirstPerson, TableView, MainMenu, SaveSlotView
+   - Dynamically spawns/destroys temporary cameras
+   - Complex cleanup logic with lambda timers
+   - Hardcoded 2.0f blend time throughout
+   - **Should be**: UFCCameraManager component
+
+2. **Table Widget Lifecycle Inconsistency** (Lines 900-1020, 120 lines)
+
+   - Main menu uses UFCUIManager ✅
+   - Pause menu uses UFCUIManager ✅
+   - **Table widgets use PlayerController directly** ❌
+   - Creates widgets with `CreateWidget(this, ...)` - tight coupling
+   - **Should be**: Delegated to UFCUIManager like other UI
+
+3. **State Tracking Fragmentation**
+
+   - `CameraMode` (EFCPlayerCameraMode) - camera system state
+   - `CurrentGameState` (EFCGameState) - game flow state
+   - `bIsPauseMenuDisplayed` (bool) - UI state
+   - `bIsInTableView` (bool) - camera/mode state
+   - Multiple overlapping state variables without clear state machine
+   - **Should be**: Unified state machine in UFCGameStateManager
+
+4. **Timer Safety Risks**
+   - Line 467 (`SetCameraModeLocal`): `[CurrentViewTarget]()` - raw pointer capture
+   - Line 940 (`OnTableObjectClicked`): `[this, TableObject]()` - weak pointer risk
+   - Line 715 (`ReturnToMainMenu`): `[this]()` - safe with UObject delegate
+   - **Should be**: Use FTimerDelegate::CreateUObject consistently
+
 **Problems:**
 
 - Violates Single Responsibility Principle (SRP)
-- Massive class will become unmaintainable by Week 6 (combat, crew UI, etc.)
-- UI logic in controller makes testing difficult
+- Inconsistent refactoring: Some UI in subsystems, some still in controller
+- Camera management growing complex (will get worse with overworld/combat)
+- Timer safety patterns inconsistent
 - Hard to extend for future perspectives (TopDown, Combat)
-- Blueprint exposure is chaotic - 30+ callable functions
+
+**Growth Projection:**
+
+At current growth rate: 137 lines/week × 19 remaining weeks = +2603 lines
+**Projected size by Week 21: 3623 lines** (unmaintainable)
 
 **GDD/DRM Future Requirements:**
 
-- Week 2: Map Table UI with route planning
-- Week 4: Overworld Map Widget with fog-of-war
-- Week 5: Camp management UI
-- Week 6: Combat UI (turn order, abilities, grid)
-- Week 7: Time/Resource HUD
-- Week 12: Camp task assignment UI
-- Week 21: Reputation/Finance UI
+- Week 3: Overworld camera (topdown, zoom, pan) → +150 lines
+- Week 4: Overworld UI widgets (fog-of-war) → +100 lines
+- Week 5: Camp management UI + cameras → +120 lines
+- Week 6: Combat camera (grid view) + UI → +200 lines
+- Week 7: Time/Resource HUD → +80 lines
+- Week 12: Camp task assignment UI → +100 lines
+- Week 21: Reputation/Finance UI → +90 lines
 
-Each new UI system would add 5-10 more methods to PlayerController!
+Each new UI system adds 5-15 methods to PlayerController if not refactored!
 
 **Violation of Conventions:**
 
 > **UE_CodeConventions.md § 2.2**: "Modular Code Organization - Example modules: Combat, UI, Inventory, AI, etc."  
 > **UE_CodeConventions.md § 4.3**: "Clean APIs - Design small, clear public interfaces."
 
-**Recommended Solution:**
+**Recommended Solution (Updated for Week 2):**
 
 Split into specialized components/subsystems:
 
 ```cpp
-// Proposed Architecture:
+// PRIORITY: Refactor Table Widget Management to UFCUIManager
 
-// 1. UFCUIManager - Game Instance Subsystem
+// 1. UFCUIManager - Game Instance Subsystem (EXTEND EXISTING)
 class UFCUIManager : public UGameInstanceSubsystem
 {
-    // Owns all UI widget references
-    // Manages UI stack (Main Menu → Save Selector → Options, etc.)
-    // Handles UI transitions
-    void ShowMainMenu();
-    void ShowSaveSlotSelector();
-    void ShowPauseMenu();
-    void HideAllMenus();
+    // Already handles main menu, pause menu, save selector ✅
 
-    // UI state tracking
-    TArray<UUserWidget*> UIStack;
-    bool IsUIActive() const;
+    // ADD: Table widget management (Week 2+)
+    void ShowTableWidget(AActor* TableObject);
+    void CloseTableWidget();
+    UUserWidget* GetCurrentTableWidget() const;
+    bool IsTableWidgetOpen() const;
+
+    // Widget registry
+    TMap<TSubclassOf<AActor>, TSubclassOf<UUserWidget>> TableWidgetMap;
+
+    // Current table widget state
+    UPROPERTY()
+    TObjectPtr<UUserWidget> CurrentTableWidget;
 };
 
-// 2. UFCCameraManager - Player State Component
+// 2. UFCCameraManager - Player Controller Component (NEW - PRIORITY 2)
 class UFCCameraManager : public UActorComponent
 {
-    // Attached to PlayerController or Player State
-    // Manages camera transitions
-    void SetViewTarget(AActor* NewTarget, float BlendTime);
-    void BlendToMenuCamera();
-    void BlendToFirstPerson();
-    void BlendToTopDown();
+    // Handles all camera transitions and state
+    void BlendToCamera(AActor* Target, float BlendTime = 2.0f, EViewTargetBlendFunction BlendFunc = VTBlend_Cubic);
+    void BlendToMenuCamera(float BlendTime = 0.0f);
+    void BlendToFirstPerson(float BlendTime = 2.0f);
+    void BlendToTableObject(AActor* TableObject, float BlendTime = 2.0f);
+    void RestorePreviousViewTarget(float BlendTime = 2.0f);
 
-    ACameraActor* MenuCamera;
-    UCameraComponent* FirstPersonCamera;
-    // Future: TopDownCamera, CombatCamera
+    // Camera state management
+    EFCPlayerCameraMode GetCameraMode() const;
+    AActor* GetOriginalViewTarget() const;
+
+private:
+    UPROPERTY()
+    TObjectPtr<ACameraActor> MenuCamera;
+
+    UPROPERTY()
+    TObjectPtr<ACameraActor> TableViewCamera;
+
+    UPROPERTY()
+    TObjectPtr<AActor> OriginalViewTarget;
+
+    EFCPlayerCameraMode CurrentCameraMode;
+    bool bIsInTableView;
 };
 
-// 3. UFCInputManager - Player Controller Component
-class UFCInputManager : public UActorComponent
+// 3. AFCPlayerController - SIMPLIFIED (Post-refactoring target)
+class AFCPlayerController : public APlayerController
 {
-    // Handles input context switching
-    void ApplyInputContext(EFCInputMappingMode Mode);
-    void SaveCurrentContext();
-    void RestoreContext();
+    // Core responsibilities only:
 
-    // Bind/unbind actions
-    void BindGameplayActions();
-    void UnbindAll();
+    // Input handling (entry points)
+    void HandleTableObjectClick();
+    void HandlePausePressed();
+    void HandleInteractPressed();
+
+    // Game state transitions
+    void InitializeMainMenu();
+    void TransitionToGameplay();
+    void ReturnToMainMenu();
+
+    // Component references
+    UPROPERTY()
+    TObjectPtr<UFCCameraManager> CameraManager;  // NEW
+
+    // Delegates to subsystems/components:
+    // - Camera → UFCCameraManager
+    // - UI → UFCUIManager
+    // - Transitions → UFCTransitionManager
+    // - Level → UFCLevelManager
 };
+```
+
+**Migration Priority for Week 2+:**
+
+**IMMEDIATE (Before Week 3):**
+
+1. Move table widget lifecycle to UFCUIManager
+   - `ShowTableWidget()` → `UFCUIManager::ShowTableWidget()`
+   - `CloseTableWidget()` → `UFCUIManager::CloseTableWidget()`
+   - `CurrentTableWidget` property → UFCUIManager
+   - Consistency with main menu/pause menu pattern
+
+**HIGH PRIORITY (Before Week 4):** 2. Create UFCCameraManager component
+
+- Extract camera blend logic from PlayerController
+- Centralize camera state tracking
+- Data-driven blend times (no more hardcoded 2.0f)
+
+**MEDIUM PRIORITY (Before Week 6):** 3. Create UFCGameStateManager subsystem
+
+- Unify `CurrentGameState`, `CameraMode`, `bIsPauseMenuDisplayed`, `bIsInTableView`
+- Explicit state machine with transitions
+- Prevents invalid state combinations
+  void UnbindAll();
+  };
 
 // 4. Simplified PlayerController
 class AFCPlayerController : public APlayerController
 {
-    // ONLY handles low-level input routing
-    virtual void SetupInputComponent() override;
+// ONLY handles low-level input routing
+virtual void SetupInputComponent() override;
 
     // Delegates to components
     UPROPERTY()
@@ -1357,8 +1537,10 @@ class AFCPlayerController : public APlayerController
     // Input handlers just route to appropriate systems
     void HandleInteractPressed(); // → Character's InteractionComponent
     void HandlePausePressed();    // → UIManager->ShowPauseMenu()
+
 };
-```
+
+````
 
 **Benefits:**
 
@@ -1391,7 +1573,7 @@ Task 5.14 (deferred) requires persistent fade-in on all level loads, but:
 // UFCTransitionManager.cpp - CreateTransitionWidget()
 APlayerController* PlayerController = World->GetFirstPlayerController();
 TransitionWidget = CreateWidget<UFCScreenTransitionWidget>(PlayerController, WidgetClass);
-```
+````
 
 **Why This Fails:**
 

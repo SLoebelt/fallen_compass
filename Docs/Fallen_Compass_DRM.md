@@ -995,3 +995,32 @@ These should be reviewed and addressed in a future sprint as part of technical d
     - Verify ScrollBox binding and item template instantiation
     - Create multiple test saves to confirm C++ returns all slots correctly
   - **Deferred**: Current workflow only uses QuickSave, will fix when implementing manual save UI
+
+#### Week 2 - Table Interaction System
+
+- [ ] **Camera Blend Hardcoded:**
+
+  - **Issue**: Camera blend duration (2s) is hardcoded in `AFCPlayerController`
+  - **Impact**: Cannot adjust blend timing without code changes
+  - **Solution**: Move to data-driven config (UDataAsset or config property) in Week 3+
+  - **Priority**: Low (works correctly, just inflexible)
+
+- [ ] **Widget Open State Not Tracked:**
+
+  - **Issue**: If player spam-clicks table objects during camera blend, multiple widgets might attempt to open
+  - **Impact**: Potential race condition with widget lifecycle
+  - **Solution**: Add `bIsWidgetOpen` flag to `AFCPlayerController` to prevent re-entry
+  - **Priority**: Medium (edge case, but could cause issues)
+
+- [ ] **Supply Display Binding:**
+
+  - **Issue**: Currently uses Tick or manual refresh in widgets
+  - **Impact**: Slightly inefficient, updates even when data hasn't changed
+  - **Solution**: Add `OnExpeditionContextChanged` delegate binding for real-time updates
+  - **Priority**: Low (performance impact negligible in Week 2 scope)
+
+- [ ] **Level Transition FadeIn Not Explicit:**
+  - **Issue**: After `LoadLevel()`, fade-in relies on existing logic in new level's BeginPlay
+  - **Impact**: No explicit control over fade-in timing
+  - **Solution**: Week 3 should add explicit fade-in call after `OpenLevel` completes
+  - **Priority**: Medium (works but not robust)

@@ -2020,15 +2020,25 @@ Extend `UFCLevelManager` subsystem with `LoadLevel()` method supporting fade/loa
 
 ### Task 6: Establish Persistent Game State Foundation
 
+**Status**: ✅ COMPLETED (Nov 20, 2025)
+
 Extend `UFCGameInstance` with persistent game state data: create `FFCGameStateData` struct (Supplies, Money, Day) and methods to manipulate supplies. Display current supplies in WBP_TableMap widget to validate data flow from GameInstance → Widget.
 
 **Key Deliverables:**
 
-- `FFCGameStateData` struct (C++): Supplies, Money (int32), Day (int32)
-- UFCGameInstance properties: CurrentSupplies (int32, default: 100)
-- Methods: AddSupplies(), ConsumeSupplies()
-- WBP_TableMap reads and displays CurrentSupplies from GameInstance
-- Test: Modify supplies in code, verify widget updates correctly
+- ✅ `FFCGameStateData` struct (C++): Supplies, Money (int32), Day (int32) with default constructor
+- ✅ UFCGameInstance properties: GameStateData (FFCGameStateData, default: Supplies=100, Money=500, Day=1)
+- ✅ Methods: AddSupplies(int32), ConsumeSupplies(int32, bool&) returns int32
+- ✅ GetCurrentSupplies() accessor returns GameStateData.Supplies
+- ✅ WBP_TableMap reads and displays CurrentSupplies from GameInstance
+- ✅ Test: Modify supplies in code, verify widget updates correctly
+- ✅ All state changes trigger OnExpeditionContextChanged broadcast
+
+**Implementation Details:**
+
+- Replaced simple `CurrentSupplies` property with full `FFCGameStateData` struct
+- Updated `ConsumeSupplies` signature: returns current supplies with success flag as out parameter
+- Maintained backward compatibility through `GetCurrentSupplies()` accessor
 
 ---
 
@@ -2473,7 +2483,7 @@ After completing Tasks 1-6, conduct comprehensive verification to ensure all Wee
     - [ ] UFCExpeditionData ✅
     - [ ] UFCExpeditionManager ✅
     - [ ] IFCTableInteractable ✅
-    - [ ] FFCGameStateData ✅
+    - [x] FFCGameStateData ✅ (Implemented with Supplies, Money, Day fields - Nov 20, 2025)
   - [ ] Blueprints:
     - [ ] BP_TableObject ✅
     - [ ] BP_TableObject_Map, Logbook, Letters, Glass ✅
