@@ -145,6 +145,14 @@ void AFCPlayerController::BeginPlay()
 		// Don't set input mode here to avoid race conditions
 		
 		UE_LOG(LogFallenCompassPlayerController, Log, TEXT("BeginPlay: Controller ready, input mode will be set by game state transitions"));
+
+		// Subscribe to game state changes
+		UFCGameStateManager* StateMgr = GameInstance->GetSubsystem<UFCGameStateManager>();
+		if (StateMgr)
+		{
+			StateMgr->OnStateChanged.AddDynamic(this, &AFCPlayerController::OnGameStateChanged);
+			UE_LOG(LogFallenCompassPlayerController, Log, TEXT("BeginPlay: Subscribed to GameStateManager.OnStateChanged"));
+		}
 	}
 
 	// Note: MenuCamera reference will be set in Blueprint (BP_FC_PlayerController)
@@ -831,6 +839,42 @@ void AFCPlayerController::HandleOverworldZoom(const FInputActionValue& Value)
 	if (OverworldCamera)
 	{
 		OverworldCamera->HandleZoom(Value);
+	}
+}
+
+void AFCPlayerController::OnGameStateChanged(EFCGameStateID OldState, EFCGameStateID NewState)
+{
+	UE_LOG(LogFallenCompassPlayerController, Log, TEXT("OnGameStateChanged: %s -> %s"),
+		*UEnum::GetValueAsString(OldState),
+		*UEnum::GetValueAsString(NewState));
+
+	// React to Overworld_Travel state entry
+	if (NewState == EFCGameStateID::Overworld_Travel)
+	{
+		// Switch to TopDown input mode
+		if (InputManager)
+		{
+			InputManager->SetInputMappingMode(EFCInputMappingMode::TopDown);
+			UE_LOG(LogFallenCompassPlayerController, Log, TEXT("OnGameStateChanged: Switched to TopDown input mode"));
+		}
+
+		// Blend to Overworld camera
+		if (CameraManager)
+		{
+			CameraManager->BlendToTopDown(2.0f);
+			UE_LOG(LogFallenCompassPlayerController, Log, TEXT("OnGameStateChanged: Blending to TopDown camera"));
+		}
+	}
+	// React to leaving Overworld_Travel state
+	else if (OldState == EFCGameStateID::Overworld_Travel)
+	{
+		// Restore FirstPerson input mode when leaving Overworld
+		if (InputManager && NewState == EFCGameStateID::Office_Exploration)
+		{
+			InputManager->SetInputMappingMode(EFCInputMappingMode::FirstPerson);
+			CameraManager->BlendToFirstPerson(2.0f);
+			UE_LOG(LogFallenCompassPlayerController, Log, TEXT("OnGameStateChanged: Returned to FirstPerson mode"));
+		}
 	}
 }
 

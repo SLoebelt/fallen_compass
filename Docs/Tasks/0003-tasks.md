@@ -1274,14 +1274,276 @@ void AFCOverworldCamera::DrawDebugLimits() const
 
 ---
 
-#### Step 4.3: ~~Create BP_FCOverworldPlayerController Blueprint~~ **SKIPPED** - Using Existing BP_FC_PlayerController
+#### Step 4.3: Configure State-Driven Camera and Input for Overworld_Travel
+
+##### Step 4.3.1: Add OnStateChanged Handler to AFCPlayerController
+
+- [x] **Analysis**
+
+  - [x] GameStateManager broadcasts OnStateChanged when state transitions occur
+  - [x] AFCPlayerController should subscribe to this delegate and react to Overworld_Travel state
+  - [x] This keeps camera/input behavior coupled to game state, not level name
+  - [x] Follows existing pattern used for Office states (Office_Exploration, Office_TableView)
+
+- [x] **Implementation (FCPlayerController.h)**
+
+  - [x] Add protected method declaration after HandleOverworldZoom:
+    ```cpp
+    /** Handle game state changes (bind to GameStateManager.OnStateChanged) */
+    UFUNCTION()
+    void OnGameStateChanged(EFCGameStateID OldState, EFCGameStateID NewState);
+    ```
+  - [x] Added forward declaration: `struct FInputActionValue;`
+  - [x] Save file
+
+- [x] **Implementation (FCPlayerController.cpp)**
+
+  - [x] Add OnGameStateChanged implementation after HandleOverworldZoom
+
+    ```cpp
+    void AFCPlayerController::OnGameStateChanged(EFCGameStateID OldState, EFCGameStateID NewState)
+    {
+        UE_LOG(LogFallenCompassPlayerController, Log, TEXT("OnGameStateChanged: %s -> %s"),
+            *UEnum::GetValueAsString(OldState),
+            *UEnum::GetValueAsString(NewState));
+
+        // React to Overworld_Travel state entry
+        if (NewState == EFCGameStateID::Overworld_Travel)
+        {
+            // Switch to TopDown input mode
+            if (InputManager)
+            {
+                InputManager->SetInputMappingMode(EFCInputMappingMode::TopDown);
+                UE_LOG(LogFallenCompassPlayerController, Log, TEXT("OnGameStateChanged: Switched to TopDown input mode"));
+            }
+
+            // Blend to Overworld camera
+            if (CameraManager)
+            {
+                CameraManager->BlendToTopDown(2.0f);
+                UE_LOG(LogFallenCompassPlayerController, Log, TEXT("OnGameStateChanged: Blending to TopDown camera"));
+            }
+        }
+        // React to leaving Overworld_Travel state
+        else if (OldState == EFCGameStateID::Overworld_Travel)
+        {
+            // Restore FirstPerson input mode when leaving Overworld
+            if (InputManager && NewState == EFCGameStateID::Office_Exploration)
+            {
+                InputManager->SetInputMappingMode(EFCInputMappingMode::FirstPerson);
+                CameraManager->BlendToFirstPerson(2.0f);
+                UE_LOG(LogFallenCompassPlayerController, Log, TEXT("OnGameStateChanged: Returned to FirstPerson mode"));
+            }
+        }
+    }
+    ```
+
+  - [ ] Bind delegate in BeginPlay (after RestorePlayerPosition call):
+    ```cpp
+    // Subscribe to game state changes
+    UFCGameInstance* GI = Cast<UFCGameInstance>(GetGameInstance());
+    if (GI)
+    {
+        UFCGameStateManager* StateMgr = GI->GetSubsystem<UFCGameStateManager>();
+        if (StateMgr)
+        {
+            StateMgr->OnStateChanged.AddDynamic(this, &AFCPlayerController::OnGameStateChanged);
+            UE_LOG(LogFallenCompassPlayerController, Log, TEXT("BeginPlay: Subscribed to GameStateManager.OnStateChanged"));
+        }
+    }
+    ```
+  - [ ] Save file
+
+- [ ] **Testing After Step 4.3.1** ✅ CHECKPOINT
+  - [ ] Code compiles without errors
+  - [ ] OnGameStateChanged signature matches delegate (EFCGameStateID, EFCGameStateID)
+  - [x] Bind delegate in BeginPlay (after RestorePlayerPosition call):
+    ```cpp
+    // Subscribe to game state changes
+    UFCGameInstance* GI = Cast<UFCGameInstance>(GetGameInstance());
+    if (GI)
+    {
+        UFCGameStateManager* StateMgr = GI->GetSubsystem<UFCGameStateManager>();
+        if (StateMgr)
+        {
+            StateMgr->OnStateChanged.AddDynamic(this, &AFCPlayerController::OnGameStateChanged);
+            UE_LOG(LogFallenCompassPlayerController, Log, TEXT("BeginPlay: Subscribed to GameStateManager.OnStateChanged"));
+        }
+    }
+    ```
+  - [x] Save file
+
+- [x] **Testing After Step 4.3.1** ✅ CHECKPOINT
+  - [x] Code compiles without errors
+  - [x] OnGameStateChanged signature matches delegate (EFCGameStateID, EFCGameStateID)
+  - [x] Delegate binding in BeginPlay present
+  - [x] Deleted obsolete FCOverworldPlayerController.h file
+
+**COMMIT POINT 4.3.1**: `git add Source/FC/Core/FCPlayerController.h Source/FC/Core/FCPlayerController.cpp && git commit -m "feat(overworld): Add state-driven camera/input switching for Overworld_Travel"`
+
+**Architecture Note**: This approach decouples level-specific behavior from Level Blueprints. Any level that transitions to Overworld_Travel state will automatically trigger TopDown camera/input mode. This also handles Office↔Overworld transitions cleanly (Task 7) without duplicating logic.
+
+---
+
+##### Step 4.3.2: Place BP_OverworldCamera in L_Overworld
 
 - [ ] **Analysis**
 
-  - [ ] Review AFCPlayerController.h/.cpp structure from Week 1
-  - [ ] Check how InputManager component is created in AFCPlayerController constructor
-  - [ ] Confirm naming: AFCOverworldPlayerController (A prefix for Actor-derived)
-  - [ ] Confirm location: `/Source/FC/Core/` (same module as FCPlayerController)
+  - [ ] UFCCameraManager.BlendToTopDown() searches for camera with "OverworldCamera" in name
+  - [ ] Camera should be positioned above PlayerStart for initial view
+  - [ ] No Level Blueprint changes needed - state transition already exists from Task 2.5.1
+
+- [ ] **Implementation (Unreal Editor)**
+
+  - [ ] Open L_Overworld level
+  - [ ] Drag BP_OverworldCamera from Content Browser into viewport
+  - [ ] Position camera:
+    - [ ] Location: X=-1000, Y=0, Z=1500 (behind and above PlayerStart)
+    - [ ] Rotation: Pitch=-70, Yaw=0, Roll=0
+  - [ ] Details panel:
+    - [ ] Auto Activate: True
+    - [ ] Verify SpringArm properties match C++ defaults
+  - [ ] Save level
+
+- [ ] **Verify Existing Level Blueprint** (no changes needed)
+
+  - [ ] Open Level Blueprint (Blueprints → Open Level Blueprint)
+  - [ ] Confirm Event BeginPlay → GameStateManager → TransitionTo(Overworld_Travel) exists
+  - [ ] This is from Task 2.5.1 - no modifications needed
+  - [ ] State transition will trigger OnGameStateChanged in PlayerController
+
+- [ ] **Testing After Step 4.3.2** ✅ CHECKPOINT
+  - [ ] BP_OverworldCamera visible in Outliner with "OverworldCamera" in name
+  - [ ] Camera positioned correctly (can see PlayerStart in viewport preview)
+  - [ ] Level Blueprint unchanged from Task 2.5.1
+  - [ ] Level saves without errors
+
+**COMMIT POINT 4.3.2**: `git add Content/FC/World/Levels/Overworld/L_Overworld.umap && git commit -m "feat(overworld): Place BP_OverworldCamera in L_Overworld"`
+
+**Integration Note**: L_Overworld Level Blueprint (Task 2.5.1) transitions to Overworld_Travel → OnStateChanged fires → AFCPlayerController.OnGameStateChanged() switches input mode and camera. This creates a clean state-driven flow without level-specific logic in the controller.
+
+---
+
+#### Step 4.4: Test State-Driven Overworld System
+
+##### Step 4.4.1: Full State-Driven Integration Test
+
+- [ ] **Analysis**
+
+  - [ ] Test complete flow: Level loads → GameState transitions → OnStateChanged fires → Camera/Input switch
+  - [ ] Verify state-driven architecture works correctly
+  - [ ] Check Output Log for delegate and state transition logs
+
+- [ ] **Test Sequence**
+
+  - [ ] Open L_Overworld in editor
+  - [ ] Compile C++ project (if not already compiled)
+  - [ ] PIE (Play In Editor)
+  - [ ] **Check Output Log for:**
+    - [ ] "Loaded IA_OverworldPan" (AFCPlayerController constructor)
+    - [ ] "Loaded IA_OverworldZoom" (AFCPlayerController constructor)
+    - [ ] "Bound IA_OverworldPan" (SetupInputComponent)
+    - [ ] "Bound IA_OverworldZoom" (SetupInputComponent)
+    - [ ] "Subscribed to GameStateManager.OnStateChanged" (BeginPlay)
+    - [ ] "L_Overworld: Transitioned to Overworld_Travel state" (Level Blueprint - Task 2.5.1)
+    - [ ] "OnGameStateChanged: None -> Overworld_Travel" (AFCPlayerController)
+    - [ ] "Switched to TopDown input mode" (OnGameStateChanged)
+    - [ ] "Blending to TopDown camera" (OnGameStateChanged)
+    - [ ] "Set PlayerPawn reference on camera" (UFCCameraManager.BlendToTopDown)
+  - [ ] **Test WASD Pan:**
+    - [ ] Press W → Camera pans forward (Y positive)
+    - [ ] Press S → Camera pans backward (Y negative)
+    - [ ] Press A → Camera pans left (X negative)
+    - [ ] Press D → Camera pans right (X positive)
+    - [ ] Pan until yellow debug circle boundary (if debug enabled)
+    - [ ] Verify camera stops at boundary (distance limiting works)
+  - [ ] **Test Mouse Wheel Zoom:**
+    - [ ] Scroll up → Camera zooms in (SpringArm shortens)
+    - [ ] Scroll down → Camera zooms out (SpringArm lengthens)
+    - [ ] Zoom to minimum (500 units)
+    - [ ] Zoom to maximum (cyan debug circle boundary if debug enabled)
+    - [ ] Verify zoom stops at min/max limits
+  - [ ] **Test North Alignment:**
+    - [ ] Try to rotate camera (should have no effect)
+    - [ ] Camera Yaw should always be 0 (north-aligned)
+  - [ ] **Test Debug Visualization (optional):**
+    - [ ] Select BP_OverworldCamera instance in Outliner
+    - [ ] Set Show Debug Radius = True in Details panel
+    - [ ] PIE again
+    - [ ] Yellow circle = pan limit (3000 units from PlayerStart)
+    - [ ] Cyan circle = zoom limit (4000 units from PlayerStart)
+  - [ ] Document any issues in "Known Issues & Backlog"
+
+- [ ] **Testing After Step 4.4.1** ✅ CHECKPOINT
+  - [ ] OnStateChanged delegate fires correctly (logs confirm)
+  - [ ] TopDown input mode active after state transition
+  - [ ] Camera auto-possesses via state-driven BlendToTopDown call
+  - [ ] WASD pans camera smoothly with distance limiting
+  - [ ] Mouse wheel zooms correctly with min/max limits
+  - [ ] Camera rotation locked to north (Yaw=0)
+  - [ ] No "Accessed None" errors
+  - [ ] No input binding warnings
+  - [ ] Debug visualization works (if enabled)
+  - [ ] State transition flow visible in logs (None→Overworld_Travel→Camera/Input switch)
+
+**COMMIT POINT 4.4.1**: `git add -A && git commit -m "test(overworld): Verify state-driven camera/input switching for Overworld_Travel"`
+
+**State Flow Verification**: Ensure the complete chain works: L_Overworld loads → Level Blueprint calls TransitionTo(Overworld_Travel) → GameStateManager broadcasts OnStateChanged → AFCPlayerController.OnGameStateChanged() reacts → InputManager switches to TopDown → CameraManager blends to camera. This validates the state-driven architecture.
+
+---
+
+### Task 4 Acceptance Criteria
+
+- [x] UFCCameraManager.BlendToTopDown() implemented to find and possess BP_OverworldCamera
+- [x] AFCPlayerController extended with IA_OverworldPan and IA_OverworldZoom input actions
+- [x] HandleOverworldPan/Zoom methods forward input to AFCOverworldCamera
+- [x] Input actions load in constructor and bind in SetupInputComponent
+- [ ] AFCPlayerController.OnGameStateChanged() method implemented
+- [ ] OnGameStateChanged() subscribes to GameStateManager.OnStateChanged delegate in BeginPlay
+- [ ] OnGameStateChanged() switches to TopDown input mode when entering Overworld_Travel state
+- [ ] OnGameStateChanged() calls CameraManager->BlendToTopDown() when entering Overworld_Travel state
+- [ ] OnGameStateChanged() restores FirstPerson mode when leaving Overworld_Travel for Office_Exploration
+- [ ] BP_OverworldCamera placed in L_Overworld at correct position
+- [ ] PIE in L_Overworld triggers Overworld_Travel state transition (Task 2.5.1)
+- [ ] State transition fires OnStateChanged delegate (confirmed in logs)
+- [ ] TopDown input mode activates via state change (confirmed in logs)
+- [ ] Camera auto-possesses via state-driven BlendToTopDown (confirmed in logs)
+- [ ] WASD pans camera with distance limiting
+- [ ] Mouse wheel zooms camera with min/max limits
+- [ ] Camera rotation locked to north (Yaw=0)
+- [ ] No compilation errors or Blueprint errors
+- [ ] All assets saved in correct folders
+
+**Architecture Note**: By using GameStateManager.OnStateChanged delegate, camera and input behavior is now **state-driven** rather than level-driven. AFCPlayerController reacts to Overworld_Travel state entry regardless of which level triggered it. This makes the system:
+
+- **Scalable**: Easy to add new Overworld levels (e.g., multiple regions) without duplicating logic
+- **Maintainable**: Camera/input logic centralized in one place (OnGameStateChanged)
+- **Testable**: State transitions can be triggered programmatically for testing
+- **Consistent**: Same behavior across all Overworld contexts (travel, combat, POI interaction)
+
+This follows the same pattern used for Office states (Office_Exploration, Office_TableView) and prepares for Task 7 (Office↔Overworld transitions) where state changes will drive camera/input switching automatically.
+
+**Task 4 complete. Ready for Task 5 sub-tasks (Convoy Pawn & Click-to-Move)? Respond with 'Go' to continue.**
+
+---
+
+### Task 5: Convoy Pawn & Click-to-Move Pathfinding
+
+**Purpose**: Create BP_OverworldConvoy pawn with left-click movement using NavMesh pathfinding via SimpleMoveToLocation().
+
+---
+
+#### Step 5.1: Create Input Action for Click-to-Move
+
+##### Step 5.1.1: Create IA_OverworldClickMove Input Action
+
+- [ ] **Analysis**
+
+  - [ ] Review existing input actions (IA_Interact from Week 1 uses Boolean type)
+  - [ ] Click-to-move needs Boolean trigger (press detection, not hold)
+  - [ ] Will be bound to Left Mouse Button in IMC_FC_TopDown
+
+- [ ] **Implementation (Unreal Editor)**
 
 - [ ] **Implementation (FCOverworldPlayerController.h)**
 

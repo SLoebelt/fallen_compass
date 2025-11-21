@@ -13,6 +13,7 @@ class ACameraActor;
 class UUserWidget;
 class UFCCameraManager;
 class UFCInputManager;
+struct FInputActionValue;
 
 DECLARE_LOG_CATEGORY_EXTERN(LogFallenCompassPlayerController, Log, All);
 
@@ -177,6 +178,10 @@ protected:
 	void HandleQuickLoadPressed();
 	void HandleOverworldPan(const FInputActionValue& Value);
 	void HandleOverworldZoom(const FInputActionValue& Value);
+
+	/** Handle game state changes (bind to GameStateManager.OnStateChanged) */
+	UFUNCTION()
+	void OnGameStateChanged(EFCGameStateID OldState, EFCGameStateID NewState);
 
 	UFUNCTION(BlueprintCallable, Category = "Game State")
 	void ResumeGame();
