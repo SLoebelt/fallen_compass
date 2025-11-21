@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/PlayerController.h"
+#include "Components/FCInputManager.h"
 #include "FCPlayerController.generated.h"
 
 class UInputAction;
@@ -11,6 +12,7 @@ class UInputMappingContext;
 class ACameraActor;
 class UUserWidget;
 class UFCCameraManager;
+class UFCInputManager;
 
 DECLARE_LOG_CATEGORY_EXTERN(LogFallenCompassPlayerController, Log, All);
 
@@ -22,15 +24,6 @@ enum class EFCPlayerCameraMode : uint8
 	MainMenu,
 	SaveSlotView,
 	TopDown  // Week 3: Overworld camera mode
-};
-
-UENUM(BlueprintType)
-enum class EFCInputMappingMode : uint8
-{
-	FirstPerson = 0,
-	TopDown,
-	Fight,
-	StaticScene
 };
 
 UENUM(BlueprintType)
@@ -60,10 +53,13 @@ public:
 
 	EFCPlayerCameraMode GetCameraMode() const;
 	bool IsPauseMenuDisplayed() const { return bIsPauseMenuDisplayed; }
-	EFCInputMappingMode GetCurrentMappingMode() const { return CurrentMappingMode; }
+	EFCInputMappingMode GetCurrentMappingMode() const;
 	EFCGameState GetCurrentGameState() const { return CurrentGameState; }
 
-	/** Switch to a different input mapping context (e.g., FirstPerson → TopDown) */
+	/**
+	 * Switch to a different input mapping context (e.g., FirstPerson → TopDown).
+	 * Delegates to UFCInputManager component for centralized input management.
+	 */
 	UFUNCTION(BlueprintCallable, Category = "Input")
 	void SetInputMappingMode(EFCInputMappingMode NewMode);
 
@@ -143,43 +139,28 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<UFCCameraManager> CameraManager;
 
-	UPROPERTY(EditDefaultsOnly, Category = "Input")
-	int32 DefaultMappingPriority = 0;
+	/** Input management component */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	TObjectPtr<UFCInputManager> InputManager;
 
-	/** Current input mapping mode */
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Input")
-	EFCInputMappingMode CurrentMappingMode;
-
-	/** Input mapping context for first-person office exploration */
-	UPROPERTY(EditDefaultsOnly, Category = "Input")
-	TObjectPtr<UInputMappingContext> FirstPersonMappingContext;
-
-	/** Input mapping context for top-down overworld navigation */
-	UPROPERTY(EditDefaultsOnly, Category = "Input")
-	TObjectPtr<UInputMappingContext> TopDownMappingContext;
-
-	/** Input mapping context for combat/fight sequences */
-	UPROPERTY(EditDefaultsOnly, Category = "Input")
-	TObjectPtr<UInputMappingContext> FightMappingContext;
-
-	/** Input mapping context for static scenes (cutscenes, dialogue) */
-	UPROPERTY(EditDefaultsOnly, Category = "Input")
-	TObjectPtr<UInputMappingContext> StaticSceneMappingContext;
-
-	UPROPERTY(EditDefaultsOnly, Category = "Input")
+	/** Input action for interaction (E key) */
+	UPROPERTY(EditDefaultsOnly, Category = "FC|Input|Actions")
 	TObjectPtr<UInputAction> InteractAction;
 
 	/** Input action for table object click */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FC|Input")
+	UPROPERTY(EditDefaultsOnly, Category = "FC|Input|Actions")
 	TObjectPtr<UInputAction> ClickAction;
 
-	UPROPERTY(EditDefaultsOnly, Category = "Input")
+	/** Input action for pause/escape (ESC key) */
+	UPROPERTY(EditDefaultsOnly, Category = "FC|Input|Actions")
 	TObjectPtr<UInputAction> EscapeAction;
 
-	UPROPERTY(EditDefaultsOnly, Category = "Input")
+	/** Input action for quick save (F5 key) */
+	UPROPERTY(EditDefaultsOnly, Category = "FC|Input|Actions")
 	TObjectPtr<UInputAction> QuickSaveAction;
 
-	UPROPERTY(EditDefaultsOnly, Category = "Input")
+	/** Input action for quick load (F9 key) */
+	UPROPERTY(EditDefaultsOnly, Category = "FC|Input|Actions")
 	TObjectPtr<UInputAction> QuickLoadAction;
 
 	void HandleInteractPressed();

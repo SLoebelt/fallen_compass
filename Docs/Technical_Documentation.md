@@ -106,8 +106,10 @@ FC/
 │   ├── FCFirstPersonCharacter.h/cpp
 │   └── FCCharacter.h/cpp (top-down variant)
 ├── Source/FC/Components
-│   └── UFCCameraManager.h/cpp (Actor Component - Priority 3A)
-│       └── EFCPlayerCameraMode, BlendToMenuCamera(), BlendToFirstPerson(), BlendToTableObject()
+│   ├── UFCCameraManager.h/cpp (Actor Component - Priority 3A)
+│   │   └── EFCPlayerCameraMode, BlendToMenuCamera(), BlendToFirstPerson(), BlendToTableObject()
+│   └── UFCInputManager.h/cpp (Actor Component - Priority 6A)
+│       └── EFCInputMappingMode, SetInputMappingMode(), Input Mapping Context registry
 ├── Source/FC/Interaction
 │   ├── IFCInteractable.h/cpp
 │   ├── IFCTableInteractable.h/cpp (Week 2)
@@ -1147,7 +1149,7 @@ if (StateMgr->GetCurrentState() == EFCGameStateID::Paused)
         bIsPauseMenuDisplayed = false;
     }
 }
-else if (CurrentState == EFCGameStateID::Office_Exploration || 
+else if (CurrentState == EFCGameStateID::Office_Exploration ||
          CurrentState == EFCGameStateID::Office_TableView)
 {
     // Pause: Push current state onto stack and transition to Paused
@@ -1160,12 +1162,14 @@ else if (CurrentState == EFCGameStateID::Office_Exploration ||
 ```
 
 **Benefits**:
+
 - ✅ Supports pausing from any state (Office_Exploration, Office_TableView, future combat/camp states)
 - ✅ Automatic return to correct previous state when resuming
 - ✅ Stack depth tracking for debugging nested states
 - ✅ Foundation for modal dialogs (confirmation, inventory, etc.)
 
 **Logging Example**:
+
 ```
 LogFCGameState: PushState: Pushed EFCGameStateID::Office_Exploration onto stack (depth now: 1)
 LogFCGameState: State transition: EFCGameStateID::Office_Exploration -> EFCGameStateID::Paused
@@ -1342,7 +1346,7 @@ void UFCUIManager::ShowPauseMenu()
                 InputMode.SetHideCursorDuringCapture(false);
                 PC->SetInputMode(InputMode);
                 PC->bShowMouseCursor = true;
-                
+
                 UE_LOG(LogFCUIManager, Log, TEXT("ShowPauseMenu: Input mode set to GameAndUI, pause menu displayed"));
             }
         }
@@ -1384,13 +1388,13 @@ void UFCUIManager::HidePauseMenu()
   - Game state system (`EFCGameStateID::Paused`) provides logical pause
   - Enhanced Input continues working (ESC key closes pause menu via `AFCPlayerController::HandlePausePressed()`)
   - PlayerController receives input events via `FInputModeGameAndUI`
-  
 - **Future Overworld** (Week 3+): Add conditional engine pause
   - Check if pausing from `Overworld_Travel` state using `UFCGameStateManager::GetStateAtDepth(0)`
   - If Overworld, call `SetPause(true)` to freeze 3D map movement/physics
   - Office pause menu continues without engine pause (current behavior)
 
 **Why Not SetPause(true) for Office**:
+
 - `SetPause(true)` stops game tick, which blocks Enhanced Input action processing
 - ESC key binding (`EscapeAction`) would not fire when paused
 - `FInputModeGameAndUI` allows both UI buttons AND game input (ESC) to work simultaneously
@@ -2866,13 +2870,23 @@ UE_LOG(LogFallenCompassGameMode, Verbose,
 
 Configured Enhanced Input System with multiple mapping contexts for different gameplay modes. Created 2D vector input actions for movement and look, with proper key bindings and modifiers for first-person controls.
 
-#### Multiple Input Mapping Contexts
+#### Multiple Input Mapping Contexts (Priority 6A - Refactored)
 
-**Architecture Decision**: Separate mapping contexts for different gameplay modes enable clean context switching without conflicts.
+**Architecture Decision**: Input management extracted to `UFCInputManager` component for reusability across multiple controller types.
+
+**Refactoring Benefits**:
+
+- **Reusability**: Component can be attached to FirstPersonPlayerController, TopDownPlayerController, etc.
+- **Maintainability**: Input logic centralized in single component instead of duplicated across controllers
+- **Extensibility**: Easy to add new input modes without modifying PlayerController
+- **Week 3 Ready**: TopDownPlayerController can use same UFCInputManager for overworld input
 
 ```mermaid
 flowchart LR
-    Controller[AFCPlayerController<br/>--Current Mode--]
+    subgraph PlayerController["AFCPlayerController"]
+        PC[Player Controller]
+        InputMgr[UFCInputManager<br/>Component]
+    end
 
     subgraph Contexts["Input Mapping Contexts"]
         FP[IMC_FC_FirstPerson<br/>Office exploration]
@@ -2881,87 +2895,138 @@ flowchart LR
         Static[IMC_FC_StaticScene<br/>Cutscenes/UI]
     end
 
-    Controller -->|SetInputMappingMode| FP
-    Controller -->|SetInputMappingMode| TD
-    Controller -->|SetInputMappingMode| Fight
-    Controller -->|SetInputMappingMode| Static
+    PC -->|delegates to| InputMgr
+    InputMgr -->|SetInputMappingMode| FP
+    InputMgr -->|SetInputMappingMode| TD
+    InputMgr -->|SetInputMappingMode| Fight
+    InputMgr -->|SetInputMappingMode| Static
 
-    style Controller fill:#4a90e2
+    style PC fill:#4a90e2
+    style InputMgr fill:#9b59b6
     style FP fill:#50c878
     style TD fill:#f39c12
     style Fight fill:#e74c3c
     style Static fill:#9b59b6
 ```
 
-#### EFCInputMappingMode Enum
+#### UFCInputManager Component
 
-**Added to `FCPlayerController.h`**:
+**Location**: `Source/FC/Components/FCInputManager.h/.cpp`
 
-```cpp
-UENUM(BlueprintType)
-enum class EFCInputMappingMode : uint8
-{
-    FirstPerson = 0,
-    TopDown,
-    Fight,
-    StaticScene
-};
-```
-
-#### Input Mapping Context Properties
-
-**Replaced single `DefaultMappingContext` with four mode-specific contexts**:
+**Component Properties**:
 
 ```cpp
-UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Input")
+/** Current input mapping mode */
+UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "FC|Input|State")
 EFCInputMappingMode CurrentMappingMode;
 
-UPROPERTY(EditDefaultsOnly, Category = "Input")
+/** Priority for input mapping contexts */
+UPROPERTY(EditDefaultsOnly, Category = "FC|Input|Settings")
+int32 DefaultMappingPriority = 0;
+
+/** Input mapping contexts for all gameplay modes */
+UPROPERTY(EditDefaultsOnly, Category = "FC|Input|Contexts")
 TObjectPtr<UInputMappingContext> FirstPersonMappingContext;
 
-UPROPERTY(EditDefaultsOnly, Category = "Input")
+UPROPERTY(EditDefaultsOnly, Category = "FC|Input|Contexts")
 TObjectPtr<UInputMappingContext> TopDownMappingContext;
 
-UPROPERTY(EditDefaultsOnly, Category = "Input")
+UPROPERTY(EditDefaultsOnly, Category = "FC|Input|Contexts")
 TObjectPtr<UInputMappingContext> FightMappingContext;
 
-UPROPERTY(EditDefaultsOnly, Category = "Input")
+UPROPERTY(EditDefaultsOnly, Category = "FC|Input|Contexts")
 TObjectPtr<UInputMappingContext> StaticSceneMappingContext;
 ```
 
-#### Dynamic Context Switching
-
-**Public method for runtime mode changes**:
+**Public API**:
 
 ```cpp
-UFUNCTION(BlueprintCallable, Category = "Input")
+/** Switch to a different input mapping context */
+UFUNCTION(BlueprintCallable, Category = "FC|Input")
 void SetInputMappingMode(EFCInputMappingMode NewMode);
+
+/** Get the currently active input mapping mode */
+UFUNCTION(BlueprintPure, Category = "FC|Input")
+EFCInputMappingMode GetCurrentMappingMode() const;
 ```
 
 **Implementation** - clears all mappings and applies new context:
 
 ```cpp
-void AFCPlayerController::SetInputMappingMode(EFCInputMappingMode NewMode)
+void UFCInputManager::SetInputMappingMode(EFCInputMappingMode NewMode)
 {
-    // Get subsystem and validate
-    UEnhancedInputLocalPlayerSubsystem* Subsystem =
-        ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer());
+    UEnhancedInputLocalPlayerSubsystem* Subsystem = GetEnhancedInputSubsystem();
 
     // Select context based on mode
     UInputMappingContext* ContextToApply = nullptr;
     switch (NewMode)
     {
-        case EFCInputMappingMode::FirstPerson: ContextToApply = FirstPersonMappingContext; break;
-        case EFCInputMappingMode::TopDown: ContextToApply = TopDownMappingContext; break;
-        case EFCInputMappingMode::Fight: ContextToApply = FightMappingContext; break;
-        case EFCInputMappingMode::StaticScene: ContextToApply = StaticSceneMappingContext; break;
+        case EFCInputMappingMode::FirstPerson:
+            ContextToApply = FirstPersonMappingContext; break;
+        case EFCInputMappingMode::TopDown:
+            ContextToApply = TopDownMappingContext; break;
+        case EFCInputMappingMode::Fight:
+            ContextToApply = FightMappingContext; break;
+        case EFCInputMappingMode::StaticScene:
+            ContextToApply = StaticSceneMappingContext; break;
     }
 
-    // Clear and apply
+    // Clear all existing mappings and apply new one
     Subsystem->ClearAllMappings();
     Subsystem->AddMappingContext(ContextToApply, DefaultMappingPriority);
     CurrentMappingMode = NewMode;
 }
+```
+
+**PlayerController Integration**:
+
+```cpp
+// AFCPlayerController constructor
+AFCPlayerController::AFCPlayerController()
+{
+    // Create input manager component
+    InputManager = CreateDefaultSubobject<UFCInputManager>(TEXT("InputManager"));
+}
+
+// Delegation methods
+void AFCPlayerController::SetInputMappingMode(EFCInputMappingMode NewMode)
+{
+    if (InputManager)
+    {
+        InputManager->SetInputMappingMode(NewMode);
+    }
+}
+
+EFCInputMappingMode AFCPlayerController::GetCurrentMappingMode() const
+{
+    return InputManager ? InputManager->GetCurrentMappingMode() : EFCInputMappingMode::FirstPerson;
+}
+```
+
+**Blueprint Configuration**:
+
+1. Open `BP_FC_PlayerController`
+2. Select `InputManager` component in hierarchy
+3. Assign all 4 Input Mapping Context references in **FC | Input | Contexts** category
+4. Input actions remain in PlayerController under **FC | Input | Actions** category
+
+#### EFCInputMappingMode Enum
+
+**Moved to `FCInputManager.h` for component encapsulation**:
+
+```cpp
+UENUM(BlueprintType)
+enum class EFCInputMappingMode : uint8
+{
+    /** First-person office exploration with WASD movement and mouse look */
+    FirstPerson = 0,
+    /** Top-down overworld navigation (Week 3: Overworld camera mode) */
+    TopDown,
+    /** Combat/fight sequences with combat-specific controls */
+    Fight,
+    /** Static scenes (cutscenes, dialogue) with minimal interaction */
+    StaticScene
+};
 ```
 
 #### Input Action Assets
@@ -3009,25 +3074,21 @@ void AFCPlayerController::SetInputMappingMode(EFCInputMappingMode NewMode)
 
 #### Constructor Updates
 
-**Loads all four mapping contexts at startup**:
+**PlayerController creates InputManager component**:
 
 ```cpp
 AFCPlayerController::AFCPlayerController()
 {
-    CurrentMappingMode = EFCInputMappingMode::FirstPerson;
-
-    // Load all four mapping contexts with ConstructorHelpers
-    static ConstructorHelpers::FObjectFinder<UInputMappingContext> FirstPersonContextFinder(
-        TEXT("/Game/FC/Input/IMC_FC_FirstPerson"));
-    FirstPersonMappingContext = FirstPersonContextFinder.Object;
-
-    static ConstructorHelpers::FObjectFinder<UInputMappingContext> TopDownContextFinder(
-        TEXT("/Game/FC/Input/IMC_FC_TopDown"));
-    TopDownMappingContext = TopDownContextFinder.Object;
-
-    // ... Fight and StaticScene contexts ...
+    // Create input manager component
+    InputManager = CreateDefaultSubobject<UFCInputManager>(TEXT("InputManager"));
 }
 ```
+
+**InputManager component handles context loading in Blueprint**:
+
+- All 4 Input Mapping Context references assigned in `BP_FC_PlayerController` → `InputManager` component
+- Context loading moved from C++ ConstructorHelpers to Blueprint property assignment
+- Reduces hardcoded paths, improves maintainability
 
 #### SetupInputComponent Updates
 
@@ -3038,8 +3099,8 @@ void AFCPlayerController::SetupInputComponent()
 {
     Super::SetupInputComponent(); // MUST be first - initializes InputComponent
 
-    // Apply initial mapping context
-    SetInputMappingMode(CurrentMappingMode);
+    // Apply initial FirstPerson mapping context via InputManager
+    SetInputMappingMode(EFCInputMappingMode::FirstPerson);
 
     // Bind shared input actions
     UEnhancedInputComponent* EnhancedInput = Cast<UEnhancedInputComponent>(InputComponent);
@@ -3053,6 +3114,8 @@ void AFCPlayerController::SetupInputComponent()
 }
 ```
 
+**Input action binding remains in PlayerController** - only context management moved to component.
+
 #### Future Usage Examples
 
 **Switching contexts at runtime**:
@@ -3061,7 +3124,7 @@ void AFCPlayerController::SetupInputComponent()
 // When entering office level
 PlayerController->SetInputMappingMode(EFCInputMappingMode::FirstPerson);
 
-// When transitioning to overworld map
+// When transitioning to overworld map (Week 3: Overworld)
 PlayerController->SetInputMappingMode(EFCInputMappingMode::TopDown);
 
 // When entering combat
@@ -3070,6 +3133,8 @@ PlayerController->SetInputMappingMode(EFCInputMappingMode::Fight);
 // During cutscenes
 PlayerController->SetInputMappingMode(EFCInputMappingMode::StaticScene);
 ```
+
+**Week 3 - Overworld Integration**: The TopDownPlayerController will create its own `UFCInputManager` component instance, allowing independent input management for the overworld camera mode. The component's architecture supports multiple controller types using the same input management pattern.
 
 #### Asset Status
 
