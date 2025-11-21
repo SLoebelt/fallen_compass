@@ -4348,6 +4348,7 @@ PlayerStart: PlayerStart_Overworld
 - **Purpose**: Provides walkable surface for convoy pathfinding
 
 **Creation Process**:
+
 1. Landscape Mode → New Landscape
 2. Section Size: 63x63 quads
 3. Number of Components: 4x4
@@ -4360,17 +4361,20 @@ PlayerStart: PlayerStart_Overworld
 **Atmospheric Lighting** (similar to L_Office pattern):
 
 - **DirectionalLight**: Main sunlight source
+
   - Intensity: ~3.0
   - Color: Warm white (slight yellow tint)
   - Angle: ~45° from horizon for natural shadows
   - Mobility: Stationary (for baked lighting optimization)
 
 - **SkyLight**: Ambient environmental lighting
+
   - Intensity: ~1.0
   - Source Type: SLS Captured Scene
   - Mobility: Stationary
 
 - **SkyAtmosphere**: Realistic sky rendering with day/night cycle support
+
   - Default atmospheric parameters
   - Enhances visual depth and horizon realism
 
@@ -4380,6 +4384,7 @@ PlayerStart: PlayerStart_Overworld
   - Start Distance: ~1000 units
 
 **Organization**:
+
 ```
 L_Overworld
 ├── WorldLighting/
@@ -4401,17 +4406,20 @@ L_Overworld
 #### NavMesh Configuration
 
 **NavMesh Bounds Volume**:
+
 - **Actor**: Nav Mesh Bounds Volume (`NavMeshBounds_Main`)
 - **Location**: X=0, Y=0, Z=0 (centered on map)
 - **Scale**: X=100, Y=100, Z=10 (covers entire landscape)
 - **Purpose**: Defines AI pathfinding walkable area for convoy movement
 
 **Visualization**:
+
 - Press `P` key in editor viewport to toggle NavMesh visualization
 - Green overlay appears on all walkable surfaces (landscape)
 - NavMesh regenerates automatically when terrain or bounds change
 
 **Agent Settings** (Project Settings → Navigation System → Agents → Agent0):
+
 - **Status**: Deferred until Task 5 (convoy implementation)
 - **Reason**: Agent Radius, Height, and Max Step Height depend on BP_OverworldConvoy collision capsule dimensions
 - **Current**: Using default agent parameters for initial testing
@@ -4453,16 +4461,19 @@ Event BeginPlay
 ```
 
 **Purpose**:
+
 - Automatically sets game state to `Overworld_Travel` when level loads
 - Ensures UFCInputManager switches to TopDown input context
 - Enables proper state tracking for pause system (Week 3 Task 8)
 
 **Validation**:
+
 - TransitionTo returns `true` if state change succeeds
 - Output Log shows: `"L_Overworld: Transitioned to Overworld_Travel state"`
 - UFCGameStateManager logs state transition if verbose logging enabled
 
 **Testing Note (Week 3 Only)**:
+
 - Temporary transition from `None` → `Overworld_Travel` added to UFCGameStateManager for direct L_Overworld testing
 - Production flow: `None` → `MainMenu` → `Office_Exploration` → `Overworld_Travel`
 - Task 10 reverts this testing-only change at Week 3 completion
@@ -4470,11 +4481,13 @@ Event BeginPlay
 ### Integration Points
 
 **Week 2 Systems**:
+
 - **UFCLevelManager**: Handles level loading via `LoadLevel("L_Overworld", bUseFade=true)`
 - **UFCGameStateManager**: Manages `Overworld_Travel` state with validated transitions from `Office_Exploration`
 - **UFCInputManager**: Auto-switches to TopDown input context when Overworld_Travel state active
 
 **Week 3 Future Systems** (Tasks 3-8):
+
 - **BP_OverworldCamera** (Task 3): Possessed by controller, WASD pan + zoom
 - **AFCOverworldPlayerController** (Task 4): Handles input, click-to-move, POI interaction
 - **BP_OverworldConvoy** (Task 5): Pawn with NavMesh pathfinding via SimpleMoveToLocation()

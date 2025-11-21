@@ -229,8 +229,56 @@ void UFCCameraManager::BlendToTableObject(AActor* TableObject, float BlendTime)
 
 void UFCCameraManager::BlendToTopDown(float BlendTime)
 {
-	// Week 3 preparation - placeholder for overworld camera
-	UE_LOG(LogFCCameraManager, Warning, TEXT("BlendToTopDown: Not yet implemented (Week 3 feature)"));
+	// Find BP_OverworldCamera in level
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		UE_LOG(LogFCCameraManager, Error, TEXT("BlendToTopDown: World is null!"));
+		return;
+	}
+
+	TArray<AActor*> FoundCameras;
+	UGameplayStatics::GetAllActorsOfClass(World, ACameraActor::StaticClass(), FoundCameras);
+
+	ACameraActor* OverworldCamera = nullptr;
+	for (AActor* Actor : FoundCameras)
+	{
+		if (Actor->GetName().Contains(TEXT("OverworldCamera")))
+		{
+			OverworldCamera = Cast<ACameraActor>(Actor);
+			break;
+		}
+	}
+
+	if (!OverworldCamera)
+	{
+		UE_LOG(LogFCCameraManager, Error, TEXT("BlendToTopDown: No OverworldCamera found in level! Place BP_OverworldCamera in L_Overworld."));
+		return;
+	}
+
+	// Set PlayerPawn reference on camera for distance limiting
+	APlayerController* PC = GetPlayerController();
+	if (PC && PC->GetPawn())
+	{
+		// Call SetPlayerPawn on AFCOverworldCamera via reflection
+		UFunction* SetPawnFunc = OverworldCamera->FindFunction(FName("SetPlayerPawn"));
+		if (SetPawnFunc)
+		{
+			struct FSetPlayerPawnParams
+			{
+				APawn* NewPawn;
+			};
+			FSetPlayerPawnParams Params;
+			Params.NewPawn = PC->GetPawn();
+			OverworldCamera->ProcessEvent(SetPawnFunc, &Params);
+			UE_LOG(LogFCCameraManager, Log, TEXT("BlendToTopDown: Set PlayerPawn reference on camera"));
+		}
+	}
+
+	float EffectiveBlendTime = GetEffectiveBlendTime(BlendTime);
+	UE_LOG(LogFCCameraManager, Log, TEXT("Blending to TopDown camera (%.2fs)"), EffectiveBlendTime);
+
+	BlendToTarget(OverworldCamera, EffectiveBlendTime, DefaultBlendFunction);
 	SetCameraMode(EFCPlayerCameraMode::TopDown);
 }
 

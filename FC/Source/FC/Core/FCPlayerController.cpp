@@ -25,6 +25,7 @@
 #include "../Interaction/FCTableInteractable.h"
 #include "GameFramework/Character.h"
 #include "Components/FCCameraManager.h"
+#include "World/FCOverworldCamera.h"
 
 DEFINE_LOG_CATEGORY(LogFallenCompassPlayerController);
 
@@ -92,6 +93,29 @@ AFCPlayerController::AFCPlayerController()
 	else
 	{
 		UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("Failed to load IA_Click."));
+	}
+
+	// Week 3: Overworld input actions
+	static ConstructorHelpers::FObjectFinder<UInputAction> OverworldPanActionFinder(TEXT("/Game/FC/Input/Actions/IA_OverworldPan"));
+	if (OverworldPanActionFinder.Succeeded())
+	{
+		OverworldPanAction = OverworldPanActionFinder.Object;
+		UE_LOG(LogFallenCompassPlayerController, Log, TEXT("Loaded IA_OverworldPan"));
+	}
+	else
+	{
+		UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("Failed to load IA_OverworldPan."));
+	}
+
+	static ConstructorHelpers::FObjectFinder<UInputAction> OverworldZoomActionFinder(TEXT("/Game/FC/Input/Actions/IA_OverworldZoom"));
+	if (OverworldZoomActionFinder.Succeeded())
+	{
+		OverworldZoomAction = OverworldZoomActionFinder.Object;
+		UE_LOG(LogFallenCompassPlayerController, Log, TEXT("Loaded IA_OverworldZoom"));
+	}
+	else
+	{
+		UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("Failed to load IA_OverworldZoom."));
 	}
 }
 
@@ -183,6 +207,19 @@ void AFCPlayerController::SetupInputComponent()
 	else
 	{
 		UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("ClickAction not assigned on %s."), *GetName());
+	}
+
+	// Week 3: Bind Overworld input actions
+	if (OverworldPanAction)
+	{
+		EnhancedInput->BindAction(OverworldPanAction, ETriggerEvent::Triggered, this, &AFCPlayerController::HandleOverworldPan);
+		UE_LOG(LogFallenCompassPlayerController, Log, TEXT("Bound IA_OverworldPan"));
+	}
+	
+	if (OverworldZoomAction)
+	{
+		EnhancedInput->BindAction(OverworldZoomAction, ETriggerEvent::Triggered, this, &AFCPlayerController::HandleOverworldZoom);
+		UE_LOG(LogFallenCompassPlayerController, Log, TEXT("Bound IA_OverworldZoom"));
 	}
 }
 
@@ -761,6 +798,40 @@ void AFCPlayerController::HandleQuickSavePressed()
 void AFCPlayerController::HandleQuickLoadPressed()
 {
 	DevQuickLoad();
+}
+
+void AFCPlayerController::HandleOverworldPan(const FInputActionValue& Value)
+{
+	// Forward input to Overworld camera (via CameraManager)
+	if (!CameraManager || CameraManager->GetCameraMode() != EFCPlayerCameraMode::TopDown)
+	{
+		return;
+	}
+
+	// Find the Overworld camera and call HandlePan
+	AActor* ViewTarget = GetViewTarget();
+	AFCOverworldCamera* OverworldCamera = Cast<AFCOverworldCamera>(ViewTarget);
+	if (OverworldCamera)
+	{
+		OverworldCamera->HandlePan(Value);
+	}
+}
+
+void AFCPlayerController::HandleOverworldZoom(const FInputActionValue& Value)
+{
+	// Forward input to Overworld camera (via CameraManager)
+	if (!CameraManager || CameraManager->GetCameraMode() != EFCPlayerCameraMode::TopDown)
+	{
+		return;
+	}
+
+	// Find the Overworld camera and call HandleZoom
+	AActor* ViewTarget = GetViewTarget();
+	AFCOverworldCamera* OverworldCamera = Cast<AFCOverworldCamera>(ViewTarget);
+	if (OverworldCamera)
+	{
+		OverworldCamera->HandleZoom(Value);
+	}
 }
 
 void AFCPlayerController::FadeScreenOut(float Duration, bool bShowLoading)

@@ -163,10 +163,20 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "FC|Input|Actions")
 	TObjectPtr<UInputAction> QuickLoadAction;
 
+	/** Input action for Overworld camera pan (WASD) - Week 3 */
+	UPROPERTY(EditDefaultsOnly, Category = "FC|Input|Actions")
+	TObjectPtr<UInputAction> OverworldPanAction;
+
+	/** Input action for Overworld camera zoom (Mouse Wheel) - Week 3 */
+	UPROPERTY(EditDefaultsOnly, Category = "FC|Input|Actions")
+	TObjectPtr<UInputAction> OverworldZoomAction;
+
 	void HandleInteractPressed();
 	void HandlePausePressed();
 	void HandleQuickSavePressed();
 	void HandleQuickLoadPressed();
+	void HandleOverworldPan(const FInputActionValue& Value);
+	void HandleOverworldZoom(const FInputActionValue& Value);
 
 	UFUNCTION(BlueprintCallable, Category = "Game State")
 	void ResumeGame();

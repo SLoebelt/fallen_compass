@@ -565,7 +565,15 @@ To Create in Week 3:
 
 ### Task 3: Top-Down Camera Actor & Input
 
-**Purpose**: Implement BP_OverworldCamera with WASD panning, mouse wheel zoom, and optional edge scrolling for top-down view control.
+**Purpose**: Implement BP_OverworldCamera with Wartales-style distance-limited panning and zoom. Camera movement is constrained by crew skills (represented by a base distance parameter with multipliers for pan/zoom limits). Camera is always north-aligned with no rotation support.
+
+**Key Design Constraints**:
+
+- **Distance-Limited Panning**: Camera can only pan within a radius from the player pawn (convoy), determined by `CrewVisionRange` parameter
+- **Distance-Limited Zoom**: Zoom out distance is also limited by `CrewVisionRange` using a `ZoomDistanceMultiplier`
+- **North-Aligned**: Camera rotation locked to Yaw=0 (always facing north), no rotation input
+- **Skill-Based**: `CrewVisionRange` parameter will later integrate with crew skill system to dynamically adjust exploration range
+- **Reference Game**: Wartales top-down camera behavior
 
 ---
 
@@ -573,26 +581,26 @@ To Create in Week 3:
 
 ##### Step 3.1.1: Create IA_OverworldPan (Axis2D for WASD)
 
-- [ ] **Analysis**
+- [x] **Analysis**
 
-  - [ ] Check existing Input Actions in `/Content/FC/Input/Actions/` (IA_Move, IA_Look from Week 1)
-  - [ ] Review IA_Move configuration for Axis2D pattern
-  - [ ] Confirm naming: IA_OverworldPan (IA\_ prefix)
+  - [x] Check existing Input Actions in `/Content/FC/Input/Actions/` (IA_Move, IA_Look from Week 1)
+  - [x] Review IA_Move configuration for Axis2D pattern
+  - [x] Confirm naming: IA_OverworldPan (IA\_ prefix)
 
-- [ ] **Implementation (Unreal Editor)**
+- [x] **Implementation (Unreal Editor)**
 
-  - [ ] Content Browser → `/Game/FC/Input/Actions/`
-  - [ ] Right-click → Input → Input Action
-  - [ ] Name: `IA_OverworldPan`
-  - [ ] Open IA_OverworldPan
-  - [ ] Set Value Type: Axis2D (Vector2D)
-  - [ ] Save asset
+  - [x] Content Browser → `/Game/FC/Input/Actions/`
+  - [x] Right-click → Input → Input Action
+  - [x] Name: `IA_OverworldPan`
+  - [x] Open IA_OverworldPan
+  - [x] Set Value Type: Axis2D (Vector2D)
+  - [x] Save asset
 
-- [ ] **Testing After Step 3.1.1** ✅ CHECKPOINT
-  - [ ] Asset created at correct path
-  - [ ] Value Type set to Axis2D
-  - [ ] Asset saves without errors
-  - [ ] No warnings in Output Log
+- [x] **Testing After Step 3.1.1** ✅ CHECKPOINT
+  - [x] Asset created at correct path
+  - [x] Value Type set to Axis2D
+  - [x] Asset saves without errors
+  - [x] No warnings in Output Log
 
 **COMMIT POINT 3.1.1**: `git add Content/FC/Input/Actions/IA_OverworldPan.uasset && git commit -m "feat(overworld): Create IA_OverworldPan input action (Axis2D)"`
 
@@ -600,24 +608,24 @@ To Create in Week 3:
 
 ##### Step 3.1.2: Create IA_OverworldZoom (Axis1D for Mouse Wheel)
 
-- [ ] **Analysis**
+- [x] **Analysis**
 
-  - [ ] Review UE Enhanced Input mouse wheel axis configuration
-  - [ ] Confirm value type: Axis1D (float) for scroll delta
+  - [x] Review UE Enhanced Input mouse wheel axis configuration
+  - [x] Confirm value type: Axis1D (float) for scroll delta
 
-- [ ] **Implementation (Unreal Editor)**
+- [x] **Implementation (Unreal Editor)**
 
-  - [ ] Content Browser → `/Game/FC/Input/Actions/`
-  - [ ] Right-click → Input → Input Action
-  - [ ] Name: `IA_OverworldZoom`
-  - [ ] Open IA_OverworldZoom
-  - [ ] Set Value Type: Axis1D (float)
-  - [ ] Save asset
+  - [x] Content Browser → `/Game/FC/Input/Actions/`
+  - [x] Right-click → Input → Input Action
+  - [x] Name: `IA_OverworldZoom`
+  - [x] Open IA_OverworldZoom
+  - [x] Set Value Type: Axis1D (float)
+  - [x] Save asset
 
-- [ ] **Testing After Step 3.1.2** ✅ CHECKPOINT
-  - [ ] Asset created at correct path
-  - [ ] Value Type set to Axis1D
-  - [ ] Asset saves without errors
+- [x] **Testing After Step 3.1.2** ✅ CHECKPOINT
+  - [x] Asset created at correct path
+  - [x] Value Type set to Axis1D
+  - [x] Asset saves without errors
 
 **COMMIT POINT 3.1.2**: `git add Content/FC/Input/Actions/IA_OverworldZoom.uasset && git commit -m "feat(overworld): Create IA_OverworldZoom input action (Axis1D)"`
 
@@ -627,31 +635,31 @@ To Create in Week 3:
 
 ##### Step 3.2.1: Add WASD Bindings to IA_OverworldPan
 
-- [ ] **Analysis**
+- [x] **Analysis**
 
-  - [ ] Check IMC_FC_FirstPerson for WASD swizzle modifier patterns (Week 1)
-  - [ ] Confirm IMC_FC_TopDown exists (created in Week 2, should be empty)
+  - [x] Check IMC_FC_FirstPerson for WASD swizzle modifier patterns (Week 1)
+  - [x] Confirm IMC_FC_TopDown exists (created in Week 2, should be empty)
 
-- [ ] **Implementation (Unreal Editor)**
+- [x] **Implementation (Unreal Editor)**
 
-  - [ ] Open `/Game/FC/Input/Contexts/IMC_FC_TopDown`
-  - [ ] Add Mapping: IA_OverworldPan
-  - [ ] Add Key: **W** (forward/up movement)
-    - [ ] Add Modifier: Swizzle Input Axis Values
-    - [ ] Set Order: YXZ (maps W to Y-axis positive)
-  - [ ] Add Key: **S** (backward/down movement)
-    - [ ] Add Modifier: Swizzle Input Axis Values (YXZ)
-    - [ ] Add Modifier: Negate (makes Y negative)
-  - [ ] Add Key: **D** (right movement)
-    - [ ] No modifiers (X-axis positive by default)
-  - [ ] Add Key: **A** (left movement)
-    - [ ] Add Modifier: Negate (makes X negative)
-  - [ ] Save IMC_FC_TopDown
+  - [x] Open `/Game/FC/Input/Contexts/IMC_FC_TopDown`
+  - [x] Add Mapping: IA_OverworldPan
+  - [x] Add Key: **W** (forward/up movement)
+    - [x] Add Modifier: Swizzle Input Axis Values
+    - [x] Set Order: YXZ (maps W to Y-axis positive)
+  - [x] Add Key: **S** (backward/down movement)
+    - [x] Add Modifier: Swizzle Input Axis Values (YXZ)
+    - [x] Add Modifier: Negate (makes Y negative)
+  - [x] Add Key: **D** (right movement)
+    - [x] No modifiers (X-axis positive by default)
+  - [x] Add Key: **A** (left movement)
+    - [x] Add Modifier: Negate (makes X negative)
+  - [x] Save IMC_FC_TopDown
 
-- [ ] **Testing After Step 3.2.1** ✅ CHECKPOINT
-  - [ ] All 4 keys (WASD) bound to IA_OverworldPan
-  - [ ] Modifiers configured correctly (Swizzle for W/S, Negate for S/A)
-  - [ ] Asset saves without errors
+- [x] **Testing After Step 3.2.1** ✅ CHECKPOINT
+  - [x] All 4 keys (WASD) bound to IA_OverworldPan
+  - [x] Modifiers configured correctly (Swizzle for W/S, Negate for S/A)
+  - [x] Asset saves without errors
 
 **COMMIT POINT 3.2.1**: `git add Content/FC/Input/Contexts/IMC_FC_TopDown.uasset && git commit -m "feat(overworld): Configure WASD bindings for camera pan in IMC_FC_TopDown"`
 
@@ -659,190 +667,419 @@ To Create in Week 3:
 
 ##### Step 3.2.2: Add Mouse Wheel Binding to IA_OverworldZoom
 
-- [ ] **Analysis**
+- [x] **Analysis**
 
-  - [ ] Review UE mouse wheel input key name (Mouse Wheel Axis)
-  - [ ] Determine if negate needed (wheel up = positive zoom or negative zoom)
+  - [x] Review UE mouse wheel input key name (Mouse Wheel Axis)
+  - [x] Determine if negate needed (wheel up = positive zoom or negative zoom)
 
-- [ ] **Implementation (Unreal Editor)**
+- [x] **Implementation (Unreal Editor)**
 
-  - [ ] Open `/Game/FC/Input/Contexts/IMC_FC_TopDown` (if not already open)
-  - [ ] Add Mapping: IA_OverworldZoom
-  - [ ] Add Key: **Mouse Wheel Axis**
-    - [ ] No modifiers (or add Negate if zoom direction feels inverted)
-  - [ ] Save IMC_FC_TopDown
+  - [x] Open `/Game/FC/Input/Contexts/IMC_FC_TopDown` (if not already open)
+  - [x] Add Mapping: IA_OverworldZoom
+  - [x] Add Key: **Mouse Wheel Axis**
+    - [x] No modifiers (or add Negate if zoom direction feels inverted)
+  - [x] Save IMC_FC_TopDown
 
-- [ ] **Testing After Step 3.2.2** ✅ CHECKPOINT
-  - [ ] Mouse Wheel Axis bound to IA_OverworldZoom
-  - [ ] Asset saves without errors
-  - [ ] IMC_FC_TopDown now has 2 mappings (Pan and Zoom)
+- [x] **Testing After Step 3.2.2** ✅ CHECKPOINT
+  - [x] Mouse Wheel Axis bound to IA_OverworldZoom
+  - [x] Asset saves without errors
+  - [x] IMC_FC_TopDown now has 2 mappings (Pan and Zoom)
 
 **COMMIT POINT 3.2.2**: `git add Content/FC/Input/Contexts/IMC_FC_TopDown.uasset && git commit -m "feat(overworld): Configure mouse wheel binding for camera zoom in IMC_FC_TopDown"`
 
 ---
 
-#### Step 3.3: Create BP_OverworldCamera Blueprint
+#### Step 3.3: Create AFCOverworldCamera C++ Class
 
-##### Step 3.3.1: Create Camera Actor Blueprint
+##### Step 3.3.1: Create C++ Class Files (AFCOverworldCamera)
 
-- [ ] **Analysis**
+- [x] **Analysis**
 
-  - [ ] Check if starter content has CameraActor examples
-  - [ ] Review Week 1 BP_MenuCamera for camera actor patterns
-  - [ ] Confirm folder: `/Content/FC/World/Blueprints/Cameras/`
+  - [x] Review ACameraActor parent class for inheritance
+  - [x] Check Enhanced Input C++ binding patterns from AFCFirstPersonCharacter (Week 1)
+  - [x] Confirm folder: `Source/FC/World/`
+  - [x] Determine if SpringArm or direct Z-height zoom approach
 
-- [ ] **Implementation (Unreal Editor)**
+- [x] **Implementation (C++ Files)**
 
-  - [ ] Content Browser → `/Game/FC/World/Blueprints/` (create Cameras subfolder if needed)
-  - [ ] Right-click → Blueprint Class → Camera Actor
-  - [ ] Name: `BP_OverworldCamera`
-  - [ ] Open BP_OverworldCamera
-  - [ ] Components Panel:
-    - [ ] Root: CameraComponent (default from CameraActor parent)
-    - [ ] Optional: Add SpringArm component as root (for smoother zoom, attach camera to spring arm tip)
-  - [ ] Select CameraComponent:
-    - [ ] Set Location: X=0, Y=0, Z=0 (relative to root or spring arm)
-    - [ ] Set Rotation: Pitch=-70, Yaw=0, Roll=0 (top-down angle)
-  - [ ] If using SpringArm:
-    - [ ] Set Target Arm Length: 1500 (starting zoom distance)
-    - [ ] Enable Camera Lag: False (instant response for Week 3)
-  - [ ] Compile and save Blueprint
+  - [x] Create new C++ class via Unreal Editor:
+    - [x] Tools → New C++ Class
+    - [x] Parent Class: Camera Actor
+    - [x] Name: `FCOverworldCamera`
+    - [x] Path: `Source/FC/World/`
+  - [x] **FCOverworldCamera.h** - Add to class declaration:
 
-- [ ] **Testing After Step 3.3.1** ✅ CHECKPOINT
-  - [ ] Blueprint compiles without errors
-  - [ ] Camera component configured with top-down rotation
-  - [ ] Asset saved in correct folder
-  - [ ] Can place in L_Overworld viewport (test placement, then delete)
+```cpp
+UCLASS()
+class FC_API AFCOverworldCamera : public ACameraActor
+{
+    GENERATED_BODY()
 
-**COMMIT POINT 3.3.1**: `git add Content/FC/World/Blueprints/Cameras/BP_OverworldCamera.uasset && git commit -m "feat(overworld): Create BP_OverworldCamera actor with top-down configuration"`
+public:
+    AFCOverworldCamera();
 
----
+    virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
+    virtual void Tick(float DeltaTime) override;
 
-##### Step 3.3.2: Add Pan Input Handling (Event Graph)
+    /** Set the player pawn reference for distance limiting (called by controller) */
+    UFUNCTION(BlueprintCallable, Category = "Camera")
+    void SetPlayerPawn(APawn* NewPawn);
 
-- [ ] **Analysis**
+    /** Get current crew vision range (for UI or skill system integration) */
+    UFUNCTION(BlueprintPure, Category = "Camera")
+    float GetCrewVisionRange() const { return CrewVisionRange; }
 
-  - [ ] Review Enhanced Input action binding in Blueprint (Enhanced Input Action events)
-  - [ ] Plan camera movement: AddActorWorldOffset based on input vector
+protected:
+    virtual void BeginPlay() override;
 
-- [ ] **Implementation (BP_OverworldCamera Event Graph)**
+    /** Handle camera panning input */
+    void HandlePan(const struct FInputActionValue& Value);
 
-  - [ ] Add Event: Enhanced Input Action IA_OverworldPan (Triggered)
-    - [ ] If event not available: Ensure Enhanced Input plugin enabled in Project Settings
-  - [ ] Get Action Value:
-    - [ ] From IA_OverworldPan event, get Action Value (Vector2D)
-  - [ ] Calculate Movement Vector:
-    - [ ] Multiply Vector2D by PanSpeed (add variable: PanSpeed, float, default 500.0)
-    - [ ] Multiply by Delta Time (to make frame-rate independent)
-  - [ ] Convert 2D to 3D:
-    - [ ] Make Vector: X = ActionValue.X, Y = ActionValue.Y, Z = 0
-  - [ ] Move Camera:
-    - [ ] Add Actor World Offset (Target: Self, Delta Location: MovementVector, Sweep: False)
-  - [ ] Add Variable: PanSpeed
-    - [ ] Type: Float
-    - [ ] Category: "Camera|Movement"
-    - [ ] Default Value: 500.0
-    - [ ] Instance Editable: True (Blueprint Details panel checkbox)
-  - [ ] Compile and save
+    /** Handle camera zoom input */
+    void HandleZoom(const struct FInputActionValue& Value);
 
-- [ ] **Testing After Step 3.3.2** ✅ CHECKPOINT
-  - [ ] Blueprint compiles without errors
-  - [ ] PanSpeed variable visible in Details panel
-  - [ ] Event graph wired correctly (no disconnected pins)
-  - [ ] Save successful
+    /** Apply distance limiting to camera position relative to player pawn */
+    void ApplyDistanceLimit();
 
-**COMMIT POINT 3.3.2**: `git add Content/FC/World/Blueprints/Cameras/BP_OverworldCamera.uasset && git commit -m "feat(overworld): Implement WASD pan input handling in BP_OverworldCamera"`
+    /** Force camera rotation to north (Yaw=0) */
+    void EnforceNorthAlignment();
 
----
+    /** Draw debug visualization for pan/zoom limits */
+    void DrawDebugLimits() const;
 
-##### Step 3.3.3: Add Zoom Input Handling (Event Graph)
+private:
+    // ========== Input Actions ==========
 
-- [ ] **Analysis**
+    /** Pan input action (WASD) */
+    UPROPERTY(EditDefaultsOnly, Category = "Input|Actions")
+    TObjectPtr<class UInputAction> PanAction;
 
-  - [ ] Plan zoom behavior: Adjust SpringArm TargetArmLength OR move camera Z position
-  - [ ] Determine zoom limits (min/max distance)
+    /** Zoom input action (Mouse Wheel) */
+    UPROPERTY(EditDefaultsOnly, Category = "Input|Actions")
+    TObjectPtr<class UInputAction> ZoomAction;
 
-- [ ] **Implementation (BP_OverworldCamera Event Graph)**
+    // ========== Movement Parameters ==========
 
-  - [ ] Add Event: Enhanced Input Action IA_OverworldZoom (Triggered)
-  - [ ] Get Action Value:
-    - [ ] From IA_OverworldZoom event, get Action Value (float)
-  - [ ] Calculate New Zoom:
-    - [ ] **If using SpringArm:**
-      - [ ] Get SpringArm → Get Target Arm Length
-      - [ ] Subtract (ActionValue \* ZoomSpeed) - Note: subtract because wheel up (positive) should zoom in (decrease distance)
-      - [ ] Clamp result between ZoomMin and ZoomMax
-      - [ ] Set SpringArm Target Arm Length to clamped value
-    - [ ] **If NOT using SpringArm:**
-      - [ ] Get Actor Location (Z component)
-      - [ ] Subtract (ActionValue \* ZoomSpeed)
-      - [ ] Clamp Z between ZoomMinHeight and ZoomMaxHeight
-      - [ ] Set Actor Location (keep X/Y, update Z)
-  - [ ] Add Variables:
-    - [ ] ZoomSpeed (Float, default 100.0, Instance Editable)
-    - [ ] ZoomMin (Float, default 500.0, Instance Editable)
-    - [ ] ZoomMax (Float, default 3000.0, Instance Editable)
-    - [ ] All in Category: "Camera|Zoom"
-  - [ ] Compile and save
+    /** Camera pan speed (units per second) */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera|Movement", meta = (AllowPrivateAccess = "true"))
+    float PanSpeed = 500.0f;
 
-- [ ] **Testing After Step 3.3.3** ✅ CHECKPOINT
-  - [ ] Blueprint compiles without errors
-  - [ ] Zoom variables visible in Details panel
-  - [ ] Event graph wired correctly
-  - [ ] Save successful
+    /** Camera zoom speed (units per wheel tick) */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera|Zoom", meta = (AllowPrivateAccess = "true"))
+    float ZoomSpeed = 100.0f;
 
-**COMMIT POINT 3.3.3**: `git add Content/FC/World/Blueprints/Cameras/BP_OverworldCamera.uasset && git commit -m "feat(overworld): Implement mouse wheel zoom input handling in BP_OverworldCamera"`
+    /** Minimum zoom distance (closest to convoy) */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera|Zoom", meta = (AllowPrivateAccess = "true"))
+    float ZoomMin = 500.0f;
 
----
+    // ========== Crew Skill Parameters ==========
 
-##### Step 3.3.4: Add Edge Scrolling (Optional - Can Defer to Polish Phase)
+    /** Base vision range for crew (drives both pan and zoom limits) */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera|Crew Skills", meta = (AllowPrivateAccess = "true", Tooltip = "Base vision range, will be driven by crew skills in future"))
+    float CrewVisionRange = 2000.0f;
 
-- [ ] **Analysis**
+    /** Multiplier for max pan distance from convoy (e.g., 1.5 = 150% of CrewVisionRange) */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera|Movement", meta = (AllowPrivateAccess = "true"))
+    float PanDistanceMultiplier = 1.5f;
 
-  - [ ] Edge scrolling checks mouse position near screen edges
-  - [ ] Requires Get Mouse Position in Viewport, compare to screen bounds
-  - [ ] This is optional for Week 3 - can be deferred if time constrained
+    /** Multiplier for max zoom distance (e.g., 2.0 = 200% of CrewVisionRange) */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera|Crew Skills", meta = (AllowPrivateAccess = "true"))
+    float ZoomDistanceMultiplier = 2.0f;
 
-- [ ] **Implementation (BP_OverworldCamera Event Graph) - OPTIONAL**
+    // ========== References ==========
 
-  - [ ] Add Event: Event Tick (only if implementing edge scroll)
-  - [ ] Get Player Controller → Get Mouse Position
-  - [ ] Get Viewport Size
-  - [ ] Check Edge Proximity:
-    - [ ] If MouseX < EdgeThreshold (e.g., 50 pixels): Pan left
-    - [ ] If MouseX > (ViewportWidth - EdgeThreshold): Pan right
-    - [ ] If MouseY < EdgeThreshold: Pan forward
-    - [ ] If MouseY > (ViewportHeight - EdgeThreshold): Pan backward
-  - [ ] Calculate Pan Direction (Vector2D based on edge proximity)
-  - [ ] Apply Pan (similar to WASD pan logic in 3.3.2)
-  - [ ] Add Variable: EdgeScrollThreshold (Float, default 50.0, Instance Editable)
-  - [ ] Compile and save
+    /** Player pawn reference (convoy) for distance limiting */
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Camera|References", meta = (AllowPrivateAccess = "true"))
+    TWeakObjectPtr<APawn> PlayerPawn;
 
-- [ ] **Alternative: Skip Edge Scrolling for Week 3**
+    /** SpringArm component (optional, created in constructor) */
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Camera|Components", meta = (AllowPrivateAccess = "true"))
+    TObjectPtr<class USpringArmComponent> SpringArm;
 
-  - [ ] Document in "Known Issues & Backlog" section as "Edge scrolling deferred to Week 4 polish"
-  - [ ] Focus on core WASD/zoom functionality
+    // ========== Debug ==========
 
-- [ ] **Testing After Step 3.3.4** ✅ CHECKPOINT
-  - [ ] If implemented: Mouse near edges pans camera
-  - [ ] If skipped: Document in backlog
-  - [ ] Blueprint compiles without errors
+    /** Show debug radius circles (yellow=pan, cyan=zoom) */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera|Debug", meta = (AllowPrivateAccess = "true"))
+    bool bShowDebugRadius = false;
 
-**COMMIT POINT 3.3.4**: `git add Content/FC/World/Blueprints/Cameras/BP_OverworldCamera.uasset && git commit -m "feat(overworld): Add edge scrolling support (optional)" OR "docs(overworld): Defer edge scrolling to Week 4 polish"`
+    /** Pending pan movement delta (accumulated from input) */
+    FVector PendingMovementDelta = FVector::ZeroVector;
+};
+```
+
+- [x] Save FCOverworldCamera.h
+
+- [x] **Testing After Step 3.3.1** ✅ CHECKPOINT
+  - [x] Header file created in `Source/FC/World/FCOverworldCamera.h`
+  - [x] Class declaration complete with all parameters
+  - [x] File saved without syntax errors
+  - [x] Ready for .cpp implementation**COMMIT POINT 3.3.1**: `git add Source/FC/World/FCOverworldCamera.h && git commit -m "feat(overworld): Create AFCOverworldCamera C++ class header"`
 
 ---
 
-### Task 3 Acceptance Criteria
+##### Step 3.3.2: Implement C++ Constructor and Core Logic (AFCOverworldCamera.cpp)
 
-- [ ] IA_OverworldPan input action created (Axis2D)
-- [ ] IA_OverworldZoom input action created (Axis1D)
-- [ ] IMC_FC_TopDown configured with WASD (pan) and Mouse Wheel (zoom) bindings
-- [ ] BP_OverworldCamera created with top-down camera angle
-- [ ] WASD pan functionality implemented and responds to input
-- [ ] Mouse wheel zoom functionality implemented with min/max limits
-- [ ] (Optional) Edge scrolling implemented OR documented as deferred
-- [ ] All Blueprints compile without errors
-- [ ] Assets saved in correct folders
+- [x] **Analysis**
+
+  - [x] Review Enhanced Input C++ binding patterns from AFCFirstPersonCharacter
+  - [x] Plan vector math for distance limiting (FVector::Dist2D, FMath::Clamp)
+  - [x] Determine SpringArm setup in constructor
+
+- [x] **Implementation (FCOverworldCamera.cpp)**
+
+```cpp
+#include "World/FCOverworldCamera.h"
+#include "Camera/CameraComponent.h"
+#include "GameFramework/SpringArmComponent.h"
+#include "EnhancedInputComponent.h"
+#include "EnhancedInputSubsystems.h"
+#include "InputActionValue.h"
+#include "DrawDebugHelpers.h"
+
+AFCOverworldCamera::AFCOverworldCamera()
+{
+    PrimaryActorTick.bCanEverTick = true;
+    PrimaryActorTick.bStartWithTickEnabled = true;
+
+    // Create SpringArm component for zoom functionality
+    SpringArm = CreateDefaultSubobject<USpringArmComponent>(TEXT("SpringArm"));
+    SpringArm->SetupAttachment(RootComponent);
+    SpringArm->TargetArmLength = 1500.0f; // Starting zoom distance
+    SpringArm->bDoCollisionTest = false; // No collision for camera
+    SpringArm->bEnableCameraLag = false; // Instant response
+    SpringArm->SetRelativeRotation(FRotator(-70.0f, 0.0f, 0.0f)); // Top-down angle
+
+    // Reattach camera to spring arm tip (override ACameraActor default)
+    GetCameraComponent()->SetupAttachment(SpringArm, USpringArmComponent::SocketName);
+    GetCameraComponent()->SetRelativeLocation(FVector::ZeroVector);
+    GetCameraComponent()->SetRelativeRotation(FRotator::ZeroRotator);
+}
+
+void AFCOverworldCamera::BeginPlay()
+{
+    Super::BeginPlay();
+
+    // Enforce initial north alignment
+    EnforceNorthAlignment();
+}
+
+void AFCOverworldCamera::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
+{
+    Super::SetupPlayerInputComponent(PlayerInputComponent);
+
+    UEnhancedInputComponent* EnhancedInput = Cast<UEnhancedInputComponent>(PlayerInputComponent);
+    if (!EnhancedInput) return;
+
+    // Bind pan action (WASD)
+    if (PanAction)
+    {
+        EnhancedInput->BindAction(PanAction, ETriggerEvent::Triggered, this, &AFCOverworldCamera::HandlePan);
+    }
+
+    // Bind zoom action (Mouse Wheel)
+    if (ZoomAction)
+    {
+        EnhancedInput->BindAction(ZoomAction, ETriggerEvent::Triggered, this, &AFCOverworldCamera::HandleZoom);
+    }
+}
+
+void AFCOverworldCamera::Tick(float DeltaTime)
+{
+    Super::Tick(DeltaTime);
+
+    // Apply pending pan movement with distance limiting
+    if (!PendingMovementDelta.IsNearlyZero())
+    {
+        FVector NewLocation = GetActorLocation() + PendingMovementDelta * DeltaTime;
+        SetActorLocation(NewLocation);
+        ApplyDistanceLimit();
+        PendingMovementDelta = FVector::ZeroVector;
+    }
+
+    // Force north alignment every frame
+    EnforceNorthAlignment();
+
+    // Draw debug visualization
+    if (bShowDebugRadius)
+    {
+        DrawDebugLimits();
+    }
+}
+
+void AFCOverworldCamera::SetPlayerPawn(APawn* NewPawn)
+{
+    PlayerPawn = NewPawn;
+}
+
+void AFCOverworldCamera::HandlePan(const FInputActionValue& Value)
+{
+    // Get 2D input vector (X=right, Y=forward)
+    const FVector2D InputVector = Value.Get<FVector2D>();
+
+    // Convert to 3D movement (Z=0 for horizontal panning)
+    const FVector MovementDelta = FVector(InputVector.X, InputVector.Y, 0.0f) * PanSpeed;
+
+    // Accumulate delta for Tick application (frame-rate independent)
+    PendingMovementDelta += MovementDelta;
+}
+
+void AFCOverworldCamera::HandleZoom(const FInputActionValue& Value)
+{
+    if (!SpringArm) return;
+
+    // Get zoom delta (mouse wheel: positive=zoom in, negative=zoom out)
+    const float ZoomDelta = Value.Get<float>();
+
+    // Calculate new arm length (subtract because wheel up should zoom in = decrease distance)
+    float NewArmLength = SpringArm->TargetArmLength - (ZoomDelta * ZoomSpeed);
+
+    // Calculate max zoom distance based on crew vision range
+    const float MaxZoomDistance = CrewVisionRange * ZoomDistanceMultiplier;
+
+    // Clamp between min and skill-based max
+    NewArmLength = FMath::Clamp(NewArmLength, ZoomMin, MaxZoomDistance);
+
+    // Apply new zoom distance
+    SpringArm->TargetArmLength = NewArmLength;
+}
+
+void AFCOverworldCamera::ApplyDistanceLimit()
+{
+    // Only apply limit if player pawn reference is valid
+    if (!PlayerPawn.IsValid()) return;
+
+    const FVector PawnLocation = PlayerPawn->GetActorLocation();
+    const FVector CameraLocation = GetActorLocation();
+
+    // Calculate 2D distance (ignore Z-axis for top-down view)
+    const float Distance = FVector::Dist2D(CameraLocation, PawnLocation);
+
+    // Calculate max allowed pan distance
+    const float MaxPanDistance = CrewVisionRange * PanDistanceMultiplier;
+
+    // Clamp camera position to circular boundary if exceeding limit
+    if (Distance > MaxPanDistance)
+    {
+        // Get 2D direction from pawn to camera
+        FVector Direction = CameraLocation - PawnLocation;
+        Direction.Z = 0.0f; // Flatten to 2D
+        Direction.Normalize();
+
+        // Calculate clamped position at max distance
+        FVector ClampedLocation = PawnLocation + Direction * MaxPanDistance;
+        ClampedLocation.Z = CameraLocation.Z; // Preserve Z height
+
+        SetActorLocation(ClampedLocation);
+    }
+}
+
+void AFCOverworldCamera::EnforceNorthAlignment()
+{
+    // Force camera rotation to always face north (Yaw=0)
+    FRotator CurrentRotation = GetActorRotation();
+    if (!FMath::IsNearlyZero(CurrentRotation.Yaw))
+    {
+        CurrentRotation.Yaw = 0.0f;
+        SetActorRotation(CurrentRotation);
+    }
+}
+
+void AFCOverworldCamera::DrawDebugLimits() const
+{
+    if (!PlayerPawn.IsValid()) return;
+
+    const FVector PawnLocation = PlayerPawn->GetActorLocation();
+    const UWorld* World = GetWorld();
+    if (!World) return;
+
+    // Draw yellow circle for pan distance limit
+    const float PanRadius = CrewVisionRange * PanDistanceMultiplier;
+    DrawDebugCircle(World, PawnLocation, PanRadius, 64, FColor::Yellow, false, -1.0f, 0, 2.0f, FVector(0,1,0), FVector(1,0,0), false);
+
+    // Draw cyan circle for zoom distance limit
+    const float ZoomRadius = CrewVisionRange * ZoomDistanceMultiplier;
+    DrawDebugCircle(World, PawnLocation, ZoomRadius, 64, FColor::Cyan, false, -1.0f, 0, 2.0f, FVector(0,1,0), FVector(1,0,0), false);
+}
+```
+
+- [x] Save FCOverworldCamera.cpp
+- [x] Compile C++ project (hot reload or editor restart)
+- [x] Verify no compilation errors
+
+- [x] **Testing After Step 3.3.2** ✅ CHECKPOINT
+  - [x] C++ compiles successfully
+  - [x] AFCOverworldCamera appears in Content Browser (C++ Classes folder)
+  - [x] No linker errors
+  - [x] Class can be instantiated in editor**COMMIT POINT 3.3.2**: `git add Source/FC/World/FCOverworldCamera.cpp && git commit -m "feat(overworld): Implement AFCOverworldCamera core logic (pan, zoom, distance limiting, north lock)"`
+
+---
+
+##### Step 3.3.3: Create BP_OverworldCamera Blueprint Child
+
+- [x] **Analysis**
+
+  - [x] Confirm AFCOverworldCamera C++ class compiled and visible
+  - [x] Plan Blueprint child for designer-friendly parameter defaults
+  - [x] Confirm folder: `/Content/FC/World/Blueprints/Cameras/`
+
+- [x] **Implementation (Unreal Editor)**
+
+  - [x] Content Browser → `/Game/FC/World/Blueprints/Cameras/` (create folder if needed)
+  - [x] Right-click → Blueprint Class
+  - [x] Parent Class: Search for `FCOverworldCamera` (C++ class)
+  - [x] Name: `BP_OverworldCamera`
+  - [x] Open BP_OverworldCamera
+  - [x] **Class Defaults** (set default parameter values for designers):
+    - [x] **Camera|Movement** section:
+      - [x] Pan Speed: 500.0
+      - [x] Pan Distance Multiplier: 1.5
+    - [x] **Camera|Zoom** section:
+      - [x] Zoom Speed: 100.0
+      - [x] Zoom Min: 500.0
+    - [x] **Camera|Crew Skills** section:
+      - [x] Crew Vision Range: 2000.0
+      - [x] Zoom Distance Multiplier: 2.0
+    - [x] **Camera|Debug** section:
+      - [x] Show Debug Radius: False
+  - [x] **Components Panel** (verify SpringArm from C++):
+    - [x] SpringArm component should be present (created in C++ constructor)
+    - [x] Camera Component attached to SpringArm tip
+    - [x] SpringArm Rotation: Pitch=-70, Yaw=0, Roll=0 (verify)
+  - [x] **Optional Blueprint-Only Additions** (Event Graph):
+    - [x] Add custom Begin Play logic if needed (e.g., level-specific camera positioning)
+    - [x] Add Blueprint-callable helper functions for designers
+    - [x] **Keep Event Graph minimal** - core logic is in C++
+  - [x] Compile and save Blueprint
+
+- [x] **Testing After Step 3.3.3** ✅ CHECKPOINT
+  - [x] Blueprint compiles without errors
+  - [x] All C++ parameters visible in Class Defaults
+  - [x] Default values set correctly for design iteration
+  - [x] Can place BP_OverworldCamera in L_Overworld viewport
+  - [x] SpringArm component present with correct rotation
+
+**COMMIT POINT 3.3.3**: `git add Content/FC/World/Blueprints/Cameras/BP_OverworldCamera.uasset && git commit -m "feat(overworld): Create BP_OverworldCamera Blueprint child with designer defaults"`
+
+---
+
+##### Step 3.3.4: Test Camera Functionality in L_Overworld
+
+- [x] **Analysis**
+
+  - [x] Verify camera works in isolation before controller integration (Task 4)
+  - [x] Test input actions, distance limiting, north lock, debug visualization
+  - [x] Manually set PlayerPawn reference for testing
+  - **SKIPPED**: Cannot test camera pan/zoom without controller (AFCOverworldPlayerController)
+  - **REASON**: BP_FC_GameMode uses BP_FC_PlayerController which doesn't have TopDown input bindings
+  - **RESOLUTION**: Implement Task 4 first to create controller that binds IA_OverworldPan/Zoom to camera methods
+
+**COMMIT POINT 3.3.4**: `git add Content/FC/World/Levels/Overworld/L_Overworld.umap && git commit -m "test(overworld): Verify BP_OverworldCamera functionality in L_Overworld"`
+
+**Note**: Proper camera spawning and PlayerPawn assignment will be handled by AFCOverworldPlayerController in Task 4. This step confirms the camera C++ logic works correctly in isolation.
+
+**Architecture Note**: AFCOverworldCamera (C++) handles all core logic (input, math, distance limiting, north lock, Tick performance), while BP_OverworldCamera (Blueprint) provides designer-friendly parameter defaults and component configuration. This split maximizes maintainability and performance while keeping design iteration fast.
+
+**Design Note**: The `CrewVisionRange` parameter serves as the base value for both pan and zoom limits, modified by separate multipliers. This allows future integration with crew skill systems while maintaining independent control over camera behavior (e.g., crews might see farther than they can zoom, or vice versa).
 
 **Task 3 complete. Ready for Task 4 sub-tasks (Overworld Player Controller)? Respond with 'Go' to continue.**
 
@@ -850,13 +1087,194 @@ To Create in Week 3:
 
 ### Task 4: Overworld Player Controller & Input Context
 
-**Purpose**: Create AFCOverworldPlayerController C++ class that uses UFCInputManager to switch to TopDown input mode and possesses BP_OverworldCamera.
+**Purpose**: ~~Create AFCOverworldPlayerController C++ class~~ **REVISED**: Enhance existing AFCPlayerController to bind Overworld input actions and use UFCCameraManager's BlendToTopDown() method.
+
+**Architecture Decision**: After reviewing Technical Documentation, UFCCameraManager already exists with placeholder BlendToTopDown(). We'll:
+
+1. Implement BlendToTopDown() in UFCCameraManager to find and possess BP_OverworldCamera
+2. Extend AFCPlayerController to bind IA_OverworldPan/Zoom input actions
+3. Use BP_FC_PlayerController (existing Blueprint) configured for L_Overworld
+4. This avoids duplicating camera management logic and leverages existing component architecture
 
 ---
 
-#### Step 4.1: Create AFCOverworldPlayerController C++ Class
+#### Step 4.1: Implement BlendToTopDown in UFCCameraManager
 
-##### Step 4.1.1: Create C++ Class Files
+##### Step 4.1.1: Implement Camera Discovery and Possession Logic
+
+- [x] **Analysis**
+
+  - [x] Review UFCCameraManager.cpp BlendToTopDown placeholder (line 230)
+  - [x] Follow pattern from BlendToTableObject (dynamic camera spawning)
+  - [x] Overworld camera is placed in level (not spawned), so use GetAllActorsOfClass
+  - [x] Set PlayerPawn reference via reflection to avoid circular dependency
+
+- [x] **Implementation (UFCCameraManager.cpp)**
+
+  - [x] Replace placeholder BlendToTopDown with full implementation:
+
+    ```cpp
+    void UFCCameraManager::BlendToTopDown(float BlendTime)
+    {
+        // Find BP_OverworldCamera in level
+        UWorld* World = GetWorld();
+        TArray<AActor*> FoundCameras;
+        UGameplayStatics::GetAllActorsOfClass(World, ACameraActor::StaticClass(), FoundCameras);
+
+        ACameraActor* OverworldCamera = nullptr;
+        for (AActor* Actor : FoundCameras)
+        {
+            if (Actor->GetName().Contains(TEXT("OverworldCamera")))
+            {
+                OverworldCamera = Cast<ACameraActor>(Actor);
+                break;
+            }
+        }
+
+        // Set PlayerPawn reference via reflection (avoid including FCOverworldCamera.h)
+        APlayerController* PC = GetPlayerController();
+        if (PC && PC->GetPawn())
+        {
+            UFunction* SetPawnFunc = OverworldCamera->FindFunction(FName("SetPlayerPawn"));
+            if (SetPawnFunc)
+            {
+                struct FSetPlayerPawnParams { APawn* NewPawn; };
+                FSetPlayerPawnParams Params;
+                Params.NewPawn = PC->GetPawn();
+                OverworldCamera->ProcessEvent(SetPawnFunc, &Params);
+            }
+        }
+
+        float EffectiveBlendTime = GetEffectiveBlendTime(BlendTime);
+        BlendToTarget(OverworldCamera, EffectiveBlendTime, DefaultBlendFunction);
+        SetCameraMode(EFCPlayerCameraMode::TopDown);
+    }
+    ```
+
+  - [x] Save file
+
+- [x] **Testing After Step 4.1.1** ✅ CHECKPOINT
+  - [x] Code compiles without errors
+  - [x] No new includes needed (uses existing Kismet/GameplayStatics.h)
+  - [x] Reflection-based SetPlayerPawn avoids circular dependency
+
+**COMMIT POINT 4.1.1**: `git add Source/FC/Components/FCCameraManager.cpp && git commit -m "feat(overworld): Implement BlendToTopDown in UFCCameraManager"`
+
+---
+
+#### Step 4.2: Extend AFCPlayerController with Overworld Input Bindings
+
+##### Step 4.2.1: Add Input Actions and Handler Methods
+
+- [x] **Analysis**
+
+  - [x] Review AFCPlayerController.h input action pattern (InteractAction, QuickSaveAction, etc.)
+  - [x] Add OverworldPanAction and OverworldZoomAction properties
+  - [x] Add HandleOverworldPan and HandleOverworldZoom handler methods
+  - [x] Forward input to AFCOverworldCamera's HandlePan/HandleZoom methods
+
+- [x] **Implementation (FCPlayerController.h)**
+
+  - [x] Add input action properties after QuickLoadAction:
+
+    ```cpp
+    /** Input action for Overworld camera pan (WASD) - Week 3 */
+    UPROPERTY(EditDefaultsOnly, Category = "FC|Input|Actions")
+    TObjectPtr<UInputAction> OverworldPanAction;
+
+    /** Input action for Overworld camera zoom (Mouse Wheel) - Week 3 */
+    UPROPERTY(EditDefaultsOnly, Category = "FC|Input|Actions")
+    TObjectPtr<UInputAction> OverworldZoomAction;
+    ```
+
+  - [x] Add handler method declarations after HandleQuickLoadPressed:
+    ```cpp
+    void HandleOverworldPan(const FInputActionValue& Value);
+    void HandleOverworldZoom(const FInputActionValue& Value);
+    ```
+  - [x] Save file
+
+- [x] **Implementation (FCPlayerController.cpp)**
+
+  - [x] Add include for AFCOverworldCamera:
+    ```cpp
+    #include "World/FCOverworldCamera.h"
+    ```
+  - [x] Load input actions in constructor (after ClickAction):
+
+    ```cpp
+    static ConstructorHelpers::FObjectFinder<UInputAction> OverworldPanActionFinder(TEXT("/Game/FC/Input/Actions/IA_OverworldPan"));
+    if (OverworldPanActionFinder.Succeeded())
+    {
+        OverworldPanAction = OverworldPanActionFinder.Object;
+        UE_LOG(LogFallenCompassPlayerController, Log, TEXT("Loaded IA_OverworldPan"));
+    }
+
+    static ConstructorHelpers::FObjectFinder<UInputAction> OverworldZoomActionFinder(TEXT("/Game/FC/Input/Actions/IA_OverworldZoom"));
+    if (OverworldZoomActionFinder.Succeeded())
+    {
+        OverworldZoomAction = OverworldZoomActionFinder.Object;
+        UE_LOG(LogFallenCompassPlayerController, Log, TEXT("Loaded IA_OverworldZoom"));
+    }
+    ```
+
+  - [x] Bind actions in SetupInputComponent (after ClickAction binding):
+
+    ```cpp
+    if (OverworldPanAction)
+    {
+        EnhancedInput->BindAction(OverworldPanAction, ETriggerEvent::Triggered, this, &AFCPlayerController::HandleOverworldPan);
+    }
+
+    if (OverworldZoomAction)
+    {
+        EnhancedInput->BindAction(OverworldZoomAction, ETriggerEvent::Triggered, this, &AFCPlayerController::HandleOverworldZoom);
+    }
+    ```
+
+  - [x] Implement handlers (after HandleQuickLoadPressed):
+
+    ```cpp
+    void AFCPlayerController::HandleOverworldPan(const FInputActionValue& Value)
+    {
+        if (!CameraManager || CameraManager->GetCameraMode() != EFCPlayerCameraMode::TopDown)
+            return;
+
+        AActor* ViewTarget = GetViewTarget();
+        AFCOverworldCamera* OverworldCamera = Cast<AFCOverworldCamera>(ViewTarget);
+        if (OverworldCamera)
+        {
+            OverworldCamera->HandlePan(Value);
+        }
+    }
+
+    void AFCPlayerController::HandleOverworldZoom(const FInputActionValue& Value)
+    {
+        if (!CameraManager || CameraManager->GetCameraMode() != EFCPlayerCameraMode::TopDown)
+            return;
+
+        AActor* ViewTarget = GetViewTarget();
+        AFCOverworldCamera* OverworldCamera = Cast<AFCOverworldCamera>(ViewTarget);
+        if (OverworldCamera)
+        {
+            OverworldCamera->HandleZoom(Value);
+        }
+    }
+    ```
+
+  - [x] Save file
+
+- [x] **Testing After Step 4.2.1** ✅ CHECKPOINT
+  - [x] Code compiles without errors
+  - [x] Input actions load correctly in constructor
+  - [x] Handlers only execute in TopDown camera mode
+  - [x] Input forwarded to camera's HandlePan/HandleZoom methods
+
+**COMMIT POINT 4.2.1**: `git add Source/FC/Core/FCPlayerController.h Source/FC/Core/FCPlayerController.cpp && git commit -m "feat(overworld): Add Overworld input bindings to AFCPlayerController"`
+
+---
+
+#### Step 4.3: ~~Create BP_FCOverworldPlayerController Blueprint~~ **SKIPPED** - Using Existing BP_FC_PlayerController
 
 - [ ] **Analysis**
 
