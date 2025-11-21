@@ -1120,6 +1120,38 @@ UFUNCTION(BlueprintCallable, Category = "UI")
 void HandleSaveSlotSelected(const FString& SlotName);
 ```
 
+#### Public API - Table Widget Management (Priority 4A)
+
+```cpp
+/** Show table widget for given table object type */
+UFUNCTION(BlueprintCallable, Category = "UI Management")
+void ShowTableWidget(AActor* TableObject);
+
+/** Close currently open table widget */
+UFUNCTION(BlueprintCallable, Category = "UI Management")
+void CloseTableWidget();
+
+/** Get current table widget (if any) */
+UFUNCTION(BlueprintPure, Category = "UI Management")
+UUserWidget* GetCurrentTableWidget() const { return CurrentTableWidget; }
+
+/** Check if table widget is open */
+UFUNCTION(BlueprintPure, Category = "UI Management")
+bool IsTableWidgetOpen() const { return CurrentTableWidget != nullptr; }
+```
+
+**Table Widget Registry**:
+
+```cpp
+/** Widget class registry: TableObjectClass → WidgetClass */
+UPROPERTY()
+TMap<TSubclassOf<AActor>, TSubclassOf<UUserWidget>> TableWidgetMap;
+
+/** Currently displayed table widget */
+UPROPERTY()
+TObjectPtr<UUserWidget> CurrentTableWidget;
+```
+
 #### Widget Lifecycle Implementation
 
 All widget lifecycle methods follow a consistent pattern:
@@ -1243,14 +1275,21 @@ if (UIManager)
 {
     UIManager->MainMenuWidgetClass = MainMenuWidgetClass;
     UIManager->SaveSlotSelectorWidgetClass = SaveSlotSelectorWidgetClass;
+    UIManager->PauseMenuWidgetClass = PauseMenuWidgetClass;
+    UIManager->TableWidgetMap = TableWidgetMap;  // Priority 4A
     UE_LOG(LogTemp, Log, TEXT("UFCGameInstance: UIManager configured"));
 }
 ```
 
-Widget class references are exposed in **BP_FC_GameInstance**:
+Widget class references are exposed in **BP_FC_GameInstance** → Details Panel → UI Category:
 
-- `MainMenuWidgetClass` → Set to `/Game/FC/UI/Menus/WBP_MainMenu`
-- `SaveSlotSelectorWidgetClass` → Set to `/Game/FC/UI/Menus/SaveMenu/WBP_SaveSlotSelector`
+- `MainMenuWidgetClass` → `/Game/FC/UI/Menus/WBP_MainMenu`
+- `SaveSlotSelectorWidgetClass` → `/Game/FC/UI/Menus/SaveMenu/WBP_SaveSlotSelector`
+- `PauseMenuWidgetClass` → `/Game/FC/UI/Menus/WBP_PauseMenu`
+- `TableWidgetMap` → Registry of table object classes to widget classes:
+  - Key: `BP_TableObject_Map` → Value: `WBP_MapTable`
+  - (Future) `BP_TableObject_Logbook` → `WBP_Logbook`
+  - (Future) `BP_TableObject_Letters` → `WBP_MessagesHub`
 
 #### Blueprint Integration
 
@@ -1287,7 +1326,39 @@ if (UIManager)
 {
     UIManager->HideMainMenu();
 }
+
+// In AFCPlayerController::OnTableObjectClicked() (Priority 4A.3)
+UFCGameInstance* GI = GetGameInstance<UFCGameInstance>();
+UFCUIManager* UIManager = GI ? GI->GetSubsystem<UFCUIManager>() : nullptr;
+
+if (UIManager && UIManager->IsTableWidgetOpen())
+{
+    // Close existing table widget before showing new one
+    UIManager->CloseTableWidget();
+}
+
+// Show table widget after camera transition completes
+GetWorldTimerManager().SetTimer(ShowWidgetTimerHandle, [this, TableObject, UIManager]()
+{
+    if (UIManager)
+    {
+        UIManager->ShowTableWidget(TableObject);
+
+        // Set input mode to GameAndUI so player controller can receive ESC key
+        FInputModeGameAndUI InputMode;
+        InputMode.SetHideCursorDuringCapture(false);
+        SetInputMode(InputMode);
+        bShowMouseCursor = true;
+    }
+}, 2.0f, false);
 ```
+
+**Benefits of UIManager Delegation**:
+
+- ✅ **51 lines removed** from PlayerController (44 from .cpp, 7 from .h)
+- ✅ **Consistent UI patterns** across all widget types (main menu, pause menu, table widgets)
+- ✅ **Registry-based table widgets** - add new table objects via Blueprint configuration (zero C++ changes)
+- ✅ **Single source of truth** - all widget classes configured in BP_FC_GameInstance
 
 #### Logging
 
@@ -1328,6 +1399,105 @@ This created tight coupling between C++ and Blueprint, making it difficult to ch
 3. No C++ coupling beyond calling subsystem methods
 
 **Architectural Benefit**: PlayerController can now focus on player state and input, while UIManager handles all UI concerns. This separation makes both classes simpler and more maintainable.
+
+#### Table Widget Management Implementation (Priority 4A)
+
+**ShowTableWidget()**:
+
+```cpp
+void UFCUIManager::ShowTableWidget(AActor* TableObject)
+{
+    if (!TableObject)
+    {
+        UE_LOG(LogFCUIManager, Error, TEXT("ShowTableWidget: TableObject is null!"));
+        return;
+    }
+
+    // Look up widget class from registry
+    TSubclassOf<AActor> TableClass = TableObject->GetClass();
+    TSubclassOf<UUserWidget>* WidgetClassPtr = TableWidgetMap.Find(TableClass);
+
+    if (!WidgetClassPtr || !(*WidgetClassPtr))
+    {
+        UE_LOG(LogFCUIManager, Error, TEXT("ShowTableWidget: No widget class registered for %s"),
+            *TableClass->GetName());
+        return;
+    }
+
+    TSubclassOf<UUserWidget> WidgetClass = *WidgetClassPtr;
+
+    // Close existing table widget if any
+    if (CurrentTableWidget)
+    {
+        UE_LOG(LogFCUIManager, Log, TEXT("ShowTableWidget: Closing existing table widget"));
+        CloseTableWidget();
+    }
+
+    // Create and show widget
+    CurrentTableWidget = CreateWidget<UUserWidget>(GetGameInstance(), WidgetClass);
+    if (!CurrentTableWidget)
+    {
+        UE_LOG(LogFCUIManager, Error, TEXT("ShowTableWidget: Failed to create widget from class %s"),
+            *WidgetClass->GetName());
+        return;
+    }
+
+    CurrentTableWidget->AddToViewport();
+    UE_LOG(LogFCUIManager, Log, TEXT("ShowTableWidget: Created and displayed widget for %s"),
+        *TableObject->GetName());
+}
+```
+
+**CloseTableWidget()**:
+
+```cpp
+void UFCUIManager::CloseTableWidget()
+{
+    if (!CurrentTableWidget)
+    {
+        UE_LOG(LogFCUIManager, Warning, TEXT("CloseTableWidget: No table widget currently open"));
+        return;
+    }
+
+    CurrentTableWidget->RemoveFromParent();
+    CurrentTableWidget = nullptr;
+
+    UE_LOG(LogFCUIManager, Log, TEXT("CloseTableWidget: Removed table widget from viewport"));
+}
+```
+
+**Registry-Based Architecture**:
+
+The `TableWidgetMap` provides a data-driven approach to table widget management:
+
+1. **Designer Workflow** (zero C++ changes):
+
+   - Create table object Blueprint (e.g., `BP_TableObject_Logbook`)
+   - Create widget Blueprint (e.g., `WBP_Logbook`)
+   - Open `BP_FC_GameInstance` → Details → UI Category → TableWidgetMap
+   - Add entry: Key = `BP_TableObject_Logbook`, Value = `WBP_Logbook`
+   - Done! Table object automatically shows correct widget
+
+2. **Runtime Behavior**:
+
+   - Player clicks table object → `OnTableObjectClicked()` fires
+   - PlayerController triggers camera transition to table object
+   - After 2-second camera blend, timer calls `UIManager->ShowTableWidget(TableObject)`
+   - UIManager looks up widget class from `TableWidgetMap` using table object's class
+   - Widget created and added to viewport
+   - ESC key closes widget → `UIManager->CloseTableWidget()` → Camera restores to previous view
+
+3. **Error Handling**:
+   - If no widget class registered for table object class → Error logged, no crash
+   - If widget creation fails → Error logged, no crash
+   - If trying to close non-existent widget → Warning logged, no crash
+
+**Benefits**:
+
+- ✅ **Zero C++ per new table object** - all configuration in Blueprint
+- ✅ **Consistent with other UI** - follows same pattern as main menu/pause menu
+- ✅ **Type-safe registry** - Blueprint validates class references at edit time
+- ✅ **Comprehensive logging** - all table widget operations logged for debugging
 
 ---
 

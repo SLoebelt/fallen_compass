@@ -59,6 +59,14 @@
 - ✅ Refactoring 2A: Level Metadata System (DT_LevelMetadata)
 - ✅ Refactoring 2B: Explicit Game State Machine (UFCGameStateManager)
 
+**Priority 3 - Camera & Component Refactoring** (Week 2)
+
+- ✅ Refactoring 3A: UFCCameraManager Component
+
+**Priority 4 - Table Widget Management** (Week 2)
+
+- ✅ Refactoring 4A: Migrate Table Widgets to UFCUIManager
+
 **Architecture Corrections**
 
 - ✅ L_MainMenu architecture fix (removed non-existent level, main menu is a state in L_Office)
@@ -214,7 +222,7 @@ UUserWidget* CurrentTableWidget; // Property in PlayerController
 
 **Step 4A.1: Extend UFCUIManager API (C++)**
 
-- [ ] Add to `UFCUIManager.h`:
+- [x] Add to `UFCUIManager.h`:
 
   ```cpp
   /** Show table widget for given table object type */
@@ -243,29 +251,29 @@ UUserWidget* CurrentTableWidget; // Property in PlayerController
     TObjectPtr<UUserWidget> CurrentTableWidget;
   ```
 
-- [ ] Compile successfully
+- [x] Compile successfully
 
 **Step 4A.2: Implement Table Widget Management**
 
-- [ ] Implement `UFCUIManager::ShowTableWidget()`:
-  - [ ] Look up widget class from `TableWidgetMap`
-  - [ ] Create widget with `CreateWidget(GetGameInstance(), WidgetClass)`
-  - [ ] Add to viewport with appropriate Z-order
-  - [ ] Store in `CurrentTableWidget`
-  - [ ] Log widget creation
-- [ ] Implement `UFCUIManager::CloseTableWidget()`:
-  - [ ] Remove from viewport
-  - [ ] Clear `CurrentTableWidget` reference
-  - [ ] Log widget closure
-- [ ] Compile successfully
+- [x] Implement `UFCUIManager::ShowTableWidget()`:
+  - [x] Look up widget class from `TableWidgetMap`
+  - [x] Create widget with `CreateWidget(GetGameInstance(), WidgetClass)`
+  - [x] Add to viewport with appropriate Z-order
+  - [x] Store in `CurrentTableWidget`
+  - [x] Log widget creation
+- [x] Implement `UFCUIManager::CloseTableWidget()`:
+  - [x] Remove from viewport
+  - [x] Clear `CurrentTableWidget` reference
+  - [x] Log widget closure
+- [x] Compile successfully
 
 **Step 4A.3: Migrate PlayerController Code**
 
-- [ ] Remove from `AFCPlayerController.h`:
-  - [ ] `void ShowTableWidget(AActor* TableObject);`
-  - [ ] `void CloseTableWidget();`
-  - [ ] `TObjectPtr<UUserWidget> CurrentTableWidget;`
-- [ ] Update `AFCPlayerController::OnTableObjectClicked()`:
+- [x] Remove from `AFCPlayerController.h`:
+  - [x] `void ShowTableWidget(AActor* TableObject);`
+  - [x] `void CloseTableWidget();`
+  - [x] `TObjectPtr<UUserWidget> CurrentTableWidget;`
+- [x] Update `AFCPlayerController::OnTableObjectClicked()`:
 
   ```cpp
   // FROM:
@@ -280,31 +288,35 @@ UUserWidget* CurrentTableWidget; // Property in PlayerController
   }
   ```
 
-- [ ] Compile successfully
+- [x] Compile successfully
 
 **Step 4A.4: Configure Blueprint Widget Registry**
 
-- [ ] Open `BP_FC_GameInstance`
-- [ ] In UFCUIManager details, populate `TableWidgetMap`:
-  - [ ] Key: `BP_TableObject_Map`, Value: `WBP_MapTable`
-  - [ ] Key: `BP_TableObject_Logbook`, Value: `WBP_Logbook` (when created)
-  - [ ] Key: `BP_TableObject_Letters`, Value: `WBP_MessagesHub` (when created)
-- [ ] Save and compile Blueprint
+- [x] Open `BP_FC_GameInstance`
+- [x] In UFCUIManager details, populate `TableWidgetMap`:
+  - [x] Key: `BP_TableObject_Map`, Value: `WBP_MapTable`
+  - [x] Key: `BP_TableObject_Logbook`, Value: `WBP_Logbook` (when created)
+  - [x] Key: `BP_TableObject_Letters`, Value: `WBP_MessagesHub` (when created)
+- [x] Save and compile Blueprint
 
 **Step 4A.5: Testing**
 
-- [ ] PIE → Walk to table
-- [ ] Click map object → `WBP_MapTable` appears
-- [ ] Close widget → Returns to gameplay correctly
-- [ ] Check logs: UFCUIManager handles widget lifecycle
-- [ ] Verify consistency with main menu/pause menu patterns
+- [x] PIE → Walk to table
+- [x] Click map object → `WBP_MapTable` appears
+- [x] Close widget → Returns to gameplay correctly
+- [x] Check logs: UFCUIManager handles widget lifecycle
+- [x] Verify consistency with main menu/pause menu patterns
 
 **Benefits**:
 
-- ✅ Reduces PlayerController by ~120 lines
-- ✅ Consistent UI management across all widget types
-- ✅ Easy to add new table objects (just add to registry)
-- ✅ Single source of truth for UI configuration
+- **Line Reduction**: 51 lines vs. estimated 120 lines
+  - Lower reduction because table system was simpler than initially scoped (only 1 table object vs. multiple)
+  - Delegation code adds lines back for UIManager access patterns
+  - **Architectural win is the primary benefit**: maintainability, consistency, extensibility
+- PlayerController now uses `UIManager->ShowTableWidget(TableObject)` instead of managing widgets directly
+- All table widget lifecycle (creation, viewport management, cleanup) handled by UFCUIManager
+- Registry-based: `TableWidgetMap` in BP_FC_GameInstance maps table object classes to widget classes
+- Adding new table objects requires only Blueprint configuration (Key = table object class, Value = widget class)
 
 ---
 
@@ -635,16 +647,18 @@ Priority 1-6 (All Complete) ──────> Priority 7 (SaveGame) ┘
 
 ### Recommended Implementation Order
 
-**Week 2 (Current)**: ✅ Priorities 1 & 2 Complete
+**Week 2 (Current)**: ✅ Priorities 1, 2, 3, 4 Complete
 
 **Before Week 3 Start** (November 21-22):
 
-1. **Priority 3**: UFCCameraManager Component (6-8 hours)
-   - Blocks: Week 3 Overworld camera
-   - Critical: Prevents +150 line growth in PlayerController
-2. **Priority 4**: Table Widget Management (3-4 hours)
-   - Blocks: Week 2+ table expansion
-   - Critical: Maintains UI consistency
+1. ~~**Priority 3**: UFCCameraManager Component (6-8 hours)~~ ✅ **COMPLETE**
+   - ~~Blocks: Week 3 Overworld camera~~
+   - ~~Critical: Prevents +150 line growth in PlayerController~~
+2. ~~**Priority 4**: Table Widget Management (3-4 hours)~~ ✅ **COMPLETE**
+   - ~~Blocks: Week 2+ table expansion~~
+   - ~~Critical: Maintains UI consistency~~
+
+**Current Status**: Priorities 3 & 4 completed ahead of schedule. PlayerController reduced by ~218 lines total (167 camera + 51 table widgets).
 
 **During Week 3** (November 23-26): 3. **Priority 5**: State Stack Implementation (4-5 hours)
 

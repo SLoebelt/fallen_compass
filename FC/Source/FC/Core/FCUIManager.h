@@ -32,6 +32,10 @@ public:
 	UPROPERTY()
 	TSubclassOf<UUserWidget> PauseMenuWidgetClass;
 
+	// Widget class registry: TableObjectClass → WidgetClass (configured from GameInstance)
+	UPROPERTY()
+	TMap<TSubclassOf<AActor>, TSubclassOf<UUserWidget>> TableWidgetMap;
+
 	// Cached widget instances
 	UPROPERTY()
 	TObjectPtr<UUserWidget> MainMenuWidget;
@@ -41,6 +45,10 @@ public:
 	
 	UPROPERTY()
 	TObjectPtr<UUserWidget> PauseMenuWidget;
+
+	// Currently displayed table widget
+	UPROPERTY()
+	TObjectPtr<UUserWidget> CurrentTableWidget;
 
 	// Widget lifecycle methods
 	UFUNCTION(BlueprintCallable, Category = "UI")
@@ -60,6 +68,20 @@ public:
 	
 	UFUNCTION(BlueprintCallable, Category = "UI")
 	void HidePauseMenu();
+
+	// Table widget lifecycle methods
+	UFUNCTION(BlueprintCallable, Category = "UI|Table")
+	void ShowTableWidget(AActor* TableObject);
+	
+	UFUNCTION(BlueprintCallable, Category = "UI|Table")
+	void CloseTableWidget();
+
+	// Table widget queries
+	UFUNCTION(BlueprintPure, Category = "UI|Table")
+	UUserWidget* GetCurrentTableWidget() const { return CurrentTableWidget; }
+	
+	UFUNCTION(BlueprintPure, Category = "UI|Table")
+	bool IsTableWidgetOpen() const { return CurrentTableWidget != nullptr; }
 
 	// Button callback methods (called from Blueprint widgets)
 	UFUNCTION(BlueprintCallable, Category = "UI")

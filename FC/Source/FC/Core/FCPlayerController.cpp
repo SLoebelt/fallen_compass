@@ -272,8 +272,11 @@ void AFCPlayerController::HandlePausePressed()
 	{
 		UE_LOG(LogFallenCompassPlayerController, Log, TEXT("ESC pressed in TableView mode"));
 		
-		// If widget is open, close it (stays in TableView)
-		if (CurrentTableWidget)
+		// Check if widget is open via UIManager
+		UFCGameInstance* GI = GetGameInstance<UFCGameInstance>();
+		UFCUIManager* UIManager = GI ? GI->GetSubsystem<UFCUIManager>() : nullptr;
+		
+		if (UIManager && UIManager->IsTableWidgetOpen())
 		{
 			CloseTableWidget();
 			UE_LOG(LogFallenCompassPlayerController, Log, TEXT("Closed table widget, staying in TableView"));
@@ -929,14 +932,14 @@ void AFCPlayerController::OnTableObjectClicked(AActor* TableObject)
 		return;
 	}
 
-	// Camera management now handled by CameraManager component
-	// Store original view target handled by CameraManager
+	// Get UIManager for widget management
+	UFCGameInstance* GI = GetGameInstance<UFCGameInstance>();
+	UFCUIManager* UIManager = GI ? GI->GetSubsystem<UFCUIManager>() : nullptr;
 
 	// Close current widget if one is open (switching between table objects)
-	if (CurrentTableWidget)
+	if (UIManager && UIManager->IsTableWidgetOpen())
 	{
-		CurrentTableWidget->RemoveFromParent();
-		CurrentTableWidget = nullptr;
+		UIManager->CloseTableWidget();
 		UE_LOG(LogFallenCompassPlayerController, Log, TEXT("Closed previous table widget"));
 	}
 
@@ -954,51 +957,31 @@ void AFCPlayerController::OnTableObjectClicked(AActor* TableObject)
 
 	// Show widget after camera blend completes (delay via timer)
 	FTimerHandle ShowWidgetTimerHandle;
-	GetWorldTimerManager().SetTimer(ShowWidgetTimerHandle, [this, TableObject]()
+	GetWorldTimerManager().SetTimer(ShowWidgetTimerHandle, [this, TableObject, UIManager]()
 	{
-		ShowTableWidget(TableObject);
+		if (UIManager)
+		{
+			UIManager->ShowTableWidget(TableObject);
+
+			// Set input mode to GameAndUI so player controller can receive ESC key
+			FInputModeGameAndUI InputMode;
+			InputMode.SetHideCursorDuringCapture(false);
+			SetInputMode(InputMode);
+			bShowMouseCursor = true;
+		}
 	}, 2.0f, false);
-}
-
-void AFCPlayerController::ShowTableWidget(AActor* TableObject)
-{
-	if (!TableObject || !TableObject->Implements<UFCTableInteractable>())
-	{
-		return;
-	}
-
-	// Get widget class from table object
-	TSubclassOf<UUserWidget> WidgetClass = IFCTableInteractable::Execute_GetWidgetClass(TableObject);
-
-	if (!WidgetClass)
-	{
-		UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("ShowTableWidget: Table object has no widget class"));
-		return;
-	}
-
-	// Create and show widget
-	CurrentTableWidget = CreateWidget<UUserWidget>(this, WidgetClass);
-	if (CurrentTableWidget)
-	{
-		CurrentTableWidget->AddToViewport();
-
-		// Set input mode to GameAndUI so player controller can receive ESC key
-		FInputModeGameAndUI InputMode;
-		InputMode.SetHideCursorDuringCapture(false);
-		SetInputMode(InputMode);
-		bShowMouseCursor = true;
-
-		UE_LOG(LogFallenCompassPlayerController, Log, TEXT("Showing table widget: %s"), *WidgetClass->GetName());
-	}
 }
 
 void AFCPlayerController::CloseTableWidget()
 {
+	// Get UIManager for widget management
+	UFCGameInstance* GI = GetGameInstance<UFCGameInstance>();
+	UFCUIManager* UIManager = GI ? GI->GetSubsystem<UFCUIManager>() : nullptr;
+
 	// Remove current widget if one is displayed
-	if (CurrentTableWidget)
+	if (UIManager && UIManager->IsTableWidgetOpen())
 	{
-		CurrentTableWidget->RemoveFromParent();
-		CurrentTableWidget = nullptr;
+		UIManager->CloseTableWidget();
 		UE_LOG(LogFallenCompassPlayerController, Log, TEXT("Closed table widget"));
 
 		// Restore input mode to GameAndUI (keep mouse cursor for clicking other table objects)

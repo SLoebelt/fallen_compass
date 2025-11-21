@@ -285,3 +285,59 @@ void UFCUIManager::HandleSaveSlotSelected(const FString& SlotName)
 	
 	UE_LOG(LogFCUIManager, Log, TEXT("HandleSaveSlotSelected: Load initiated for '%s'"), *SlotName);
 }
+
+void UFCUIManager::ShowTableWidget(AActor* TableObject)
+{
+	if (!TableObject)
+	{
+		UE_LOG(LogFCUIManager, Error, TEXT("ShowTableWidget: TableObject is null!"));
+		return;
+	}
+
+	// Get the widget class for this table object type
+	TSubclassOf<AActor> TableClass = TableObject->GetClass();
+	TSubclassOf<UUserWidget>* WidgetClassPtr = TableWidgetMap.Find(TableClass);
+	
+	if (!WidgetClassPtr || !(*WidgetClassPtr))
+	{
+		UE_LOG(LogFCUIManager, Error, TEXT("ShowTableWidget: No widget class registered for %s"), *TableClass->GetName());
+		return;
+	}
+
+	TSubclassOf<UUserWidget> WidgetClass = *WidgetClassPtr;
+
+	// Close any existing table widget first
+	if (CurrentTableWidget)
+	{
+		UE_LOG(LogFCUIManager, Log, TEXT("ShowTableWidget: Closing existing table widget"));
+		CloseTableWidget();
+	}
+
+	// Create new table widget
+	CurrentTableWidget = CreateWidget<UUserWidget>(GetGameInstance(), WidgetClass);
+	if (!CurrentTableWidget)
+	{
+		UE_LOG(LogFCUIManager, Error, TEXT("ShowTableWidget: Failed to create widget from class %s"), *WidgetClass->GetName());
+		return;
+	}
+
+	// Add to viewport
+	CurrentTableWidget->AddToViewport();
+	UE_LOG(LogFCUIManager, Log, TEXT("ShowTableWidget: Created and displayed widget for %s"), *TableObject->GetName());
+}
+
+void UFCUIManager::CloseTableWidget()
+{
+	if (!CurrentTableWidget)
+	{
+		UE_LOG(LogFCUIManager, Warning, TEXT("CloseTableWidget: No table widget currently open"));
+		return;
+	}
+
+	// Remove from viewport
+	CurrentTableWidget->RemoveFromParent();
+	UE_LOG(LogFCUIManager, Log, TEXT("CloseTableWidget: Removed table widget from viewport"));
+
+	// Clear reference
+	CurrentTableWidget = nullptr;
+}

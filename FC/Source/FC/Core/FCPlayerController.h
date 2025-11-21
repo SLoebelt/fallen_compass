@@ -196,13 +196,6 @@ protected:
 
 private:
 	void LogStateChange(const FString& Context) const;
-
-	/** Helper method to show widget for a table object */
-	void ShowTableWidget(AActor* TableObject);
-
-	/** Current table widget being displayed */
-	UPROPERTY()
-	TObjectPtr<UUserWidget> CurrentTableWidget;
 };
 
 

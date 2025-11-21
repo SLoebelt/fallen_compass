@@ -91,6 +91,10 @@ class FC_API UFCGameInstance : public UGameInstance
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "UI")
     TSubclassOf<UUserWidget> PauseMenuWidgetClass;
 
+    /** Table widget registry: Maps table object classes to their widget classes */
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "UI")
+    TMap<TSubclassOf<AActor>, TSubclassOf<UUserWidget>> TableWidgetMap;
+
     /** Level metadata DataTable (data-driven level configuration) */
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Level")
     TObjectPtr<UDataTable> LevelMetadataTable;
