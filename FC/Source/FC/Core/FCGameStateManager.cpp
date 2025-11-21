@@ -150,3 +150,86 @@ bool UFCGameStateManager::TransitionTo(EFCGameStateID NewState)
 
 	return true;
 }
+
+bool UFCGameStateManager::PushState(EFCGameStateID NewState)
+{
+	// Validate transition before pushing
+	if (!CanTransitionTo(NewState))
+	{
+		UE_LOG(LogFCGameState, Error, TEXT("PushState: Invalid transition from %s to %s"),
+			*UEnum::GetValueAsString(CurrentState),
+			*UEnum::GetValueAsString(NewState));
+		return false;
+	}
+
+	// Push current state onto stack
+	StateStack.Add(CurrentState);
+	
+	UE_LOG(LogFCGameState, Log, TEXT("PushState: Pushed %s onto stack (depth now: %d)"),
+		*UEnum::GetValueAsString(CurrentState),
+		StateStack.Num());
+
+	// Execute transition to new state
+	EFCGameStateID OldState = CurrentState;
+	PreviousState = CurrentState;
+	CurrentState = NewState;
+
+	UE_LOG(LogFCGameState, Log, TEXT("State transition (push): %s -> %s"),
+		*UEnum::GetValueAsString(OldState),
+		*UEnum::GetValueAsString(NewState));
+
+	// Broadcast state change event
+	OnStateChanged.Broadcast(OldState, NewState);
+
+	return true;
+}
+
+bool UFCGameStateManager::PopState()
+{
+	// Check if stack has states to pop
+	if (StateStack.Num() == 0)
+	{
+		UE_LOG(LogFCGameState, Warning, TEXT("PopState: State stack is empty, cannot pop"));
+		return false;
+	}
+
+	// Pop state from stack
+	EFCGameStateID RestoredState = StateStack.Pop();
+
+	UE_LOG(LogFCGameState, Log, TEXT("PopState: Popped state, restoring to %s (stack depth now: %d)"),
+		*UEnum::GetValueAsString(RestoredState),
+		StateStack.Num());
+
+	// Transition to restored state (without validation - we trust the stack)
+	EFCGameStateID OldState = CurrentState;
+	PreviousState = CurrentState;
+	CurrentState = RestoredState;
+
+	UE_LOG(LogFCGameState, Log, TEXT("State transition (pop): %s -> %s"),
+		*UEnum::GetValueAsString(OldState),
+		*UEnum::GetValueAsString(RestoredState));
+
+	// Broadcast state change event
+	OnStateChanged.Broadcast(OldState, RestoredState);
+
+	return true;
+}
+
+EFCGameStateID UFCGameStateManager::GetStateAtDepth(int32 Depth) const
+{
+	// Handle negative indices (from top)
+	if (Depth < 0)
+	{
+		Depth = StateStack.Num() + Depth;
+	}
+
+	// Validate depth
+	if (Depth < 0 || Depth >= StateStack.Num())
+	{
+		UE_LOG(LogFCGameState, Warning, TEXT("GetStateAtDepth: Invalid depth %d (stack size: %d)"),
+			Depth, StateStack.Num());
+		return EFCGameStateID::None;
+	}
+
+	return StateStack[Depth];
+}

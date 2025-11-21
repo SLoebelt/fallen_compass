@@ -291,54 +291,48 @@ void AFCPlayerController::HandlePausePressed()
 	}
 
 	// If in gameplay state (first-person, can move), ESC toggles pause menu
-	// Check GameStateManager for current state
+	// Use GameStateManager's state stack for proper pause/resume handling
 	UFCGameInstance* GI = GetGameInstance<UFCGameInstance>();
 	if (!GI) return;
 
 	UFCGameStateManager* StateMgr = GI->GetSubsystem<UFCGameStateManager>();
 	UFCUIManager* UIManager = GI->GetSubsystem<UFCUIManager>();
 	
-	if (StateMgr && StateMgr->GetCurrentState() == EFCGameStateID::Office_Exploration)
+	if (!StateMgr || !UIManager) return;
+
+	// Check if we're currently paused
+	if (StateMgr->GetCurrentState() == EFCGameStateID::Paused)
 	{
-		if (!UIManager) return;
-		
-		if (bIsPauseMenuDisplayed)
+		// Resume: Pop state from stack to return to previous state
+		if (StateMgr->PopState())
 		{
 			UIManager->HidePauseMenu();
 			bIsPauseMenuDisplayed = false;
-			StateMgr->TransitionTo(EFCGameStateID::Office_Exploration); // Return from paused
-			UE_LOG(LogFallenCompassPlayerController, Log, TEXT("HandlePausePressed: Pause menu hidden, game unpaused."));
-		}
-		else
-		{
-			StateMgr->TransitionTo(EFCGameStateID::Paused);
-			UIManager->ShowPauseMenu();
-			bIsPauseMenuDisplayed = true;
-			UE_LOG(LogFallenCompassPlayerController, Log, TEXT("HandlePausePressed: Pause menu displayed, game paused."));
+			UE_LOG(LogFallenCompassPlayerController, Log, TEXT("HandlePausePressed: Resumed from pause, returned to %s"),
+				*UEnum::GetValueAsString(StateMgr->GetCurrentState()));
 		}
 		return;
 	}
 
-	// Fallback: Use deprecated CurrentGameState for backward compatibility
-	if (CurrentGameState == EFCGameState::Gameplay && UIManager)
+	// Check if we're in a pausable state (Office_Exploration or Office_TableView)
+	EFCGameStateID CurrentState = StateMgr->GetCurrentState();
+	if (CurrentState == EFCGameStateID::Office_Exploration || 
+	    CurrentState == EFCGameStateID::Office_TableView)
 	{
-		if (bIsPauseMenuDisplayed)
-		{
-			UIManager->HidePauseMenu();
-			bIsPauseMenuDisplayed = false;
-			UE_LOG(LogFallenCompassPlayerController, Log, TEXT("HandlePausePressed: Pause menu hidden, game unpaused."));
-		}
-		else
+		// Pause: Push current state onto stack and transition to Paused
+		if (StateMgr->PushState(EFCGameStateID::Paused))
 		{
 			UIManager->ShowPauseMenu();
 			bIsPauseMenuDisplayed = true;
-			UE_LOG(LogFallenCompassPlayerController, Log, TEXT("HandlePausePressed: Pause menu displayed, game paused."));
+			UE_LOG(LogFallenCompassPlayerController, Log, TEXT("HandlePausePressed: Paused from %s"),
+				*UEnum::GetValueAsString(CurrentState));
 		}
 		return;
 	}
 
-	// If in main menu state or other UI states, ESC does nothing (handled by UI widgets)
-	UE_LOG(LogFallenCompassPlayerController, Log, TEXT("ESC pressed in state %d - no action"), static_cast<int32>(CurrentGameState));
+	// If in main menu state or other non-pausable states, ESC does nothing (handled by UI widgets or state logic)
+	UE_LOG(LogFallenCompassPlayerController, Log, TEXT("HandlePausePressed: ESC pressed in non-pausable state %s - no action"),
+		*UEnum::GetValueAsString(StateMgr->GetCurrentState()));
 }
 
 void AFCPlayerController::ShowPauseMenuPlaceholder()
@@ -367,7 +361,8 @@ void AFCPlayerController::HidePauseMenuPlaceholder()
 
 void AFCPlayerController::ResumeGame()
 {
-	// Hide pause menu and unpause game via UIManager
+	// Resume game by popping state from stack (same as ESC key)
+	// This ensures Resume button and ESC key use the same code path
 	UFCGameInstance* GI = GetGameInstance<UFCGameInstance>();
 	if (!GI)
 	{
@@ -375,17 +370,27 @@ void AFCPlayerController::ResumeGame()
 		return;
 	}
 	
+	UFCGameStateManager* StateMgr = GI->GetSubsystem<UFCGameStateManager>();
 	UFCUIManager* UIManager = GI->GetSubsystem<UFCUIManager>();
-	if (!UIManager)
+	
+	if (!StateMgr || !UIManager)
 	{
-		UE_LOG(LogFallenCompassPlayerController, Error, TEXT("ResumeGame: UIManager is null!"));
+		UE_LOG(LogFallenCompassPlayerController, Error, TEXT("ResumeGame: StateMgr or UIManager is null!"));
 		return;
 	}
 	
-	UIManager->HidePauseMenu();
-	bIsPauseMenuDisplayed = false;
+	// Use the same logic as HandlePausePressed: PopState to resume
+	if (StateMgr->GetCurrentState() == EFCGameStateID::Paused)
+	{
+		if (StateMgr->PopState())
+		{
+			UIManager->HidePauseMenu();
+			bIsPauseMenuDisplayed = false;
+			UE_LOG(LogFallenCompassPlayerController, Log, TEXT("ResumeGame: Resumed from pause via PopState, returned to %s"),
+				*UEnum::GetValueAsString(StateMgr->GetCurrentState()));
+		}
+	}
 	
-	UE_LOG(LogFallenCompassPlayerController, Log, TEXT("ResumeGame: Game resumed, pause menu hidden"));
 	LogStateChange(TEXT("Game resumed"));
 }
 

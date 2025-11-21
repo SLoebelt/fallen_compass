@@ -108,19 +108,23 @@ void UFCUIManager::ShowPauseMenu()
 		PauseMenuWidget->AddToViewport(100);
 		UE_LOG(LogFCUIManager, Log, TEXT("ShowPauseMenu: Widget added to viewport"));
 
-		// Set input mode to UI and show cursor
+		// Set input mode to allow both UI interaction and game input (ESC key)
+		// NOTE: We do NOT call SetPause(true) because that prevents Enhanced Input actions from firing
+		// The game state system (EFCGameStateID::Paused) provides the logical pause state
+		// For gameplay that needs engine pause (e.g., Overworld 3D map), use CustomTimeDilation instead
 		UWorld* World = GetWorld();
 		if (World)
 		{
 			APlayerController* PC = World->GetFirstPlayerController();
 			if (PC)
 			{
-				PC->SetPause(true);
-				FInputModeUIOnly InputMode;
+				FInputModeGameAndUI InputMode;
 				InputMode.SetWidgetToFocus(PauseMenuWidget->TakeWidget());
+				InputMode.SetHideCursorDuringCapture(false);
 				PC->SetInputMode(InputMode);
 				PC->bShowMouseCursor = true;
-				UE_LOG(LogFCUIManager, Log, TEXT("ShowPauseMenu: Game paused, input mode set to UI"));
+				
+				UE_LOG(LogFCUIManager, Log, TEXT("ShowPauseMenu: Input mode set to GameAndUI, pause menu displayed"));
 			}
 		}
 	}
@@ -139,17 +143,16 @@ void UFCUIManager::HidePauseMenu()
 		PauseMenuWidget->RemoveFromParent();
 		UE_LOG(LogFCUIManager, Log, TEXT("HidePauseMenu: Widget removed from viewport"));
 
-		// Restore game input mode and hide cursor
+		// Restore input mode
 		UWorld* World = GetWorld();
 		if (World)
 		{
 			APlayerController* PC = World->GetFirstPlayerController();
 			if (PC)
 			{
-				PC->SetPause(false);
 				PC->SetInputMode(FInputModeGameOnly());
 				PC->bShowMouseCursor = false;
-				UE_LOG(LogFCUIManager, Log, TEXT("HidePauseMenu: Game resumed, input mode set to game only"));
+				UE_LOG(LogFCUIManager, Log, TEXT("HidePauseMenu: Input mode restored to game only, pause menu hidden"));
 			}
 		}
 	}

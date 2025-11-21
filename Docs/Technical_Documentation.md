@@ -785,6 +785,10 @@ FOnStateChanged OnStateChanged;
 
 /** Delegate signature: void OnStateChanged(EFCGameStateID OldState, EFCGameStateID NewState) */
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnStateChanged, EFCGameStateID, OldState, EFCGameStateID, NewState);
+
+/** State stack for pause/modal states (Priority 5A - Week 2) */
+UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Game State")
+TArray<EFCGameStateID> StateStack;
 ```
 
 #### Public API
@@ -811,6 +815,30 @@ bool TransitionTo(EFCGameStateID NewState);
  */
 UFUNCTION(BlueprintPure, Category = "Game State")
 bool CanTransitionTo(EFCGameStateID TargetState) const;
+
+/** Push new state onto stack and transition to it (for pause/modal states)
+ * @param NewState State to push and transition to
+ * @return True if push succeeded, false if transition invalid
+ */
+UFUNCTION(BlueprintCallable, Category = "Game State")
+bool PushState(EFCGameStateID NewState);
+
+/** Pop state from stack and return to previous state
+ * @return True if pop succeeded, false if stack empty or transition invalid
+ */
+UFUNCTION(BlueprintCallable, Category = "Game State")
+bool PopState();
+
+/** Get state stack depth (number of pushed states) */
+UFUNCTION(BlueprintPure, Category = "Game State")
+int32 GetStateStackDepth() const { return StateStack.Num(); }
+
+/** Get state at stack position (0 = bottom, -1 = top)
+ * @param Depth Stack depth to query (negative indices count from top)
+ * @return State at given depth, or None if invalid depth
+ */
+UFUNCTION(BlueprintPure, Category = "Game State")
+EFCGameStateID GetStateAtDepth(int32 Depth) const;
 ```
 
 #### Valid State Transitions
@@ -1039,6 +1067,112 @@ Now all state is explicit and centralized in a single subsystem with validation.
 
 **Week 3 Cleanup Note**: `AFCPlayerController::CurrentGameState` marked as deprecated. Remove after verifying all references use UFCGameStateManager instead.
 
+#### State Stack Implementation (Priority 5A - Week 2)
+
+**Purpose**: Support nested states (e.g., pause menu while in any state) with proper return-to-previous behavior.
+
+**Architecture**: Uses `TArray<EFCGameStateID> StateStack` to maintain state history. When pausing, current state is pushed onto stack. When resuming, state is popped from stack.
+
+**Implementation**:
+
+```cpp
+bool UFCGameStateManager::PushState(EFCGameStateID NewState)
+{
+    if (!CanTransitionTo(NewState))
+    {
+        UE_LOG(LogFCGameState, Warning, TEXT("PushState: Invalid transition from %s to %s"),
+            *UEnum::GetValueAsString(CurrentState),
+            *UEnum::GetValueAsString(NewState));
+        return false;
+    }
+
+    // Push current state onto stack before transitioning
+    StateStack.Push(CurrentState);
+
+    UE_LOG(LogFCGameState, Log, TEXT("PushState: Pushed %s onto stack (depth now: %d)"),
+        *UEnum::GetValueAsString(CurrentState),
+        StateStack.Num());
+
+    return TransitionTo(NewState);
+}
+
+bool UFCGameStateManager::PopState()
+{
+    if (StateStack.Num() == 0)
+    {
+        UE_LOG(LogFCGameState, Warning, TEXT("PopState: Stack is empty, cannot pop"));
+        return false;
+    }
+
+    EFCGameStateID StateToRestore = StateStack.Pop();
+
+    UE_LOG(LogFCGameState, Log, TEXT("PopState: Popped state, restoring to %s (stack depth now: %d)"),
+        *UEnum::GetValueAsString(StateToRestore),
+        StateStack.Num());
+
+    return TransitionTo(StateToRestore);
+}
+
+EFCGameStateID UFCGameStateManager::GetStateAtDepth(int32 Depth) const
+{
+    // Support negative indices (Python-style: -1 = top)
+    if (Depth < 0)
+    {
+        Depth = StateStack.Num() + Depth;
+    }
+
+    if (Depth < 0 || Depth >= StateStack.Num())
+    {
+        UE_LOG(LogFCGameState, Warning, TEXT("GetStateAtDepth: Invalid depth %d (stack size: %d)"),
+            Depth, StateStack.Num());
+        return EFCGameStateID::None;
+    }
+
+    return StateStack[Depth];
+}
+```
+
+**Usage Pattern - Pause Menu**:
+
+```cpp
+// In AFCPlayerController::HandlePausePressed()
+UFCGameStateManager* StateMgr = GI->GetSubsystem<UFCGameStateManager>();
+
+if (StateMgr->GetCurrentState() == EFCGameStateID::Paused)
+{
+    // Resume: Pop state from stack to return to previous state
+    if (StateMgr->PopState())
+    {
+        UIManager->HidePauseMenu();
+        bIsPauseMenuDisplayed = false;
+    }
+}
+else if (CurrentState == EFCGameStateID::Office_Exploration || 
+         CurrentState == EFCGameStateID::Office_TableView)
+{
+    // Pause: Push current state onto stack and transition to Paused
+    if (StateMgr->PushState(EFCGameStateID::Paused))
+    {
+        UIManager->ShowPauseMenu();
+        bIsPauseMenuDisplayed = true;
+    }
+}
+```
+
+**Benefits**:
+- ✅ Supports pausing from any state (Office_Exploration, Office_TableView, future combat/camp states)
+- ✅ Automatic return to correct previous state when resuming
+- ✅ Stack depth tracking for debugging nested states
+- ✅ Foundation for modal dialogs (confirmation, inventory, etc.)
+
+**Logging Example**:
+```
+LogFCGameState: PushState: Pushed EFCGameStateID::Office_Exploration onto stack (depth now: 1)
+LogFCGameState: State transition: EFCGameStateID::Office_Exploration -> EFCGameStateID::Paused
+LogFCGameState: PopState: Popped state, restoring to EFCGameStateID::Office_Exploration (stack depth now: 0)
+LogFCGameState: State transition: EFCGameStateID::Paused -> EFCGameStateID::Office_Exploration
+```
+
 ---
 
 ### UFCUIManager (2.1.6)
@@ -1150,6 +1284,140 @@ TMap<TSubclassOf<AActor>, TSubclassOf<UUserWidget>> TableWidgetMap;
 /** Currently displayed table widget */
 UPROPERTY()
 TObjectPtr<UUserWidget> CurrentTableWidget;
+```
+
+#### Public API - Pause Menu Management (Priority 5A)
+
+```cpp
+/** Show pause menu */
+UFUNCTION(BlueprintCallable, Category = "UI Management")
+void ShowPauseMenu();
+
+/** Hide pause menu */
+UFUNCTION(BlueprintCallable, Category = "UI Management")
+void HidePauseMenu();
+```
+
+**Pause Menu Implementation**:
+
+```cpp
+void UFCUIManager::ShowPauseMenu()
+{
+    if (!PauseMenuWidgetClass)
+    {
+        UE_LOG(LogFCUIManager, Error, TEXT("ShowPauseMenu: PauseMenuWidgetClass is null!"));
+        return;
+    }
+
+    // Create widget if not already cached
+    if (!PauseMenuWidget)
+    {
+        PauseMenuWidget = CreateWidget<UUserWidget>(GetGameInstance(), PauseMenuWidgetClass);
+        if (!PauseMenuWidget)
+        {
+            UE_LOG(LogFCUIManager, Error, TEXT("ShowPauseMenu: Failed to create PauseMenuWidget!"));
+            return;
+        }
+        UE_LOG(LogFCUIManager, Log, TEXT("ShowPauseMenu: Created PauseMenuWidget"));
+    }
+
+    // Add to viewport with high z-order (above gameplay UI)
+    if (!PauseMenuWidget->IsInViewport())
+    {
+        PauseMenuWidget->AddToViewport(100);
+        UE_LOG(LogFCUIManager, Log, TEXT("ShowPauseMenu: Widget added to viewport"));
+
+        // Set input mode to allow both UI interaction and game input (ESC key)
+        // NOTE: We do NOT call SetPause(true) because that prevents Enhanced Input actions from firing
+        // The game state system (EFCGameStateID::Paused) provides the logical pause state
+        // For gameplay that needs engine pause (e.g., Overworld 3D map), use conditional pause in Week 3+
+        UWorld* World = GetWorld();
+        if (World)
+        {
+            APlayerController* PC = World->GetFirstPlayerController();
+            if (PC)
+            {
+                FInputModeGameAndUI InputMode;
+                InputMode.SetWidgetToFocus(PauseMenuWidget->TakeWidget());
+                InputMode.SetHideCursorDuringCapture(false);
+                PC->SetInputMode(InputMode);
+                PC->bShowMouseCursor = true;
+                
+                UE_LOG(LogFCUIManager, Log, TEXT("ShowPauseMenu: Input mode set to GameAndUI, pause menu displayed"));
+            }
+        }
+    }
+}
+
+void UFCUIManager::HidePauseMenu()
+{
+    if (!PauseMenuWidget)
+    {
+        UE_LOG(LogFCUIManager, Warning, TEXT("HidePauseMenu: PauseMenuWidget is null, nothing to hide"));
+        return;
+    }
+
+    if (PauseMenuWidget->IsInViewport())
+    {
+        PauseMenuWidget->RemoveFromParent();
+        UE_LOG(LogFCUIManager, Log, TEXT("HidePauseMenu: Widget removed from viewport"));
+
+        // Restore input mode
+        UWorld* World = GetWorld();
+        if (World)
+        {
+            APlayerController* PC = World->GetFirstPlayerController();
+            if (PC)
+            {
+                PC->SetInputMode(FInputModeGameOnly());
+                PC->bShowMouseCursor = false;
+                UE_LOG(LogFCUIManager, Log, TEXT("HidePauseMenu: Input mode restored to game only, pause menu hidden"));
+            }
+        }
+    }
+}
+```
+
+**Pause Menu Design - Input Mode Pattern**:
+
+- **Office**: Uses `FInputModeGameAndUI` without engine pause (`SetPause(false)`)
+  - Game state system (`EFCGameStateID::Paused`) provides logical pause
+  - Enhanced Input continues working (ESC key closes pause menu via `AFCPlayerController::HandlePausePressed()`)
+  - PlayerController receives input events via `FInputModeGameAndUI`
+  
+- **Future Overworld** (Week 3+): Add conditional engine pause
+  - Check if pausing from `Overworld_Travel` state using `UFCGameStateManager::GetStateAtDepth(0)`
+  - If Overworld, call `SetPause(true)` to freeze 3D map movement/physics
+  - Office pause menu continues without engine pause (current behavior)
+
+**Why Not SetPause(true) for Office**:
+- `SetPause(true)` stops game tick, which blocks Enhanced Input action processing
+- ESC key binding (`EscapeAction`) would not fire when paused
+- `FInputModeGameAndUI` allows both UI buttons AND game input (ESC) to work simultaneously
+- Game state `Paused` prevents gameplay logic without blocking input processing
+
+**Integration with State Stack**:
+
+Pause menu show/hide is synchronized with UFCGameStateManager state stack:
+
+```cpp
+// In AFCPlayerController::HandlePausePressed()
+if (StateMgr->GetCurrentState() == EFCGameStateID::Paused)
+{
+    // Resume: Pop state from stack
+    if (StateMgr->PopState())
+    {
+        UIManager->HidePauseMenu();  // Synchronized with state transition
+    }
+}
+else
+{
+    // Pause: Push state onto stack
+    if (StateMgr->PushState(EFCGameStateID::Paused))
+    {
+        UIManager->ShowPauseMenu();  // Synchronized with state transition
+    }
+}
 ```
 
 #### Widget Lifecycle Implementation

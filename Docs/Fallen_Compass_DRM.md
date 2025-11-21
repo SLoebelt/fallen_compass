@@ -133,6 +133,14 @@ Every week aims to leave the game **playable and compiling**. Multi-week feature
   - Implement **Left-click** on ground → move convoy to clicked location.
   - Add **Right-click interaction stub** on a test POI actor (just prints “Interact”).
 
+- **Backlog: Conditional Engine Pause for Overworld Pause Menu**
+
+  - Current implementation: Pause menu uses game state system without engine pause (Enhanced Input continues working).
+  - When Overworld 3D map is implemented, add conditional engine pause:
+    - Check if pausing from `Overworld_Travel` state.
+    - If yes, call `SetPause(true)` to freeze 3D map movement/physics.
+    - Office pause menu continues without engine pause (current behavior).
+  - Implementation location: `UFCUIManager::ShowPauseMenu()` - add state check after setting input mode.
 ---
 
 ### Week 4 – Overworld Map Widget & Basic Expedition Flow

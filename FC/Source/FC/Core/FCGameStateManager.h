@@ -79,6 +79,37 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "FC|GameState")
 	bool CanTransitionTo(EFCGameStateID NewState) const;
 
+	/**
+	 * Push new state onto stack (for pause/modal states)
+	 * Saves current state and transitions to new state
+	 * @param NewState The state to push and transition to
+	 * @return True if push was successful
+	 */
+	UFUNCTION(BlueprintCallable, Category = "FC|GameState")
+	bool PushState(EFCGameStateID NewState);
+
+	/**
+	 * Pop state and return to previous state from stack
+	 * @return True if pop was successful, false if stack was empty
+	 */
+	UFUNCTION(BlueprintCallable, Category = "FC|GameState")
+	bool PopState();
+
+	/**
+	 * Get state stack depth
+	 * @return Number of states currently on the stack
+	 */
+	UFUNCTION(BlueprintPure, Category = "FC|GameState")
+	int32 GetStateStackDepth() const { return StateStack.Num(); }
+
+	/**
+	 * Get state at stack position (0 = bottom, -1 = top)
+	 * @param Depth Stack position (0-based from bottom, negative from top)
+	 * @return State at the given depth, or None if invalid depth
+	 */
+	UFUNCTION(BlueprintPure, Category = "FC|GameState")
+	EFCGameStateID GetStateAtDepth(int32 Depth) const;
+
 	/** Delegate broadcast when state changes */
 	DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnStateChanged, EFCGameStateID, OldState, EFCGameStateID, NewState);
 	
@@ -93,6 +124,10 @@ private:
 	/** Previous game state (for state restoration) */
 	UPROPERTY()
 	EFCGameStateID PreviousState;
+
+	/** State stack for pause/modal states (supports nested state transitions) */
+	UPROPERTY()
+	TArray<EFCGameStateID> StateStack;
 
 	/** 
 	 * Valid state transitions map

@@ -67,6 +67,10 @@
 
 - ✅ Refactoring 4A: Migrate Table Widgets to UFCUIManager
 
+**Priority 5 - Advanced State Management** (Week 2)
+
+- ✅ Refactoring 5A: State Stack for Pause/Modal States
+
 **Architecture Corrections**
 
 - ✅ L_MainMenu architecture fix (removed non-existent level, main menu is a state in L_Office)
@@ -348,7 +352,7 @@ bool CanTransitionTo(EFCGameStateID NewState) const;
 
 **Step 5A.1: Extend State Manager API**
 
-- [ ] Add to `UFCGameStateManager.h`:
+- [x] Add to `UFCGameStateManager.h`:
 
   ```cpp
   /** Push new state onto stack (for pause/modal) */
@@ -372,24 +376,24 @@ bool CanTransitionTo(EFCGameStateID NewState) const;
     TArray<EFCGameStateID> StateStack;
   ```
 
-- [ ] Compile successfully
+- [x] Compile successfully
 
 **Step 5A.2: Implement Stack Operations**
 
-- [ ] Implement `PushState()`:
-  - [ ] Push current state to stack
-  - [ ] Transition to new state
-  - [ ] Log stack operation
-- [ ] Implement `PopState()`:
-  - [ ] Validate stack not empty
-  - [ ] Pop state from stack
-  - [ ] Transition to popped state
-  - [ ] Return success/failure
-- [ ] Compile successfully
+- [x] Implement `PushState()`:
+  - [x] Push current state to stack
+  - [x] Transition to new state
+  - [x] Log stack operation
+- [x] Implement `PopState()`:
+  - [x] Validate stack not empty
+  - [x] Pop state from stack
+  - [x] Transition to popped state
+  - [x] Return success/failure
+- [x] Compile successfully
 
 **Step 5A.3: Update Pause Logic**
 
-- [ ] Update `AFCPlayerController::HandlePausePressed()`:
+- [x] Update `AFCPlayerController::HandlePausePressed()`:
 
   ```cpp
   // FROM: Manual state checking
@@ -405,17 +409,17 @@ bool CanTransitionTo(EFCGameStateID NewState) const;
   }
   ```
 
-- [ ] Compile successfully
+- [x] Compile successfully
 
 **Step 5A.4: Testing**
 
-- [ ] PIE → Enter gameplay
-- [ ] Press Pause → State: Office_Exploration → Paused (stack: [Office_Exploration])
-- [ ] Press Pause again → State: Paused → Office_Exploration (stack: [])
-- [ ] Open table widget → State: Office_TableView
-- [ ] Press Pause → State: Office_TableView → Paused (stack: [Office_TableView])
-- [ ] Press Pause again → Returns to Office_TableView correctly
-- [ ] Check logs: All stack operations logged
+- [x] PIE → Enter gameplay
+- [x] Press Pause → State: Office_Exploration → Paused (stack: [Office_Exploration])
+- [x] Press Pause again → State: Paused → Office_Exploration (stack: [])
+- [x] Open table widget → State: Office_TableView
+- [x] Press Pause → State: Office_TableView → Paused (stack: [Office_TableView])
+- [x] Press Pause again → Returns to Office_TableView correctly
+- [x] Check logs: All stack operations logged
 
 **Benefits**:
 
@@ -423,6 +427,17 @@ bool CanTransitionTo(EFCGameStateID NewState) const;
 - ✅ Proper "return to previous" behavior
 - ✅ Foundation for modal dialogs (confirmation, etc.)
 - ✅ Stack depth tracking for debugging
+
+**Implementation Details**:
+
+- Added `StateStack` (TArray<EFCGameStateID>) to UFCGameStateManager
+- Implemented `PushState()` - saves current state to stack, transitions to new state
+- Implemented `PopState()` - validates stack not empty, pops and transitions to saved state
+- Implemented `GetStateAtDepth()` - query stack contents for debugging
+- PlayerController pause logic simplified - `PushState(Paused)` to pause, `PopState()` to resume
+- Removed fallback code and manual state tracking - state stack handles all pause/resume logic
+- All stack operations logged with depth tracking for debugging
+- Supports pausing from any state (Office_Exploration, Office_TableView, future combat/camp states)
 
 ---
 
@@ -658,12 +673,13 @@ Priority 1-6 (All Complete) ──────> Priority 7 (SaveGame) ┘
    - ~~Blocks: Week 2+ table expansion~~
    - ~~Critical: Maintains UI consistency~~
 
-**Current Status**: Priorities 3 & 4 completed ahead of schedule. PlayerController reduced by ~218 lines total (167 camera + 51 table widgets).
+**Current Status**: Priorities 3, 4, 5 completed ahead of schedule. PlayerController reduced by ~218 lines total (167 camera + 51 table widgets). State management now supports nested states via stack architecture.
 
-**During Week 3** (November 23-26): 3. **Priority 5**: State Stack Implementation (4-5 hours)
+**During Week 3** (November 23-26):
 
-- Blocks: Week 5+ camp/combat states
-- Can be done in parallel with Week 3 features
+3. ~~**Priority 5**: State Stack Implementation (4-5 hours)~~ ✅ **COMPLETE**
+   - ~~Blocks: Week 5+ camp/combat states~~
+   - Ready for Week 5+ camp substates and Week 6+ combat turn states
 
 **Week 4-6** (As Time Allows): 4. **Priority 6**: Input Manager Component (6-8 hours) - OPTIONAL
 
