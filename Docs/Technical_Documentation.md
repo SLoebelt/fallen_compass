@@ -141,7 +141,9 @@ FC/
 │   │   └── DT_LevelMetadata (DataTable - Priority 2A)
 │   ├── World/
 │   │   ├── Levels/
-│   │   │   └── L_Office (Main menu state & gameplay hub)
+│   │   │   ├── L_Office (Main menu state & gameplay hub)
+│   │   │   └── Overworld/
+│   │   │       └── L_Overworld (Week 3: Expedition travel map)
 │   │   ├── Blueprints/
 │   │   │   └── Interactables/
 │   │   │       ├── BP_TableObject (Week 2: Base class)
@@ -4306,6 +4308,200 @@ OnGameLoaded.Broadcast(true);
 ### Design Rationale
 
 In-world menu design provides atmospheric immersion while maintaining clear separation between menu navigation and gameplay. Level reload ensures clean state transitions without complex save/load systems. Widget-based UI allows for flexible menu design and future expansion. The save system integrates seamlessly with the main menu, providing familiar Continue/Load options while maintaining the immersive atmosphere.
+
+---
+
+## Overworld Level (Week 3 - Task 2)
+
+### Overview
+
+Created the first 3D overworld level for Fallen Compass - a greyboxed outdoor environment serving as the primary expedition travel map. The level provides a traversable landscape with NavMesh pathfinding support, atmospheric lighting, and proper state management integration.
+
+**Key Architecture Decision**: L_Overworld is designed for top-down camera gameplay with convoy pathfinding, not first-person exploration. The level transitions from Office via the map table "Start Journey" button and uses the `Overworld_Travel` game state.
+
+### Level Asset
+
+- **Location**: `/Game/FC/World/Levels/Overworld/L_Overworld.umap`
+- **Game Mode**: `FCGameMode` (inherited from World Settings)
+- **Purpose**: Expedition travel map with convoy movement and POI interaction
+- **Camera Mode**: Top-down (not first-person)
+- **State Integration**: Automatically transitions to `Overworld_Travel` state on BeginPlay
+
+### World Settings Configuration
+
+```
+Game Mode Override: FCGameMode
+Default Pawn Class: BP_OverworldConvoy (Week 3 Task 5)
+PlayerStart: PlayerStart_Overworld
+```
+
+### Terrain & Environment
+
+#### Landscape Setup
+
+**Type**: Landscape Actor with Smooth Tool applied
+
+- **Size**: 2000x2000 units base coverage
+- **Material**: M_Landscape_Default (placeholder, assigned via Landscape Mode)
+- **Topology**: Gentle hills for visual interest
+- **Collision**: Enabled (required for NavMesh generation)
+- **Purpose**: Provides walkable surface for convoy pathfinding
+
+**Creation Process**:
+1. Landscape Mode → New Landscape
+2. Section Size: 63x63 quads
+3. Number of Components: 4x4
+4. Material: `/Game/FC/World/Materials/M_Landscape_Default` (or engine default)
+5. Smooth Tool applied to reduce harsh edges
+6. Fill World option enabled for seamless coverage
+
+#### Lighting System
+
+**Atmospheric Lighting** (similar to L_Office pattern):
+
+- **DirectionalLight**: Main sunlight source
+  - Intensity: ~3.0
+  - Color: Warm white (slight yellow tint)
+  - Angle: ~45° from horizon for natural shadows
+  - Mobility: Stationary (for baked lighting optimization)
+
+- **SkyLight**: Ambient environmental lighting
+  - Intensity: ~1.0
+  - Source Type: SLS Captured Scene
+  - Mobility: Stationary
+
+- **SkyAtmosphere**: Realistic sky rendering with day/night cycle support
+  - Default atmospheric parameters
+  - Enhances visual depth and horizon realism
+
+- **ExponentialHeightFog** (Optional):
+  - Adds atmospheric depth to distant terrain
+  - Fog Density: ~0.02 (subtle, not obscuring)
+  - Start Distance: ~1000 units
+
+**Organization**:
+```
+L_Overworld
+├── WorldLighting/
+│   ├── DirectionalLight
+│   ├── SkyLight
+│   ├── SkyAtmosphere
+│   └── ExponentialHeightFog (optional)
+├── Terrain/
+│   └── Landscape
+├── Navigation/
+│   └── NavMeshBounds_Main
+└── Spawning/
+    ├── PlayerStart_Overworld
+    └── CameraStart_Overworld (reference marker)
+```
+
+### Navigation System
+
+#### NavMesh Configuration
+
+**NavMesh Bounds Volume**:
+- **Actor**: Nav Mesh Bounds Volume (`NavMeshBounds_Main`)
+- **Location**: X=0, Y=0, Z=0 (centered on map)
+- **Scale**: X=100, Y=100, Z=10 (covers entire landscape)
+- **Purpose**: Defines AI pathfinding walkable area for convoy movement
+
+**Visualization**:
+- Press `P` key in editor viewport to toggle NavMesh visualization
+- Green overlay appears on all walkable surfaces (landscape)
+- NavMesh regenerates automatically when terrain or bounds change
+
+**Agent Settings** (Project Settings → Navigation System → Agents → Agent0):
+- **Status**: Deferred until Task 5 (convoy implementation)
+- **Reason**: Agent Radius, Height, and Max Step Height depend on BP_OverworldConvoy collision capsule dimensions
+- **Current**: Using default agent parameters for initial testing
+- **Future**: Will be tuned after convoy pawn creation to match exact collision size
+
+### Player Start & Camera Reference
+
+#### PlayerStart_Overworld
+
+- **Type**: Player Start Actor
+- **Location**: X=0, Y=0, Z=100 (center of map, slightly above terrain)
+- **Rotation**: Yaw=0 (facing north)
+- **Purpose**: Spawn point for BP_OverworldConvoy pawn when loading level
+- **Collision**: Must be positioned on NavMesh (green overlay) to avoid spawn failures
+
+#### CameraStart_Overworld (Reference Marker)
+
+- **Type**: Empty Actor (reference only, not functional camera)
+- **Location**: X=-1000, Y=0, Z=1500 (elevated, offset from spawn)
+- **Rotation**: Pitch=-70, Yaw=0, Roll=0 (angled downward for top-down view)
+- **Purpose**: Visual reference for BP_OverworldCamera initial positioning (Task 3)
+- **Note**: Actual camera is BP_OverworldCamera actor (separate Blueprint)
+
+### Level Blueprint - State Management
+
+#### Overworld_Travel State Transition
+
+**Implementation** (L_Overworld Level Blueprint → Event BeginPlay):
+
+```
+Event BeginPlay
+    ├─→ Get Game Instance
+    │      └─→ Cast to BP_FCGameInstance
+    ├─→ Get Subsystem (UFCGameStateManager)
+    ├─→ TransitionTo(Overworld_Travel)
+    │      └─→ Return Value (bool): Success check
+    └─→ Print String: "L_Overworld: Transitioned to Overworld_Travel state"
+           └─→ Duration: 5.0 seconds
+```
+
+**Purpose**:
+- Automatically sets game state to `Overworld_Travel` when level loads
+- Ensures UFCInputManager switches to TopDown input context
+- Enables proper state tracking for pause system (Week 3 Task 8)
+
+**Validation**:
+- TransitionTo returns `true` if state change succeeds
+- Output Log shows: `"L_Overworld: Transitioned to Overworld_Travel state"`
+- UFCGameStateManager logs state transition if verbose logging enabled
+
+**Testing Note (Week 3 Only)**:
+- Temporary transition from `None` → `Overworld_Travel` added to UFCGameStateManager for direct L_Overworld testing
+- Production flow: `None` → `MainMenu` → `Office_Exploration` → `Overworld_Travel`
+- Task 10 reverts this testing-only change at Week 3 completion
+
+### Integration Points
+
+**Week 2 Systems**:
+- **UFCLevelManager**: Handles level loading via `LoadLevel("L_Overworld", bUseFade=true)`
+- **UFCGameStateManager**: Manages `Overworld_Travel` state with validated transitions from `Office_Exploration`
+- **UFCInputManager**: Auto-switches to TopDown input context when Overworld_Travel state active
+
+**Week 3 Future Systems** (Tasks 3-8):
+- **BP_OverworldCamera** (Task 3): Possessed by controller, WASD pan + zoom
+- **AFCOverworldPlayerController** (Task 4): Handles input, click-to-move, POI interaction
+- **BP_OverworldConvoy** (Task 5): Pawn with NavMesh pathfinding via SimpleMoveToLocation()
+- **BP_OverworldPOI** (Task 6): Interactable actors placed on landscape
+- **Office Transition** (Task 7): Tab key or Pause Menu returns to L_Office
+- **Pause System** (Task 8): ESC key conditional pause (Overworld only)
+
+### Acceptance Criteria
+
+- ✅ L_Overworld level created at `/Game/FC/World/Levels/Overworld/L_Overworld.umap`
+- ✅ Lighting system configured (DirectionalLight, SkyLight, SkyAtmosphere, optional fog)
+- ✅ Landscape terrain with proper collision and visual topology
+- ✅ NavMesh Bounds Volume placed with green overlay visible (press `P`)
+- ✅ PlayerStart_Overworld positioned on NavMesh at map center
+- ✅ Level Blueprint transitions to `Overworld_Travel` state on BeginPlay
+- ✅ No errors or warnings when loading level in PIE (Play In Editor)
+- ✅ All assets saved in correct folder structure
+
+### Open Hooks for Week 3
+
+- **Task 3**: BP_OverworldCamera to be placed and configured with pan/zoom input
+- **Task 4**: AFCOverworldPlayerController to possess camera and handle input
+- **Task 5**: BP_OverworldConvoy pawn to spawn at PlayerStart_Overworld
+- **Task 6**: BP_OverworldPOI actors to be placed on landscape for interaction
+- **Task 7**: Office ↔ Overworld transition flow via map table widget
+- **Task 8**: ESC key pause menu (conditional, Overworld only)
+- **Task 10**: Revert testing-only `None` → `Overworld_Travel` state transition
 
 ---
 

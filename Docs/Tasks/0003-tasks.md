@@ -416,7 +416,7 @@ To Create in Week 3:
 
   - [x] If Landscape: Review UE Landscape documentation for NavMesh compatibility
 
-- [ ] **Implementation (Unreal Editor) - Option B: Create Landscape (More Realistic)**
+- [x] **Implementation (Unreal Editor) - Option B: Create Landscape (More Realistic)**
 
   - [x] Landscape Mode → Create New Landscape
   - [x] Set Section Size: 63x63 quads, Sections Per Component: 1x1, Components: 8x8 (medium size)
@@ -432,7 +432,7 @@ To Create in Week 3:
   - [x] Props (if added) have collision
   - [x] Save successful
 
-**COMMIT POINT 2.2.2**: `git add Content/FC/World/Levels/L_Overworld.umap && git commit -m "feat(overworld): Add terrain variation and visual reference props"`
+**COMMIT POINT 2.2.2**: `git add Content/FC/World/Levels/L_Overworld.umap && git commit -m "feat(overworld): Add terrain variation"`
 
 ---
 
@@ -440,34 +440,35 @@ To Create in Week 3:
 
 ##### Step 2.3.1: Add NavMesh Bounds Volume
 
-- [ ] **Analysis**
+- [x] **Analysis**
 
-  - [ ] Review UE NavMesh documentation (NavMeshBoundsVolume, RecastNavMesh)
-  - [ ] Confirm ground plane/landscape has proper collision for NavMesh generation
+  - [x] Review UE NavMesh documentation (NavMeshBoundsVolume, RecastNavMesh)
+  - [x] Confirm ground plane/landscape has proper collision for NavMesh generation
 
-- [ ] **Implementation (Unreal Editor)**
+- [x] **Implementation (Unreal Editor)**
 
-  - [ ] Add NavMesh Bounds Volume:
-    - [ ] Place Actor → Volumes → Nav Mesh Bounds Volume
-    - [ ] Rename to `NavMeshBounds_Main`
-    - [ ] Set Location: X=0, Y=0, Z=0 (center of map)
-    - [ ] Set Scale to cover entire ground plane: X=100, Y=100, Z=10 (or adjust to match ground size)
-  - [ ] Verify NavMesh Generation:
-    - [ ] Press `P` key in viewport to toggle NavMesh visualization
-    - [ ] Green overlay should appear on walkable surfaces (ground plane)
-    - [ ] If no green overlay: Check collision settings on ground plane
-  - [ ] Configure Project Settings (if needed):
-    - [ ] Project Settings → Navigation System → Agents → Agent0
-    - [ ] Agent Radius: 50 units (convoy size)
-    - [ ] Agent Height: 200 units (convoy height)
-    - [ ] Max Step Height: 50 units
-  - [ ] Save level
+  - [x] Add NavMesh Bounds Volume:
+    - [x] Place Actor → Volumes → Nav Mesh Bounds Volume
+    - [x] Rename to `NavMeshBounds_Main`
+    - [x] Set Location: X=0, Y=0, Z=0 (center of map)
+    - [x] Set Scale to cover entire ground plane: X=100, Y=100, Z=10 (or adjust to match ground size)
+  - [x] Verify NavMesh Generation:
+    - [x] Press `P` key in viewport to toggle NavMesh visualization
+    - [x] Green overlay should appear on walkable surfaces (ground plane)
+    - [x] If no green overlay: Check collision settings on ground plane
+  - [x] Configure Project Settings (deferred until convoy details known):
+    - [x] Project Settings → Navigation System → Agents → Agent0
+    - [x] NOTE: Agent Radius, Height, Max Step Height will be adjusted after convoy implementation
+    - [x] Current defaults acceptable for initial testing
+  - [x] Save level
 
-- [ ] **Testing After Step 2.3.1** ✅ CHECKPOINT
-  - [ ] Press `P` to see green NavMesh overlay covering ground
-  - [ ] NavMesh regenerates when moving bounds volume
-  - [ ] No errors in Output Log related to NavMesh
-  - [ ] Save successful
+- [x] **Testing After Step 2.3.1** ✅ CHECKPOINT
+  - [x] Press `P` to see green NavMesh overlay covering ground
+  - [x] NavMesh regenerates when moving bounds volume
+  - [x] No errors in Output Log related to NavMesh
+  - [x] Save successful
+
+**Navigation System Settings Note**: Agent parameters (Radius, Height, Max Step Height) will be configured after convoy pawn implementation in Task 5 when exact dimensions are known.
 
 **COMMIT POINT 2.3.1**: `git add Content/FC/World/Levels/L_Overworld.umap && git commit -m "feat(overworld): Add NavMesh bounds volume for AI pathfinding"`
 
@@ -477,31 +478,31 @@ To Create in Week 3:
 
 ##### Step 2.4.1: Add Player Start for Overworld Spawn
 
-- [ ] **Analysis**
+- [x] **Analysis**
 
-  - [ ] Check L_Office PlayerStart placement pattern
-  - [ ] Determine appropriate spawn location (center or edge of map)
+  - [x] Check L_Office PlayerStart placement pattern
+  - [x] Determine appropriate spawn location (center or edge of map)
 
-- [ ] **Implementation (Unreal Editor)**
+- [x] **Implementation (Unreal Editor)**
 
-  - [ ] Add Player Start:
-    - [ ] Place Actor → Basic → Player Start
-    - [ ] Rename to `PlayerStart_Overworld`
-    - [ ] Set Location: X=0, Y=0, Z=100 (center of map, above ground)
-    - [ ] Set Rotation: Yaw=0 (facing north)
-  - [ ] Add Camera Start Position Marker (optional, for reference):
-    - [ ] Place Actor → Empty Actor
-    - [ ] Rename to `CameraStart_Overworld`
-    - [ ] Set Location: X=-1000, Y=0, Z=1500 (top-down view position)
-    - [ ] Set Rotation: Pitch=-70, Yaw=0, Roll=0 (looking down at spawn)
-  - [ ] Save level
+  - [x] Add Player Start:
+    - [x] Place Actor → Basic → Player Start
+    - [x] Rename to `PlayerStart_Overworld`
+    - [x] Set Location: X=0, Y=0, Z=100 (center of map, above ground)
+    - [x] Set Rotation: Yaw=0 (facing north)
+  - [x] Add Camera Start Position Marker (optional, for reference):
+    - [x] Place Actor → Empty Actor
+    - [x] Rename to `CameraStart_Overworld`
+    - [x] Set Location: X=-1000, Y=0, Z=1500 (top-down view position)
+    - [x] Set Rotation: Pitch=-70, Yaw=0, Roll=0 (looking down at spawn)
+  - [x] Save level
 
-- [ ] **Testing After Step 2.4.1** ✅ CHECKPOINT
-  - [ ] PlayerStart visible in viewport (blue flag icon)
-  - [ ] PlayerStart positioned correctly on NavMesh (green overlay)
-  - [ ] PIE (Play In Editor) - spawns at PlayerStart location
-  - [ ] No spawn collision warnings
-  - [ ] Save successful
+- [x] **Testing After Step 2.4.1** ✅ CHECKPOINT
+  - [x] PlayerStart visible in viewport (blue flag icon)
+  - [x] PlayerStart positioned correctly on NavMesh (green overlay)
+  - [x] PIE (Play In Editor) - spawns at PlayerStart location
+  - [x] No spawn collision warnings
+  - [x] Save successful
 
 **COMMIT POINT 2.4.1**: `git add Content/FC/World/Levels/L_Overworld.umap && git commit -m "feat(overworld): Add PlayerStart and camera reference marker"`
 
@@ -511,37 +512,37 @@ To Create in Week 3:
 
 ##### Step 2.5.1: Configure Level Blueprint to Set Overworld_Travel State
 
-- [ ] **Analysis**
+- [x] **Analysis**
 
-  - [ ] Review L_Office Level Blueprint for GameStateManager usage patterns
-  - [ ] Confirm UFCGameStateManager has Overworld_Travel state (should exist from Week 2)
+  - [x] Review L_Office Level Blueprint for GameStateManager usage patterns
+  - [x] Confirm UFCGameStateManager has Overworld_Travel state (should exist from Week 2)
 
-- [ ] **Implementation (Unreal Editor - Level Blueprint)**
+- [x] **Implementation (Unreal Editor - Level Blueprint)**
 
-  - [ ] Open L_Overworld Level Blueprint (Blueprints → Open Level Blueprint)
-  - [ ] Add Event BeginPlay node
-  - [ ] Get Game Instance:
-    - [ ] Add node: Get Game Instance
-    - [ ] Cast to BP_FCGameInstance (or UFCGameInstance if C++ cast node)
-  - [ ] Get GameStateManager Subsystem:
-    - [ ] From Game Instance, add node: Get Subsystem
-    - [ ] Subsystem Class: UFCGameStateManager
-  - [ ] Transition to Overworld_Travel:
-    - [ ] From GameStateManager, call: TransitionTo
-    - [ ] New State: Overworld_Travel (enum value)
-  - [ ] Add Print String (debug):
-    - [ ] Connect after TransitionTo
-    - [ ] Text: "L_Overworld: Transitioned to Overworld_Travel state"
-    - [ ] Duration: 5.0
-  - [ ] Compile and save Level Blueprint
+  - [x] Open L_Overworld Level Blueprint (Blueprints → Open Level Blueprint)
+  - [x] Add Event BeginPlay node
+  - [x] Get Game Instance:
+    - [x] Add node: Get Game Instance
+    - [x] Cast to BP_FCGameInstance (or UFCGameInstance if C++ cast node)
+  - [x] Get GameStateManager Subsystem:
+    - [x] From Game Instance, add node: Get Subsystem
+    - [x] Subsystem Class: UFCGameStateManager
+  - [x] Transition to Overworld_Travel:
+    - [x] From GameStateManager, call: TransitionTo
+    - [x] New State: Overworld_Travel (enum value)
+  - [x] Add Print String (debug):
+    - [x] Connect after TransitionTo
+    - [x] Text: "L_Overworld: Transitioned to Overworld_Travel state"
+    - [x] Duration: 5.0
+  - [x] Compile and save Level Blueprint
 
-- [ ] **Testing After Step 2.5.1** ✅ CHECKPOINT
-  - [ ] Open L_Overworld and PIE (Play In Editor)
-  - [ ] Check Output Log for:
-    - [ ] "L_Overworld: Transitioned to Overworld_Travel state" message
-    - [ ] UFCGameStateManager transition log (if logging enabled)
-  - [ ] No errors or "Accessed None" warnings
-  - [ ] Save successful
+- [x] **Testing After Step 2.5.1** ✅ CHECKPOINT
+  - [x] Open L_Overworld and PIE (Play In Editor)
+  - [x] Check Output Log for:
+    - [x] "L_Overworld: Transitioned to Overworld_Travel state" message
+    - [x] UFCGameStateManager transition log (if logging enabled)
+  - [x] No errors or "Accessed None" warnings
+  - [x] Save successful
 
 **COMMIT POINT 2.5.1**: `git add Content/FC/World/Levels/L_Overworld.umap && git commit -m "feat(overworld): Configure Level Blueprint to transition to Overworld_Travel state"`
 
@@ -549,14 +550,14 @@ To Create in Week 3:
 
 ### Task 2 Acceptance Criteria
 
-- [ ] L_Overworld level created and opens without errors
-- [ ] Lighting setup complete (DirectionalLight, SkyLight, SkyAtmosphere, optional fog)
-- [ ] Ground plane or landscape with proper collision
-- [ ] NavMesh visible (green overlay when pressing `P`)
-- [ ] PlayerStart positioned correctly
-- [ ] Level Blueprint transitions to Overworld_Travel state on BeginPlay
-- [ ] No errors or warnings when loading level in PIE
-- [ ] All assets saved in correct folders (`/Game/FC/World/Levels/`)
+- [x] L_Overworld level created and opens without errors
+- [x] Lighting setup complete (DirectionalLight, SkyLight, SkyAtmosphere, optional fog)
+- [x] Ground plane or landscape with proper collision
+- [x] NavMesh visible (green overlay when pressing `P`)
+- [x] PlayerStart positioned correctly
+- [x] Level Blueprint transitions to Overworld_Travel state on BeginPlay
+- [x] No errors or warnings when loading level in PIE
+- [x] All assets saved in correct folders (`/Game/FC/World/Levels/Overworld`)
 
 **Task 2 complete. Ready for Task 3 sub-tasks (Top-Down Camera Actor)? Respond with 'Go' to continue.**
 
@@ -3603,6 +3604,133 @@ To Create in Week 3:
 
 ---
 
+## Task 10: Cleanup - Revert Testing-Only State Transition
+
+**Purpose**: Remove the temporary state transition added for Week 3 testing that allows direct loading into `Overworld_Travel` from `None` state. In production flow, the game should start from MainMenu or Office, not directly into Overworld.
+
+---
+
+### Step 10.1: Revert FCGameStateManager None → Overworld_Travel Transition
+
+#### Step 10.1.1: Remove Overworld_Travel from None State Valid Transitions
+
+- [ ] **Analysis**
+
+  - [ ] Review FCGameStateManager.cpp InitializeValidTransitions() method
+  - [ ] Confirm `Overworld_Travel` was added to `None` state transitions for Week 3 testing
+  - [ ] Verify production flow: MainMenu → Office_Exploration → Overworld_Travel
+
+- [ ] **Implementation (C++ Source)**
+
+  - [ ] Open `Source/FC/Core/FCGameStateManager.cpp`
+  - [ ] Locate `InitializeValidTransitions()` method
+  - [ ] Find the `None` state transitions block:
+    ```cpp
+    // None transitions (initial state, can go anywhere)
+    ValidTransitions.Add(EFCGameStateID::None, {
+        EFCGameStateID::MainMenu,
+        EFCGameStateID::Office_Exploration,
+        EFCGameStateID::Overworld_Travel,  // ← REMOVE THIS LINE
+        EFCGameStateID::Loading
+    });
+    ```
+  - [ ] Remove `EFCGameStateID::Overworld_Travel` from the array
+  - [ ] Result should be:
+    ```cpp
+    // None transitions (initial state, can go anywhere)
+    ValidTransitions.Add(EFCGameStateID::None, {
+        EFCGameStateID::MainMenu,
+        EFCGameStateID::Office_Exploration,
+        EFCGameStateID::Loading
+    });
+    ```
+  - [ ] Save file
+
+- [ ] **Testing After Step 10.1.1** ✅ CHECKPOINT
+  - [ ] File compiles without errors
+  - [ ] Hot reload successful in Unreal Editor
+  - [ ] Direct loading L_Overworld should now fail TransitionTo (expected behavior)
+  - [ ] Production flow tested: MainMenu → L_Office → Overworld button → L_Overworld (TransitionTo succeeds)
+
+**COMMIT POINT 10.1.1**: `git add Source/FC/Core/FCGameStateManager.cpp && git commit -m "fix(state): Revert testing-only None→Overworld_Travel transition"`
+
+---
+
+#### Step 10.1.2: Verify Production State Flow
+
+- [ ] **Analysis**
+
+  - [ ] Confirm normal game flow works correctly
+  - [ ] Test all critical transitions
+
+- [ ] **Testing (Unreal Editor - PIE)**
+
+  - [ ] Load MainMenu level (or L_Office if MainMenu not yet implemented)
+  - [ ] Navigate to Office (or start in Office)
+  - [ ] Open map table widget (WBP_MapTable)
+  - [ ] Click "Start Journey" button
+  - [ ] Verify:
+    - [ ] TransitionTo(Overworld_Travel) succeeds (returns true)
+    - [ ] L_Overworld loads correctly
+    - [ ] Camera and convoy functional
+  - [ ] Press Tab or open Pause Menu → "Return to Office"
+  - [ ] Verify:
+    - [ ] TransitionTo(Office_Exploration) succeeds
+    - [ ] L_Office loads correctly
+  - [ ] Check Output Log for state transition messages (no errors)
+
+- [ ] **Testing After Step 10.1.2** ✅ CHECKPOINT
+  - [ ] Production state flow verified working
+  - [ ] No invalid transition errors
+  - [ ] Office ↔ Overworld transitions functional
+  - [ ] Direct L_Overworld loading correctly fails TransitionTo (as expected)
+
+**COMMIT POINT 10.1.2**: N/A (testing verification only)
+
+---
+
+#### Step 10.1.3: Update Technical Documentation
+
+- [ ] **Analysis**
+
+  - [ ] Document the production state flow
+  - [ ] Note the testing-only change was reverted
+
+- [ ] **Implementation (Technical_Documentation.md)**
+
+  - [ ] Open `Docs/Technical_Documentation.md`
+  - [ ] Locate **UFCGameStateManager** section
+  - [ ] Under **Valid State Transitions**, ensure `None` state documentation reads:
+    ```
+    // None → MainMenu, Office_Exploration, Loading
+    // (Initial state, typical flow: None → MainMenu → Office → Overworld)
+    ```
+  - [ ] Add note in **Week 3 Systems** section:
+    - [ ] "Note: During Week 3 development, a temporary transition from `None` → `Overworld_Travel` was added to allow direct testing of L_Overworld. This was reverted in Task 10 to enforce production state flow (MainMenu → Office → Overworld)."
+  - [ ] Save file
+
+- [ ] **Testing After Step 10.1.3** ✅ CHECKPOINT
+  - [ ] Technical_Documentation.md updated with state flow clarification
+  - [ ] Note about testing-only change documented
+  - [ ] File saves without errors
+
+**COMMIT POINT 10.1.3**: `git add Docs/Technical_Documentation.md && git commit -m "docs(state): Document production state flow, note Week 3 testing revert"`
+
+---
+
+### Task 10 Acceptance Criteria
+
+- [ ] `Overworld_Travel` removed from `None` state valid transitions in FCGameStateManager.cpp
+- [ ] Direct loading L_Overworld correctly fails state transition (expected behavior)
+- [ ] Production flow verified: MainMenu/Office → Overworld_Travel → Office (all transitions succeed)
+- [ ] Technical_Documentation.md updated with production state flow documentation
+- [ ] All changes committed with clear commit messages
+- [ ] No regressions in Office ↔ Overworld transition functionality
+
+**Task 10 complete. State machine restored to production configuration.**
+
+---
+
 ## Week 3 Tasks Complete
 
 **All 9 parent tasks with 70+ sub-steps have been generated and documented.**
@@ -3642,11 +3770,16 @@ To Create in Week 3:
    - Create IA_Pause (ESC key), WBP_PauseMenu with Resume/Return buttons, implement pause/unpause in controller (Overworld only)
 
 9. **Task 9: Testing, Polish & Documentation** (5 steps, 10 sub-steps)
+
    - Comprehensive integration testing, performance validation, bug fixes, update Technical_Documentation.md and DRM, final git push
+
+10. **Task 10: Cleanup - Revert Testing-Only State Transition** (1 step, 3 sub-steps)
+
+- Remove `Overworld_Travel` from `None` state valid transitions in FCGameStateManager (restore production state flow)
 
 ### Implementation Notes
 
-- **Total Sub-Steps**: 70+ detailed implementation steps across 9 parent tasks
+- **Total Sub-Steps**: 70+ detailed implementation steps across 10 parent tasks
 - **Commit Points**: 50+ git commit checkpoints for incremental progress tracking
 - **Testing Checkpoints**: Embedded after every sub-step for continuous validation
 - **Architecture Pattern**: C++ + Blueprint hybrid, leveraging Week 2 subsystems (UFCInputManager, UFCLevelManager, UFCGameStateManager)
@@ -3663,6 +3796,7 @@ To Create in Week 3:
   - Tasks 5-6: ~6 hours (convoy pathfinding and POI system)
   - Tasks 7-8: ~5 hours (transitions and pause)
   - Task 9: ~4 hours (testing and documentation)
+  - Task 10: ~0.5 hours (cleanup and revert testing changes)
 
 ### Next Steps After Week 3
 

@@ -89,6 +89,7 @@ void UFCGameStateManager::InitializeValidTransitions()
 	ValidTransitions.Add(EFCGameStateID::None, {
 		EFCGameStateID::MainMenu,
 		EFCGameStateID::Office_Exploration,
+		EFCGameStateID::Overworld_Travel,
 		EFCGameStateID::Loading
 	});
 
