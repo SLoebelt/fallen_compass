@@ -1355,6 +1355,7 @@ void AFCOverworldCamera::DrawDebugLimits() const
   - [ ] Save file
 
 - [ ] **Testing After Step 4.3.1** ✅ CHECKPOINT
+
   - [ ] Code compiles without errors
   - [ ] OnGameStateChanged signature matches delegate (EFCGameStateID, EFCGameStateID)
   - [x] Bind delegate in BeginPlay (after RestorePlayerPosition call):
@@ -1387,36 +1388,36 @@ void AFCOverworldCamera::DrawDebugLimits() const
 
 ##### Step 4.3.2: Place BP_OverworldCamera in L_Overworld
 
-- [ ] **Analysis**
+- [x] **Analysis**
 
-  - [ ] UFCCameraManager.BlendToTopDown() searches for camera with "OverworldCamera" in name
-  - [ ] Camera should be positioned above PlayerStart for initial view
-  - [ ] No Level Blueprint changes needed - state transition already exists from Task 2.5.1
+  - [x] UFCCameraManager.BlendToTopDown() searches for camera with "OverworldCamera" in name
+  - [x] Camera should be positioned above PlayerStart for initial view
+  - [x] No Level Blueprint changes needed - state transition already exists from Task 2.5.1
 
-- [ ] **Implementation (Unreal Editor)**
+- [x] **Implementation (Unreal Editor)**
 
-  - [ ] Open L_Overworld level
-  - [ ] Drag BP_OverworldCamera from Content Browser into viewport
-  - [ ] Position camera:
-    - [ ] Location: X=-1000, Y=0, Z=1500 (behind and above PlayerStart)
-    - [ ] Rotation: Pitch=-70, Yaw=0, Roll=0
-  - [ ] Details panel:
-    - [ ] Auto Activate: True
-    - [ ] Verify SpringArm properties match C++ defaults
-  - [ ] Save level
+  - [x] Open L_Overworld level
+  - [x] Drag BP_OverworldCamera from Content Browser into viewport
+  - [x] Position camera:
+    - [x] Location: X=-1000, Y=0, Z=1500 (behind and above PlayerStart)
+    - [x] Rotation: Pitch=-70, Yaw=0, Roll=0
+  - [x] Details panel:
+    - [x] Auto Activate: True
+    - [x] Verify SpringArm properties match C++ defaults
+  - [x] Save level
 
-- [ ] **Verify Existing Level Blueprint** (no changes needed)
+- [x] **Verify Existing Level Blueprint** (no changes needed)
 
-  - [ ] Open Level Blueprint (Blueprints → Open Level Blueprint)
-  - [ ] Confirm Event BeginPlay → GameStateManager → TransitionTo(Overworld_Travel) exists
-  - [ ] This is from Task 2.5.1 - no modifications needed
-  - [ ] State transition will trigger OnGameStateChanged in PlayerController
+  - [x] Open Level Blueprint (Blueprints → Open Level Blueprint)
+  - [x] Confirm Event BeginPlay → GameStateManager → TransitionTo(Overworld_Travel) exists
+  - [x] This is from Task 2.5.1 - no modifications needed
+  - [x] State transition will trigger OnGameStateChanged in PlayerController
 
-- [ ] **Testing After Step 4.3.2** ✅ CHECKPOINT
-  - [ ] BP_OverworldCamera visible in Outliner with "OverworldCamera" in name
-  - [ ] Camera positioned correctly (can see PlayerStart in viewport preview)
-  - [ ] Level Blueprint unchanged from Task 2.5.1
-  - [ ] Level saves without errors
+- [x] **Testing After Step 4.3.2** ✅ CHECKPOINT
+  - [x] BP_OverworldCamera visible in Outliner with "OverworldCamera" in name
+  - [x] Camera positioned correctly (can see PlayerStart in viewport preview)
+  - [x] Level Blueprint unchanged from Task 2.5.1
+  - [x] Level saves without errors
 
 **COMMIT POINT 4.3.2**: `git add Content/FC/World/Levels/Overworld/L_Overworld.umap && git commit -m "feat(overworld): Place BP_OverworldCamera in L_Overworld"`
 
@@ -1428,63 +1429,63 @@ void AFCOverworldCamera::DrawDebugLimits() const
 
 ##### Step 4.4.1: Full State-Driven Integration Test
 
-- [ ] **Analysis**
+- [x] **Analysis**
 
-  - [ ] Test complete flow: Level loads → GameState transitions → OnStateChanged fires → Camera/Input switch
-  - [ ] Verify state-driven architecture works correctly
-  - [ ] Check Output Log for delegate and state transition logs
+  - [x] Test complete flow: Level loads → GameState transitions → OnStateChanged fires → Camera/Input switch
+  - [x] Verify state-driven architecture works correctly
+  - [x] Check Output Log for delegate and state transition logs
 
-- [ ] **Test Sequence**
+- [x] **Test Sequence**
 
-  - [ ] Open L_Overworld in editor
-  - [ ] Compile C++ project (if not already compiled)
-  - [ ] PIE (Play In Editor)
-  - [ ] **Check Output Log for:**
-    - [ ] "Loaded IA_OverworldPan" (AFCPlayerController constructor)
-    - [ ] "Loaded IA_OverworldZoom" (AFCPlayerController constructor)
-    - [ ] "Bound IA_OverworldPan" (SetupInputComponent)
-    - [ ] "Bound IA_OverworldZoom" (SetupInputComponent)
-    - [ ] "Subscribed to GameStateManager.OnStateChanged" (BeginPlay)
-    - [ ] "L_Overworld: Transitioned to Overworld_Travel state" (Level Blueprint - Task 2.5.1)
-    - [ ] "OnGameStateChanged: None -> Overworld_Travel" (AFCPlayerController)
-    - [ ] "Switched to TopDown input mode" (OnGameStateChanged)
-    - [ ] "Blending to TopDown camera" (OnGameStateChanged)
-    - [ ] "Set PlayerPawn reference on camera" (UFCCameraManager.BlendToTopDown)
-  - [ ] **Test WASD Pan:**
-    - [ ] Press W → Camera pans forward (Y positive)
-    - [ ] Press S → Camera pans backward (Y negative)
-    - [ ] Press A → Camera pans left (X negative)
-    - [ ] Press D → Camera pans right (X positive)
-    - [ ] Pan until yellow debug circle boundary (if debug enabled)
-    - [ ] Verify camera stops at boundary (distance limiting works)
-  - [ ] **Test Mouse Wheel Zoom:**
-    - [ ] Scroll up → Camera zooms in (SpringArm shortens)
-    - [ ] Scroll down → Camera zooms out (SpringArm lengthens)
-    - [ ] Zoom to minimum (500 units)
-    - [ ] Zoom to maximum (cyan debug circle boundary if debug enabled)
-    - [ ] Verify zoom stops at min/max limits
-  - [ ] **Test North Alignment:**
-    - [ ] Try to rotate camera (should have no effect)
-    - [ ] Camera Yaw should always be 0 (north-aligned)
-  - [ ] **Test Debug Visualization (optional):**
-    - [ ] Select BP_OverworldCamera instance in Outliner
-    - [ ] Set Show Debug Radius = True in Details panel
-    - [ ] PIE again
-    - [ ] Yellow circle = pan limit (3000 units from PlayerStart)
-    - [ ] Cyan circle = zoom limit (4000 units from PlayerStart)
-  - [ ] Document any issues in "Known Issues & Backlog"
+  - [x] Open L_Overworld in editor
+  - [x] Compile C++ project (if not already compiled)
+  - [x] PIE (Play In Editor)
+  - [x] **Check Output Log for:**
+    - [x] "Loaded IA_OverworldPan" (AFCPlayerController constructor)
+    - [x] "Loaded IA_OverworldZoom" (AFCPlayerController constructor)
+    - [x] "Bound IA_OverworldPan" (SetupInputComponent)
+    - [x] "Bound IA_OverworldZoom" (SetupInputComponent)
+    - [x] "Subscribed to GameStateManager.OnStateChanged" (BeginPlay)
+    - [x] "L_Overworld: Transitioned to Overworld_Travel state" (Level Blueprint - Task 2.5.1)
+    - [x] "OnGameStateChanged: None -> Overworld_Travel" (AFCPlayerController)
+    - [x] "Switched to TopDown input mode" (OnGameStateChanged)
+    - [x] "Blending to TopDown camera" (OnGameStateChanged)
+    - [x] "Set PlayerPawn reference on camera" (UFCCameraManager.BlendToTopDown)
+  - [x] **Test WASD Pan:**
+    - [x] Press W → Camera pans forward (Y positive)
+    - [x] Press S → Camera pans backward (Y negative)
+    - [x] Press A → Camera pans left (X negative)
+    - [x] Press D → Camera pans right (X positive)
+    - [x] Pan until yellow debug circle boundary (if debug enabled)
+    - [x] Verify camera stops at boundary (distance limiting works)
+  - [x] **Test Mouse Wheel Zoom:**
+    - [x] Scroll up → Camera zooms in (SpringArm shortens)
+    - [x] Scroll down → Camera zooms out (SpringArm lengthens)
+    - [x] Zoom to minimum (500 units)
+    - [x] Zoom to maximum (cyan debug circle boundary if debug enabled)
+    - [x] Verify zoom stops at min/max limits
+  - [x] **Test North Alignment:**
+    - [x] Try to rotate camera (should have no effect)
+    - [x] Camera Yaw should always be 0 (north-aligned)
+  - [x] **Test Debug Visualization (optional):**
+    - [x] Select BP_OverworldCamera instance in Outliner
+    - [x] Set Show Debug Radius = True in Details panel
+    - [x] PIE again
+    - [x] Yellow circle = pan limit (3000 units from PlayerStart)
+    - [x] Cyan circle = zoom limit (4000 units from PlayerStart)
+  - [x] Document any issues in "Known Issues & Backlog"
 
-- [ ] **Testing After Step 4.4.1** ✅ CHECKPOINT
-  - [ ] OnStateChanged delegate fires correctly (logs confirm)
-  - [ ] TopDown input mode active after state transition
-  - [ ] Camera auto-possesses via state-driven BlendToTopDown call
-  - [ ] WASD pans camera smoothly with distance limiting
-  - [ ] Mouse wheel zooms correctly with min/max limits
-  - [ ] Camera rotation locked to north (Yaw=0)
-  - [ ] No "Accessed None" errors
-  - [ ] No input binding warnings
-  - [ ] Debug visualization works (if enabled)
-  - [ ] State transition flow visible in logs (None→Overworld_Travel→Camera/Input switch)
+- [x] **Testing After Step 4.4.1** ✅ CHECKPOINT
+  - [x] OnStateChanged delegate fires correctly (logs confirm)
+  - [x] TopDown input mode active after state transition
+  - [x] Camera auto-possesses via state-driven BlendToTopDown call
+  - [x] WASD pans camera smoothly with distance limiting
+  - [x] Mouse wheel zooms correctly with min/max limits
+  - [x] Camera rotation locked to north (Yaw=0)
+  - [x] No "Accessed None" errors
+  - [x] No input binding warnings
+  - [x] Debug visualization works (if enabled)
+  - [x] State transition flow visible in logs (None→Overworld_Travel→Camera/Input switch)
 
 **COMMIT POINT 4.4.1**: `git add -A && git commit -m "test(overworld): Verify state-driven camera/input switching for Overworld_Travel"`
 
@@ -1492,27 +1493,35 @@ void AFCOverworldCamera::DrawDebugLimits() const
 
 ---
 
-### Task 4 Acceptance Criteria
+### Task 4 Acceptance Criteria ✅ COMPLETE
 
 - [x] UFCCameraManager.BlendToTopDown() implemented to find and possess BP_OverworldCamera
 - [x] AFCPlayerController extended with IA_OverworldPan and IA_OverworldZoom input actions
 - [x] HandleOverworldPan/Zoom methods forward input to AFCOverworldCamera
 - [x] Input actions load in constructor and bind in SetupInputComponent
-- [ ] AFCPlayerController.OnGameStateChanged() method implemented
-- [ ] OnGameStateChanged() subscribes to GameStateManager.OnStateChanged delegate in BeginPlay
-- [ ] OnGameStateChanged() switches to TopDown input mode when entering Overworld_Travel state
-- [ ] OnGameStateChanged() calls CameraManager->BlendToTopDown() when entering Overworld_Travel state
-- [ ] OnGameStateChanged() restores FirstPerson mode when leaving Overworld_Travel for Office_Exploration
-- [ ] BP_OverworldCamera placed in L_Overworld at correct position
-- [ ] PIE in L_Overworld triggers Overworld_Travel state transition (Task 2.5.1)
-- [ ] State transition fires OnStateChanged delegate (confirmed in logs)
-- [ ] TopDown input mode activates via state change (confirmed in logs)
-- [ ] Camera auto-possesses via state-driven BlendToTopDown (confirmed in logs)
-- [ ] WASD pans camera with distance limiting
-- [ ] Mouse wheel zooms camera with min/max limits
-- [ ] Camera rotation locked to north (Yaw=0)
-- [ ] No compilation errors or Blueprint errors
-- [ ] All assets saved in correct folders
+- [x] AFCPlayerController.OnGameStateChanged() method implemented
+- [x] OnGameStateChanged() subscribes to GameStateManager.OnStateChanged delegate in BeginPlay
+- [x] OnGameStateChanged() switches to TopDown input mode when entering Overworld_Travel state
+- [x] OnGameStateChanged() calls CameraManager->BlendToTopDown() when entering Overworld_Travel state
+- [x] OnGameStateChanged() restores FirstPerson mode when leaving Overworld_Travel for Office_Exploration
+- [x] BP_OverworldCamera placed in L_Overworld at correct position
+- [x] PIE in L_Overworld triggers Overworld_Travel state transition (Task 2.5.1)
+- [x] State transition fires OnStateChanged delegate (confirmed in logs)
+- [x] TopDown input mode activates via state change (confirmed in logs)
+- [x] Camera auto-possesses via state-driven BlendToTopDown (confirmed in logs)
+- [x] WASD pans camera with distance limiting
+- [x] Mouse wheel zooms camera with min/max limits
+- [x] Camera rotation locked to north (Yaw=0)
+- [x] Fixed input axis mapping (swapped X/Y for correct WASD directions)
+- [x] Fixed input action asset paths (/Game/FC/Input/ not /Game/FC/Input/Actions/)
+- [x] No compilation errors or Blueprint errors
+- [x] All assets saved in correct folders
+- [x] Camera auto-possesses via state-driven BlendToTopDown (confirmed in logs)
+- [x] WASD pans camera with distance limiting
+- [x] Mouse wheel zooms camera with min/max limits
+- [x] Camera rotation locked to north (Yaw=0)
+- [x] No compilation errors or Blueprint errors
+- [x] All assets saved in correct folders
 
 **Architecture Note**: By using GameStateManager.OnStateChanged delegate, camera and input behavior is now **state-driven** rather than level-driven. AFCPlayerController reacts to Overworld_Travel state entry regardless of which level triggered it. This makes the system:
 
@@ -1522,8 +1531,6 @@ void AFCOverworldCamera::DrawDebugLimits() const
 - **Consistent**: Same behavior across all Overworld contexts (travel, combat, POI interaction)
 
 This follows the same pattern used for Office states (Office_Exploration, Office_TableView) and prepares for Task 7 (Office↔Overworld transitions) where state changes will drive camera/input switching automatically.
-
-**Task 4 complete. Ready for Task 5 sub-tasks (Convoy Pawn & Click-to-Move)? Respond with 'Go' to continue.**
 
 ---
 

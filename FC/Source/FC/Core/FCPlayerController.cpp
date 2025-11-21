@@ -96,7 +96,7 @@ AFCPlayerController::AFCPlayerController()
 	}
 
 	// Week 3: Overworld input actions
-	static ConstructorHelpers::FObjectFinder<UInputAction> OverworldPanActionFinder(TEXT("/Game/FC/Input/Actions/IA_OverworldPan"));
+	static ConstructorHelpers::FObjectFinder<UInputAction> OverworldPanActionFinder(TEXT("/Game/FC/Input/IA_OverworldPan"));
 	if (OverworldPanActionFinder.Succeeded())
 	{
 		OverworldPanAction = OverworldPanActionFinder.Object;
@@ -107,7 +107,7 @@ AFCPlayerController::AFCPlayerController()
 		UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("Failed to load IA_OverworldPan."));
 	}
 
-	static ConstructorHelpers::FObjectFinder<UInputAction> OverworldZoomActionFinder(TEXT("/Game/FC/Input/Actions/IA_OverworldZoom"));
+	static ConstructorHelpers::FObjectFinder<UInputAction> OverworldZoomActionFinder(TEXT("/Game/FC/Input/IA_OverworldZoom"));
 	if (OverworldZoomActionFinder.Succeeded())
 	{
 		OverworldZoomAction = OverworldZoomActionFinder.Object;
@@ -152,7 +152,27 @@ void AFCPlayerController::BeginPlay()
 		{
 			StateMgr->OnStateChanged.AddDynamic(this, &AFCPlayerController::OnGameStateChanged);
 			UE_LOG(LogFallenCompassPlayerController, Log, TEXT("BeginPlay: Subscribed to GameStateManager.OnStateChanged"));
+			
+			// Log current state to verify subscription timing
+			EFCGameStateID CurrentState = StateMgr->GetCurrentState();
+			UE_LOG(LogFallenCompassPlayerController, Log, TEXT("BeginPlay: Current game state is %s"), 
+				*UEnum::GetValueAsString(CurrentState));
+			
+			// If we're already in Overworld_Travel state, manually trigger the handler
+			if (CurrentState == EFCGameStateID::Overworld_Travel)
+			{
+				UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("BeginPlay: Already in Overworld_Travel state, manually triggering camera/input switch"));
+				OnGameStateChanged(EFCGameStateID::None, CurrentState);
+			}
 		}
+		else
+		{
+			UE_LOG(LogFallenCompassPlayerController, Error, TEXT("BeginPlay: Failed to get GameStateManager subsystem"));
+		}
+	}
+	else
+	{
+		UE_LOG(LogFallenCompassPlayerController, Error, TEXT("BeginPlay: Failed to get GameInstance"));
 	}
 
 	// Note: MenuCamera reference will be set in Blueprint (BP_FC_PlayerController)

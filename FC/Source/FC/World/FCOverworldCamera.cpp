@@ -65,11 +65,14 @@ void AFCOverworldCamera::SetPlayerPawn(APawn* NewPawn)
 
 void AFCOverworldCamera::HandlePan(const FInputActionValue& Value)
 {
-	// Get 2D input vector (X=right, Y=forward)
+	// Get 2D input vector from Enhanced Input
+	// Enhanced Input: X=horizontal (left/right), Y=vertical (forward/back)
 	const FVector2D InputVector = Value.Get<FVector2D>();
 
-	// Convert to 3D movement (Z=0 for horizontal panning)
-	const FVector MovementDelta = FVector(InputVector.X, InputVector.Y, 0.0f) * PanSpeed;
+	// Convert to 3D world movement
+	// Unreal coords: X=forward/back, Y=right/left, Z=up/down
+	// So we need to swap: InputVector.Y → WorldX (forward), InputVector.X → WorldY (right)
+	const FVector MovementDelta = FVector(InputVector.Y, InputVector.X, 0.0f) * PanSpeed;
 
 	// Accumulate delta for Tick application (frame-rate independent)
 	PendingMovementDelta += MovementDelta;
