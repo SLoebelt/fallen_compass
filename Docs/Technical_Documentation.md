@@ -8,6 +8,13 @@
 
 1. [Project Overview & Architecture](#project-overview--architecture)
 2. [Core Framework (Task 2)](#core-framework-task-2)
+   - [UFCGameInstance](#ufcgameinstance-21)
+   - [UFCLevelManager](#ufclevelmanager-priority-1a)
+   - [UFCGameStateManager](#ufcgamestatemanager-priority-2b)
+   - [UFCUIManager](#ufcuimanager-212)
+   - [UFCTransitionManager](#ufctransitionmanager-217)
+   - [AFCPlayerController](#afcplayercontroller-23)
+   - [UFCCameraManager](#ufccameramanager-priority-3a)
 3. [First-Person Character & Input (Task 3)](#first-person-character--input-task-3)
 4. [Office Level & Greybox (Task 4)](#office-level--greybox-task-4)
 5. [Main Menu System (Task 5)](#main-menu-system-task-5)
@@ -84,7 +91,10 @@ FC/
 │   ├── UFCGameInstance.h/cpp
 │   │   └── FFCGameStateData (struct: Supplies, Money, Day)
 │   ├── UFCLevelManager.h/cpp (Game Instance Subsystem)
-│   │   └── LoadLevel(), PreviousLevelName tracking
+│   │   ├── FFCLevelMetadata (struct for DataTable - Priority 2A)
+│   │   └── LoadLevel(), PreviousLevelName tracking, GetLevelMetadata()
+│   ├── UFCGameStateManager.h/cpp (Game Instance Subsystem - Priority 2B)
+│   │   └── EFCGameStateID, TransitionTo(), OnStateChanged delegate
 │   ├── UFCExpeditionManager.h/cpp (Game Instance Subsystem - Week 2)
 │   │   └── EFCExpeditionStatus, CreateExpedition(), CompleteExpedition()
 │   ├── UFCUIManager.h/cpp (Game Instance Subsystem)
@@ -95,6 +105,9 @@ FC/
 │   ├── FCPlayerController.h/cpp
 │   ├── FCFirstPersonCharacter.h/cpp
 │   └── FCCharacter.h/cpp (top-down variant)
+├── Source/FC/Components
+│   └── UFCCameraManager.h/cpp (Actor Component - Priority 3A)
+│       └── EFCPlayerCameraMode, BlendToMenuCamera(), BlendToFirstPerson(), BlendToTableObject()
 ├── Source/FC/Interaction
 │   ├── IFCInteractable.h/cpp
 │   ├── IFCTableInteractable.h/cpp (Week 2)
@@ -122,6 +135,8 @@ FC/
 │   │   │       ├── WBP_SaveSlotSelector
 │   │   │       └── WBP_SaveSlotItem
 │   │   └── WBP_InteractionPrompt
+│   ├── Data/
+│   │   └── DT_LevelMetadata (DataTable - Priority 2A)
 │   ├── World/
 │   │   ├── Levels/
 │   │   │   └── L_Office (Main menu state & gameplay hub)
@@ -318,12 +333,12 @@ Keeping systemic state in one place avoids circular dependencies once Tasks 5–
 
 ---
 
-### UFCLevelManager (2.1.5 & Week 2)
+### UFCLevelManager (2.1.5 & Week 2 + Priority 2A)
 
 - **Files**: `Source/FC/Core/UFCLevelManager.h/.cpp`
 - **Inheritance**: `UGameInstanceSubsystem`
 - **Registration**: Automatic (subsystem registered via UE module system)
-- **Purpose**: Centralized level name normalization, type detection, and transition management. **Week 2 added LoadLevel() method with fade integration and PreviousLevelName tracking.**
+- **Purpose**: Centralized level name normalization, type detection, and transition management. **Week 2 added LoadLevel() method with fade integration and PreviousLevelName tracking.** **Priority 2A added data-driven level metadata system via FFCLevelMetadata struct and DT_LevelMetadata DataTable.**
 
 #### Key Members
 
@@ -342,6 +357,41 @@ enum class EFCLevelType : uint8
     Village
 };
 
+/** Data-driven level metadata (Priority 2A) */
+USTRUCT(BlueprintType)
+struct FFCLevelMetadata : public FTableRowBase
+{
+    GENERATED_BODY()
+
+    /** Level type classification */
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Level")
+    EFCLevelType LevelType = EFCLevelType::Unknown;
+
+    /** Default input mode (0=UIOnly, 1=GameOnly, 2=GameAndUI) */
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Level")
+    uint8 DefaultInputMode = 0;
+
+    /** Whether this level requires fade transitions */
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Level")
+    bool bRequiresFadeTransition = true;
+
+    /** Whether to show mouse cursor by default */
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Level")
+    bool bShowCursor = true;
+
+    /** Whether this level requires loading screen */
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Level")
+    bool bRequiresLoadingScreen = false;
+
+    /** Human-readable level name */
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Level")
+    FText DisplayName;
+
+    /** Level description for debugging/UI */
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Level")
+    FText Description;
+};
+
 /** Current normalized level name (PIE prefixes stripped) */
 UPROPERTY(VisibleAnywhere, Category = "Level")
 FName CurrentLevelName;
@@ -350,7 +400,7 @@ FName CurrentLevelName;
 UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Level Management")
 FName PreviousLevelName;
 
-/** Current level type based on name pattern matching */
+/** Current level type based on metadata or name pattern matching */
 UPROPERTY(VisibleAnywhere, Category = "Level")
 EFCLevelType CurrentLevelType;
 
@@ -359,6 +409,10 @@ FName PendingLevelName;
 
 /** Whether to use fade transition for pending load - Week 2 */
 bool bUseFadeForPendingLoad = false;
+
+/** DataTable containing level metadata (Priority 2A) */
+UPROPERTY()
+UDataTable* LevelMetadataTable = nullptr;
 ```
 
 #### Public API
@@ -396,6 +450,29 @@ void UpdateCurrentLevel(const FName& NewLevelName);
 
 /** Normalize a level name (strip PIE prefix) */
 FName NormalizeLevelName(const FName& LevelName) const;
+
+// --- Priority 2A: Metadata System ---
+
+/** Set the level metadata DataTable reference (called by GameInstance::Init)
+ * @param InMetadataTable DataTable of type FFCLevelMetadata
+ */
+UFUNCTION(BlueprintCallable, Category = "Level Metadata")
+void SetLevelMetadataTable(UDataTable* InMetadataTable);
+
+/** Get metadata for a specific level by name
+ * @param LevelName Name of the level to query (e.g., "L_Office")
+ * @param OutMetadata Populated with level metadata if found
+ * @return True if metadata was found, false otherwise
+ */
+UFUNCTION(BlueprintCallable, Category = "Level Metadata")
+bool GetLevelMetadata(FName LevelName, FFCLevelMetadata& OutMetadata) const;
+
+/** Get metadata for the current level
+ * @param OutMetadata Populated with current level metadata if found
+ * @return True if metadata was found, false otherwise
+ */
+UFUNCTION(BlueprintCallable, Category = "Level Metadata")
+bool GetCurrentLevelMetadata(FFCLevelMetadata& OutMetadata) const;
 ```
 
 #### LoadLevel Implementation (Week 2)
@@ -457,22 +534,33 @@ void UFCLevelManager::OnFadeOutCompleteForLevelLoad()
 
 **Flow**: LoadLevel → BeginFadeOut → OnFadeOutComplete → OpenLevel → Initialize (new level) → BeginFadeIn
 
-#### Level Type Detection
+#### Level Type Detection (Priority 2A: Data-Driven)
 
-Level types are determined using pattern matching on the normalized level name:
+**Updated Behavior**: Level types are now determined using metadata-first approach with fallback to pattern matching.
 
 ```cpp
 EFCLevelType UFCLevelManager::DetermineLevelType(const FName& LevelName) const
 {
-    const FString LevelStr = LevelName.ToString();
-
-    // Exact match for main menu
-    if (LevelStr.Equals(TEXT("L_MainMenu"), ESearchCase::IgnoreCase))
+    // Priority 1: Check metadata table (data-driven approach)
+    if (LevelMetadataTable)
     {
-        return EFCLevelType::MainMenu;
+        FFCLevelMetadata* Metadata = LevelMetadataTable->FindRow<FFCLevelMetadata>(LevelName, TEXT("DetermineLevelType"));
+        if (Metadata)
+        {
+            UE_LOG(LogFCLevelManager, Verbose, TEXT("DetermineLevelType: Found metadata for %s -> %s"),
+                *LevelName.ToString(), *UEnum::GetValueAsString(Metadata->LevelType));
+            return Metadata->LevelType;
+        }
+    }
+    else
+    {
+        UE_LOG(LogFCLevelManager, Warning, TEXT("DetermineLevelType: LevelMetadataTable not set, falling back to string matching"));
     }
 
-    // Substring matching for other level types
+    // Priority 2: Fallback to string matching for backwards compatibility
+    const FString LevelStr = LevelName.ToString();
+
+    // Substring matching for level types (MainMenu state is within L_Office, no separate level)
     if (LevelStr.Contains(TEXT("Office"))) return EFCLevelType::Office;
     if (LevelStr.Contains(TEXT("Overworld"))) return EFCLevelType::Overworld;
     if (LevelStr.Contains(TEXT("Camp"))) return EFCLevelType::Camp;
@@ -481,6 +569,89 @@ EFCLevelType UFCLevelManager::DetermineLevelType(const FName& LevelName) const
     if (LevelStr.Contains(TEXT("Village"))) return EFCLevelType::Village;
 
     return EFCLevelType::Unknown;
+}
+```
+
+**Implementation Notes**:
+
+- **Metadata Lookup**: If `LevelMetadataTable` is set, it takes priority over string matching
+- **Fallback Behavior**: String matching used during initialization race condition (LevelManager::Initialize runs before GameInstance::Init sets metadata table)
+- **No L_MainMenu Level**: Main menu is a STATE within L_Office, not a separate level
+- **DataTable Reference**: Set via `SetLevelMetadataTable()` called by `UFCGameInstance::Init()`
+
+#### Metadata System Implementation (Priority 2A)
+
+```cpp
+void UFCLevelManager::SetLevelMetadataTable(UDataTable* InMetadataTable)
+{
+    if (!InMetadataTable)
+    {
+        UE_LOG(LogFCLevelManager, Warning, TEXT("SetLevelMetadataTable: Null DataTable provided"));
+        return;
+    }
+
+    LevelMetadataTable = InMetadataTable;
+
+    // Log all available rows for debugging
+    TArray<FName> RowNames = LevelMetadataTable->GetRowNames();
+    UE_LOG(LogFCLevelManager, Log, TEXT("SetLevelMetadataTable: Loaded DataTable with %d rows:"), RowNames.Num());
+    for (const FName& RowName : RowNames)
+    {
+        UE_LOG(LogFCLevelManager, Log, TEXT("  - %s"), *RowName.ToString());
+    }
+
+    // Re-determine current level type using new metadata
+    CurrentLevelType = DetermineLevelType(CurrentLevelName);
+}
+
+bool UFCLevelManager::GetLevelMetadata(FName LevelName, FFCLevelMetadata& OutMetadata) const
+{
+    if (!LevelMetadataTable)
+    {
+        UE_LOG(LogFCLevelManager, Warning, TEXT("GetLevelMetadata: LevelMetadataTable is null"));
+        return false;
+    }
+
+    FFCLevelMetadata* FoundMetadata = LevelMetadataTable->FindRow<FFCLevelMetadata>(LevelName, TEXT("GetLevelMetadata"));
+    if (FoundMetadata)
+    {
+        OutMetadata = *FoundMetadata;
+        return true;
+    }
+
+    UE_LOG(LogFCLevelManager, Warning, TEXT("GetLevelMetadata: No metadata found for level %s"), *LevelName.ToString());
+    return false;
+}
+
+bool UFCLevelManager::GetCurrentLevelMetadata(FFCLevelMetadata& OutMetadata) const
+{
+    return GetLevelMetadata(CurrentLevelName, OutMetadata);
+}
+```
+
+**DataTable Setup** (`Content/FC/Data/DT_LevelMetadata`):
+
+- **Row Name**: `L_Office`
+- **LevelType**: `Office`
+- **DefaultInputMode**: `0` (UIOnly for main menu state)
+- **bRequiresFadeTransition**: `true`
+- **bShowCursor**: `true`
+- **bRequiresLoadingScreen**: `false`
+- **DisplayName**: "Officer's Quarters"
+- **Description**: "Main menu state & gameplay hub"
+
+**Integration**: `UFCGameInstance::Init()` sets the metadata table reference:
+
+```cpp
+void UFCGameInstance::Init()
+{
+    Super::Init();
+
+    UFCLevelManager* LevelManager = GetSubsystem<UFCLevelManager>();
+    if (LevelManager && LevelMetadataTable)
+    {
+        LevelManager->SetLevelMetadataTable(LevelMetadataTable);
+    }
 }
 ```
 
@@ -569,6 +740,304 @@ DEFINE_LOG_CATEGORY(LogFCLevelManager);
 Now all level name handling goes through a single subsystem with proper logging and validation.
 
 **Architectural Insight - L_Office Dual Purpose**: L_Office serves as both the menu location (where player starts and interacts with expedition board) AND a gameplay location (first-person exploration). This unique design means level type detection alone cannot determine input mode—explicit state transitions handle that instead.
+
+---
+
+### UFCGameStateManager (Priority 2B)
+
+- **Files**: `Source/FC/Core/FCGameStateManager.h/.cpp`
+- **Inheritance**: `UGameInstanceSubsystem`
+- **Registration**: Automatic (subsystem registered via UE module system)
+- **Purpose**: Explicit game state machine to replace implicit state tracking scattered across PlayerController. Provides centralized state management with validated transitions and broadcast notifications.
+
+#### Key Members
+
+```cpp
+/** Enum defining all possible game states */
+UENUM(BlueprintType)
+enum class EFCGameStateID : uint8
+{
+    None = 0 UMETA(DisplayName = "None"),
+    MainMenu UMETA(DisplayName = "Main Menu"),
+    Office_Exploration UMETA(DisplayName = "Office Exploration"),
+    Office_TableView UMETA(DisplayName = "Office Table View"),
+    Overworld_Travel UMETA(DisplayName = "Overworld Travel"),
+    Combat_PlayerTurn UMETA(DisplayName = "Combat - Player Turn"),
+    Combat_EnemyTurn UMETA(DisplayName = "Combat - Enemy Turn"),
+    Paused UMETA(DisplayName = "Paused"),
+    Loading UMETA(DisplayName = "Loading")
+};
+
+/** Current active game state */
+UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Game State")
+EFCGameStateID CurrentState = EFCGameStateID::None;
+
+/** Previous game state (for returning from pause, etc.) */
+UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Game State")
+EFCGameStateID PreviousState = EFCGameStateID::None;
+
+/** Map of valid state transitions (populated in InitializeValidTransitions) */
+TMap<EFCGameStateID, TArray<EFCGameStateID>> ValidTransitions;
+
+/** Delegate broadcast when state changes */
+UPROPERTY(BlueprintAssignable, Category = "Game State")
+FOnStateChanged OnStateChanged;
+
+/** Delegate signature: void OnStateChanged(EFCGameStateID OldState, EFCGameStateID NewState) */
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnStateChanged, EFCGameStateID, OldState, EFCGameStateID, NewState);
+```
+
+#### Public API
+
+```cpp
+/** Get the current game state */
+UFUNCTION(BlueprintPure, Category = "Game State")
+EFCGameStateID GetCurrentState() const { return CurrentState; }
+
+/** Get the previous game state */
+UFUNCTION(BlueprintPure, Category = "Game State")
+EFCGameStateID GetPreviousState() const { return PreviousState; }
+
+/** Attempt to transition to a new state (validates against ValidTransitions)
+ * @param NewState Target state to transition to
+ * @return True if transition succeeded, false if invalid
+ */
+UFUNCTION(BlueprintCallable, Category = "Game State")
+bool TransitionTo(EFCGameStateID NewState);
+
+/** Check if a transition from current state to target state is valid
+ * @param TargetState State to check transition validity for
+ * @return True if transition is allowed, false otherwise
+ */
+UFUNCTION(BlueprintPure, Category = "Game State")
+bool CanTransitionTo(EFCGameStateID TargetState) const;
+```
+
+#### Valid State Transitions
+
+Configured in `InitializeValidTransitions()`:
+
+```cpp
+void UFCGameStateManager::InitializeValidTransitions()
+{
+    ValidTransitions.Empty();
+
+    // None → MainMenu (game startup)
+    ValidTransitions.Add(EFCGameStateID::None, {
+        EFCGameStateID::MainMenu,
+        EFCGameStateID::Loading
+    });
+
+    // MainMenu → Office_Exploration, Loading
+    ValidTransitions.Add(EFCGameStateID::MainMenu, {
+        EFCGameStateID::Office_Exploration,
+        EFCGameStateID::Loading
+    });
+
+    // Office_Exploration → All office/overworld states + pause/loading
+    ValidTransitions.Add(EFCGameStateID::Office_Exploration, {
+        EFCGameStateID::Office_TableView,
+        EFCGameStateID::Overworld_Travel,
+        EFCGameStateID::Paused,
+        EFCGameStateID::Loading
+    });
+
+    // Office_TableView → Back to exploration or loading
+    ValidTransitions.Add(EFCGameStateID::Office_TableView, {
+        EFCGameStateID::Office_Exploration,
+        EFCGameStateID::Loading
+    });
+
+    // Overworld_Travel → Combat, office, pause
+    ValidTransitions.Add(EFCGameStateID::Overworld_Travel, {
+        EFCGameStateID::Combat_PlayerTurn,
+        EFCGameStateID::Office_Exploration,
+        EFCGameStateID::Paused,
+        EFCGameStateID::Loading
+    });
+
+    // Combat states
+    ValidTransitions.Add(EFCGameStateID::Combat_PlayerTurn, {
+        EFCGameStateID::Combat_EnemyTurn,
+        EFCGameStateID::Paused,
+        EFCGameStateID::Loading
+    });
+
+    ValidTransitions.Add(EFCGameStateID::Combat_EnemyTurn, {
+        EFCGameStateID::Combat_PlayerTurn,
+        EFCGameStateID::Paused,
+        EFCGameStateID::Loading
+    });
+
+    // Paused → Return to previous state or loading
+    ValidTransitions.Add(EFCGameStateID::Paused, {
+        EFCGameStateID::Office_Exploration,
+        EFCGameStateID::Office_TableView,
+        EFCGameStateID::Overworld_Travel,
+        EFCGameStateID::Combat_PlayerTurn,
+        EFCGameStateID::Combat_EnemyTurn,
+        EFCGameStateID::Loading
+    });
+
+    // Loading → Any state (level transitions)
+    ValidTransitions.Add(EFCGameStateID::Loading, {
+        EFCGameStateID::MainMenu,
+        EFCGameStateID::Office_Exploration,
+        EFCGameStateID::Overworld_Travel,
+        EFCGameStateID::Combat_PlayerTurn
+    });
+}
+```
+
+#### State Transition Logic
+
+```cpp
+bool UFCGameStateManager::TransitionTo(EFCGameStateID NewState)
+{
+    if (CurrentState == NewState)
+    {
+        UE_LOG(LogFCGameStateManager, Verbose, TEXT("TransitionTo: Already in state %s"),
+            *UEnum::GetValueAsString(NewState));
+        return true;
+    }
+
+    if (!CanTransitionTo(NewState))
+    {
+        UE_LOG(LogFCGameStateManager, Warning, TEXT("TransitionTo: Invalid transition from %s to %s"),
+            *UEnum::GetValueAsString(CurrentState),
+            *UEnum::GetValueAsString(NewState));
+        return false;
+    }
+
+    EFCGameStateID OldState = CurrentState;
+    PreviousState = CurrentState;
+    CurrentState = NewState;
+
+    UE_LOG(LogFCGameStateManager, Log, TEXT("State transition: %s → %s"),
+        *UEnum::GetValueAsString(OldState),
+        *UEnum::GetValueAsString(NewState));
+
+    OnStateChanged.Broadcast(OldState, NewState);
+    return true;
+}
+
+bool UFCGameStateManager::CanTransitionTo(EFCGameStateID TargetState) const
+{
+    const TArray<EFCGameStateID>* AllowedStates = ValidTransitions.Find(CurrentState);
+    if (!AllowedStates)
+    {
+        UE_LOG(LogFCGameStateManager, Warning, TEXT("CanTransitionTo: No valid transitions defined for state %s"),
+            *UEnum::GetValueAsString(CurrentState));
+        return false;
+    }
+
+    return AllowedStates->Contains(TargetState);
+}
+```
+
+#### Integration with AFCPlayerController
+
+**InitializeMainMenu()**: Sets state to MainMenu
+
+```cpp
+void AFCPlayerController::InitializeMainMenu()
+{
+    UFCGameInstance* GI = GetGameInstance<UFCGameInstance>();
+    if (!GI) return;
+
+    UFCGameStateManager* StateMgr = GI->GetSubsystem<UFCGameStateManager>();
+    if (StateMgr)
+    {
+        StateMgr->TransitionTo(EFCGameStateID::MainMenu);
+    }
+
+    // ... UI and input mode setup
+}
+```
+
+**TransitionToGameplay()**: Sets state to Office_Exploration
+
+```cpp
+void AFCPlayerController::TransitionToGameplay()
+{
+    UFCGameInstance* GI = GetGameInstance<UFCGameInstance>();
+    if (!GI) return;
+
+    UFCGameStateManager* StateMgr = GI->GetSubsystem<UFCGameStateManager>();
+    if (StateMgr)
+    {
+        StateMgr->TransitionTo(EFCGameStateID::Office_Exploration);
+    }
+
+    // ... UI and input mode setup
+}
+```
+
+**HandlePausePressed()**: Toggles between current state and Paused
+
+```cpp
+void AFCPlayerController::HandlePausePressed()
+{
+    UFCGameInstance* GI = GetGameInstance<UFCGameInstance>();
+    if (!GI) return;
+
+    UFCGameStateManager* StateMgr = GI->GetSubsystem<UFCGameStateManager>();
+    if (!StateMgr) return;
+
+    EFCGameStateID CurrentGameState = StateMgr->GetCurrentState();
+
+    if (CurrentGameState == EFCGameStateID::Paused)
+    {
+        // Resume to previous state
+        EFCGameStateID StateToReturn = StateMgr->GetPreviousState();
+        if (StateToReturn != EFCGameStateID::None && StateToReturn != EFCGameStateID::Paused)
+        {
+            StateMgr->TransitionTo(StateToReturn);
+        }
+    }
+    else if (CurrentGameState != EFCGameStateID::MainMenu && CurrentGameState != EFCGameStateID::Loading)
+    {
+        // Pause game
+        StateMgr->TransitionTo(EFCGameStateID::Paused);
+    }
+}
+```
+
+#### Logging
+
+All state transitions are logged via `LogFCGameStateManager`:
+
+```cpp
+DEFINE_LOG_CATEGORY(LogFCGameStateManager);
+
+// Example log output:
+// LogFCGameStateManager: State transition: None → MainMenu
+// LogFCGameStateManager: State transition: MainMenu → Office_Exploration
+// LogFCGameStateManager: State transition: Office_Exploration → Paused
+// LogFCGameStateManager: State transition: Paused → Office_Exploration
+```
+
+#### Design Rationale
+
+**Eliminates Implicit State Tracking**: Before UFCGameStateManager, game state was inferred from:
+
+- `AFCPlayerController::CurrentGameState` (deprecated, kept for Week 3 cleanup)
+- Level type checks via UFCLevelManager
+- UI widget visibility flags
+- Input mode settings
+
+Now all state is explicit and centralized in a single subsystem with validation.
+
+**Validated Transitions**: `ValidTransitions` map prevents illegal state changes (e.g., MainMenu → Combat_PlayerTurn). Invalid transitions are logged with warnings.
+
+**Future-Proof**: OnStateChanged delegate allows any system to react to state changes without tight coupling:
+
+- UI systems can show/hide widgets based on state
+- Audio system can change music based on state
+- Save system can record state for restoration
+- Analytics can track state duration and transitions
+
+**Week 3 Cleanup Note**: `AFCPlayerController::CurrentGameState` marked as deprecated. Remove after verifying all references use UFCGameStateManager instead.
 
 ---
 
@@ -1321,6 +1790,369 @@ void AFCPlayerController::HandlePausePressed()
 **Rationale**: PlayerController is destroyed and recreated on level transitions, making it unsuitable for tracking "save load vs fresh start" state. GameInstance (persistent across levels) orchestrates the proper state setup by calling the appropriate transition method.
 
 **L_Office Dual Purpose**: L_Office serves as both menu location AND gameplay location. Level type alone cannot determine input mode—explicit state transitions (InitializeMainMenu/TransitionToGameplay) handle input mode setup based on game state, not level name.
+
+---
+
+### UFCCameraManager (Priority 3A)
+
+- **Files**: `Source/FC/Components/FCCameraManager.h/.cpp`
+- **Inheritance**: `UActorComponent`
+- **Purpose**: Centralized camera management component to handle all camera mode transitions, view target blending, and camera state tracking. Extracted from AFCPlayerController to reduce complexity and enable new camera modes (Week 3 Overworld).
+
+#### Key Members
+
+```cpp
+/** Current camera mode */
+UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Camera")
+EFCPlayerCameraMode CurrentCameraMode;
+
+/** Camera for main menu view (set in Blueprint) */
+UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category = "Camera|Targets")
+TObjectPtr<ACameraActor> MenuCamera;
+
+/** Camera for table overview (spawned dynamically) */
+UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Camera|Targets")
+TObjectPtr<ACameraActor> TableViewCamera;
+
+/** Original view target before entering table view (player pawn) */
+UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Camera|Targets")
+TObjectPtr<AActor> OriginalViewTarget;
+
+/** Previous table view camera (for smooth transitions between table objects) */
+UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Camera|Targets")
+TObjectPtr<ACameraActor> PreviousTableCamera;
+
+/** Default blend time for camera transitions */
+UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera|Settings")
+float DefaultBlendTime = 2.0f;
+```
+
+#### Camera Mode Enum
+
+```cpp
+UENUM(BlueprintType)
+enum class EFCPlayerCameraMode : uint8
+{
+    FirstPerson = 0 UMETA(DisplayName = "First Person"),
+    TableView UMETA(DisplayName = "Table View"),
+    MainMenu UMETA(DisplayName = "Main Menu"),
+    SaveSlotView UMETA(DisplayName = "Save Slot View"),
+    TopDown UMETA(DisplayName = "Top Down")
+};
+```
+
+Defined in `FCPlayerController.h` to avoid circular dependencies, forward-declared in `FCCameraManager.h`.
+
+#### Public API - Camera Transitions
+
+```cpp
+/** Blend to main menu camera */
+UFUNCTION(BlueprintCallable, Category = "Camera")
+void BlendToMenuCamera(float BlendTime);
+
+/** Blend back to first-person view (player pawn) */
+UFUNCTION(BlueprintCallable, Category = "Camera")
+void BlendToFirstPerson(float BlendTime);
+
+/** Blend to a table object's camera */
+UFUNCTION(BlueprintCallable, Category = "Camera")
+void BlendToTableObject(AActor* TableActor, float BlendTime);
+
+/** Blend to top-down view (Week 3) */
+UFUNCTION(BlueprintCallable, Category = "Camera")
+void BlendToTopDown(float BlendTime);
+
+/** Restore previous view target (generic fallback) */
+UFUNCTION(BlueprintCallable, Category = "Camera")
+void RestorePreviousViewTarget(float BlendTime);
+
+/** Restore previous table view camera (for ESC from widget) */
+UFUNCTION(BlueprintCallable, Category = "Camera")
+void RestorePreviousTableCamera(float BlendTime);
+
+/** Get current camera mode */
+UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Camera")
+EFCPlayerCameraMode GetCameraMode() const { return CurrentCameraMode; }
+
+/** Set camera mode directly (internal use) */
+void SetCameraMode(EFCPlayerCameraMode NewMode);
+```
+
+#### Lifecycle
+
+```cpp
+void UFCCameraManager::BeginPlay()
+{
+    Super::BeginPlay();
+
+    APlayerController* PC = Cast<APlayerController>(GetOwner());
+    if (!PC)
+    {
+        UE_LOG(LogFCCameraManager, Error, TEXT("BeginPlay: Owner is not a PlayerController!"));
+        return;
+    }
+
+    // Prefer player pawn as original view target (game starts at main menu)
+    OriginalViewTarget = PC->GetPawn();
+    if (!OriginalViewTarget)
+    {
+        OriginalViewTarget = PC->GetViewTarget();
+    }
+
+    UE_LOG(LogFCCameraManager, Log, TEXT("BeginPlay: OriginalViewTarget set to %s"),
+        OriginalViewTarget ? *OriginalViewTarget->GetName() : TEXT("NULL"));
+}
+```
+
+**Design Note**: `OriginalViewTarget` is set to player pawn (not current view target) because the game starts at main menu where the view target is `MenuCamera`. This ensures `BlendToFirstPerson()` has the correct pawn reference for transitions.
+
+#### Camera Transition Implementation
+
+**BlendToFirstPerson**:
+
+```cpp
+void UFCCameraManager::BlendToFirstPerson(float BlendTime)
+{
+    APlayerController* PC = Cast<APlayerController>(GetOwner());
+    if (!PC) return;
+
+    // Refresh OriginalViewTarget if null or not a pawn
+    if (!OriginalViewTarget || !OriginalViewTarget->IsA(APawn::StaticClass()))
+    {
+        OriginalViewTarget = PC->GetPawn();
+        UE_LOG(LogFCCameraManager, Warning, TEXT("BlendToFirstPerson: Refreshed OriginalViewTarget to %s"),
+            OriginalViewTarget ? *OriginalViewTarget->GetName() : TEXT("NULL"));
+    }
+
+    if (OriginalViewTarget)
+    {
+        BlendToTarget(OriginalViewTarget, BlendTime, VTBlend_Cubic);
+        SetCameraMode(EFCPlayerCameraMode::FirstPerson);
+    }
+}
+```
+
+**BlendToTableObject**:
+
+```cpp
+void UFCCameraManager::BlendToTableObject(AActor* TableActor, float BlendTime)
+{
+    if (!TableActor)
+    {
+        UE_LOG(LogFCCameraManager, Error, TEXT("BlendToTableObject: TableActor is NULL!"));
+        return;
+    }
+
+    APlayerController* PC = Cast<APlayerController>(GetOwner());
+    if (!PC) return;
+
+    // Save previous table camera for smooth transitions between table objects
+    if (TableViewCamera && CurrentCameraMode == EFCPlayerCameraMode::TableView)
+    {
+        PreviousTableCamera = TableViewCamera;
+    }
+
+    // Find CameraTargetPoint component
+    UCameraTargetPoint* CameraTarget = TableActor->FindComponentByClass<UCameraTargetPoint>();
+    if (!CameraTarget)
+    {
+        UE_LOG(LogFCCameraManager, Error, TEXT("BlendToTableObject: No CameraTargetPoint found on %s"),
+            *TableActor->GetName());
+        return;
+    }
+
+    // Spawn new table view camera at target point
+    FVector Location = CameraTarget->GetComponentLocation();
+    FRotator Rotation = CameraTarget->GetComponentRotation();
+
+    FActorSpawnParameters SpawnParams;
+    SpawnParams.Owner = PC;
+    TableViewCamera = GetWorld()->SpawnActor<ACameraActor>(Location, Rotation, SpawnParams);
+
+    if (TableViewCamera)
+    {
+        BlendToTarget(TableViewCamera, BlendTime, VTBlend_Cubic);
+        SetCameraMode(EFCPlayerCameraMode::TableView);
+    }
+}
+```
+
+**RestorePreviousTableCamera**:
+
+```cpp
+void UFCCameraManager::RestorePreviousTableCamera(float BlendTime)
+{
+    if (!PreviousTableCamera)
+    {
+        UE_LOG(LogFCCameraManager, Warning, TEXT("RestorePreviousTableCamera: No previous table camera to restore"));
+        return;
+    }
+
+    // Clean up current table camera
+    if (TableViewCamera && TableViewCamera != PreviousTableCamera)
+    {
+        FTimerHandle DestroyTimer;
+        ACameraActor* CameraToDestroy = TableViewCamera;
+        GetWorld()->GetTimerManager().SetTimer(DestroyTimer, [CameraToDestroy]()
+        {
+            if (IsValid(CameraToDestroy))
+            {
+                CameraToDestroy->Destroy();
+            }
+        }, BlendTime + 0.5f, false);
+    }
+
+    // Restore previous table camera
+    TableViewCamera = PreviousTableCamera;
+    PreviousTableCamera = nullptr;
+
+    BlendToTarget(TableViewCamera, BlendTime, VTBlend_Cubic);
+    SetCameraMode(EFCPlayerCameraMode::TableView);
+}
+```
+
+#### BlendToTarget Helper
+
+```cpp
+void UFCCameraManager::BlendToTarget(AActor* Target, float BlendTime, EViewTargetBlendFunction BlendFunc)
+{
+    if (!Target) return;
+
+    APlayerController* PC = Cast<APlayerController>(GetOwner());
+    if (!PC) return;
+
+    PC->SetViewTargetWithBlend(Target, BlendTime, BlendFunc);
+
+    // Clean up old table camera after blend completes
+    if (TableViewCamera && Target != TableViewCamera)
+    {
+        FTimerHandle DestroyTimer;
+        ACameraActor* CameraToDestroy = TableViewCamera;
+        GetWorld()->GetTimerManager().SetTimer(DestroyTimer, [CameraToDestroy]()
+        {
+            if (IsValid(CameraToDestroy))
+            {
+                CameraToDestroy->Destroy();
+            }
+        }, BlendTime + 0.5f, false);
+    }
+}
+```
+
+#### PlayerController Integration
+
+**Component Creation**:
+
+```cpp
+// In AFCPlayerController constructor
+CameraManager = CreateDefaultSubobject<UFCCameraManager>(TEXT("CameraManager"));
+```
+
+**Camera Mode Delegation**:
+
+```cpp
+// All camera transitions now delegate to CameraManager
+void AFCPlayerController::SetCameraModeLocal(EFCPlayerCameraMode NewMode, float BlendTime)
+{
+    switch (NewMode)
+    {
+        case EFCPlayerCameraMode::MainMenu:
+            CameraManager->BlendToMenuCamera(BlendTime);
+            break;
+        case EFCPlayerCameraMode::FirstPerson:
+            CameraManager->BlendToFirstPerson(BlendTime);
+            break;
+        case EFCPlayerCameraMode::TableView:
+            // Handled by HandleInteractPressed with specific table actor
+            break;
+        case EFCPlayerCameraMode::TopDown:
+            CameraManager->BlendToTopDown(BlendTime);
+            break;
+    }
+}
+
+EFCPlayerCameraMode AFCPlayerController::GetCameraMode() const
+{
+    return CameraManager ? CameraManager->GetCameraMode() : EFCPlayerCameraMode::FirstPerson;
+}
+```
+
+#### Blueprint Configuration
+
+**MenuCamera Assignment**:
+
+In `BP_FC_PlayerController` Event Graph → BeginPlay:
+
+```
+Get Camera Manager → Set Menu Camera (Select from viewport dropdown)
+```
+
+**Why EditInstanceOnly**: MenuCamera uses `EditInstanceOnly` instead of `EditAnywhere` to avoid "Illegal TEXT reference to private object" Blueprint compilation warnings when assigning camera references across packages.
+
+#### Smooth Table Object Transitions
+
+**Problem**: When clicking a table object while already viewing another table object, camera would jump to FirstPerson view before blending to new table object.
+
+**Solution**: Track `PreviousTableCamera` when transitioning between table objects:
+
+1. User views OfficeDesk (TableViewCamera = OfficeDeskCamera)
+2. User clicks Map → `BlendToTableObject` saves `PreviousTableCamera = OfficeDeskCamera`
+3. Camera smoothly blends from OfficeDeskCamera to MapCamera
+4. User presses ESC → `RestorePreviousTableCamera` blends back to OfficeDeskCamera
+
+#### Widget Close Behavior
+
+**ESC from Widget (Map open)**:
+
+```cpp
+// In AFCPlayerController::HandlePausePressed()
+if (CurrentTableWidget)
+{
+    CloseTableWidget();
+    return; // Don't fall through to pause menu
+}
+
+// In AFCPlayerController::CloseTableWidget()
+if (CurrentTableWidget)
+{
+    CurrentTableWidget->RemoveFromParent();
+    CurrentTableWidget = nullptr;
+
+    // Return to previous table view camera
+    CameraManager->RestorePreviousTableCamera(CameraManager->DefaultBlendTime);
+}
+```
+
+**ESC from TableView (no widget)**:
+
+```cpp
+// In AFCPlayerController::HandlePausePressed()
+if (CameraManager->GetCameraMode() == EFCPlayerCameraMode::TableView)
+{
+    // Return to first-person
+    CameraManager->BlendToFirstPerson(CameraManager->DefaultBlendTime);
+    return;
+}
+
+// Fallthrough to pause menu if in FirstPerson
+```
+
+#### Design Rationale
+
+**Extracted from PlayerController**: Before UFCCameraManager, PlayerController had ~167 lines of camera management code scattered across multiple methods. This extraction:
+
+- ✅ Reduces PlayerController complexity by ~167 lines
+- ✅ Enables Week 3 Overworld camera without growing PlayerController further
+- ✅ Centralizes camera state in single component with clear ownership
+- ✅ Provides clean API for future camera modes (SaveSlotView, TopDown)
+
+**Component vs Subsystem**: Camera management is component-based (not subsystem) because:
+
+- Camera state is tied to specific PlayerController instance
+- PlayerController destroyed/recreated on level transitions (camera state should reset)
+- Each player in multiplayer would need independent camera management
+
+**Timer-Safe Cleanup**: Camera destruction uses `FTimerDelegate::CreateUObject` pattern to avoid dangling references when cameras are destroyed after blend completes.
 
 ---
 
@@ -4791,6 +5623,7 @@ All FC-specific categories use the prefix `LogFallenCompass*`:
 | `LogFCInteraction`                 | `Log, All` | Interaction detection, prompt updates, interface calls       |
 | `LogFCLevelManager`                | `Log, All` | Level transitions, previous level tracking, fade integration |
 | `LogFCExpedition`                  | `Log, All` | Expedition lifecycle, status changes, context updates        |
+| `LogFCCameraManager`               | `Log, All` | Camera mode transitions, view target blending, camera state  |
 
 ### Enabling Categories at Runtime
 
@@ -4804,6 +5637,7 @@ Log LogFallenCompassCharacter VeryVerbose
 Log LogFCInteraction VeryVerbose
 Log LogFCLevelManager VeryVerbose
 Log LogFCExpedition VeryVerbose
+Log LogFCCameraManager VeryVerbose
 ```
 
 ### Common Issues

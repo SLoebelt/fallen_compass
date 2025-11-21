@@ -10,6 +10,7 @@ class UInputAction;
 class UInputMappingContext;
 class ACameraActor;
 class UUserWidget;
+class UFCCameraManager;
 
 DECLARE_LOG_CATEGORY_EXTERN(LogFallenCompassPlayerController, Log, All);
 
@@ -19,7 +20,8 @@ enum class EFCPlayerCameraMode : uint8
 	FirstPerson = 0,
 	TableView,
 	MainMenu,
-	SaveSlotView
+	SaveSlotView,
+	TopDown  // Week 3: Overworld camera mode
 };
 
 UENUM(BlueprintType)
@@ -56,7 +58,7 @@ public:
 	virtual void BeginPlay() override;
 	virtual void SetupInputComponent() override;
 
-	EFCPlayerCameraMode GetCameraMode() const { return CameraMode; }
+	EFCPlayerCameraMode GetCameraMode() const;
 	bool IsPauseMenuDisplayed() const { return bIsPauseMenuDisplayed; }
 	EFCInputMappingMode GetCurrentMappingMode() const { return CurrentMappingMode; }
 	EFCGameState GetCurrentGameState() const { return CurrentGameState; }
@@ -126,9 +128,6 @@ public:
 	void FadeScreenIn(float Duration = 1.0f);
 
 protected:
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "State")
-	EFCPlayerCameraMode CameraMode;
-
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "State")
 	bool bIsPauseMenuDisplayed;
 
@@ -140,11 +139,9 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "State")
 	EFCGameState CurrentGameState;
 
-	/** Reference to the MenuCamera actor in L_Office */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera")
-	TObjectPtr<class ACameraActor> MenuCamera;
-
-
+	/** Camera management component */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	TObjectPtr<UFCCameraManager> CameraManager;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
 	int32 DefaultMappingPriority = 0;
@@ -206,14 +203,6 @@ private:
 	/** Current table widget being displayed */
 	UPROPERTY()
 	TObjectPtr<UUserWidget> CurrentTableWidget;
-
-	/** Camera actor used for table view focus */
-	UPROPERTY()
-	TObjectPtr<ACameraActor> TableViewCamera;
-
-	/** Original view target before table focus (for restoration) */
-	UPROPERTY()
-	TObjectPtr<AActor> OriginalViewTarget;
 };
 
 

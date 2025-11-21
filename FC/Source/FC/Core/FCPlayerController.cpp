@@ -23,12 +23,14 @@
 #include "Core/FCGameStateManager.h"
 #include "../Interaction/FCTableInteractable.h"
 #include "GameFramework/Character.h"
+#include "Components/FCCameraManager.h"
 
 DEFINE_LOG_CATEGORY(LogFallenCompassPlayerController);
 
 AFCPlayerController::AFCPlayerController()
 {
-	CameraMode = EFCPlayerCameraMode::FirstPerson;
+	// Create camera manager component
+	CameraManager = CreateDefaultSubobject<UFCCameraManager>(TEXT("CameraManager"));
 	bIsPauseMenuDisplayed = false;
 	bShowMouseCursor = false;
 	CurrentMappingMode = EFCInputMappingMode::FirstPerson;
@@ -137,6 +139,11 @@ AFCPlayerController::AFCPlayerController()
 	}
 }
 
+EFCPlayerCameraMode AFCPlayerController::GetCameraMode() const
+{
+	return CameraManager ? CameraManager->GetCameraMode() : EFCPlayerCameraMode::FirstPerson;
+}
+
 void AFCPlayerController::BeginPlay()
 {
 	Super::BeginPlay();
@@ -159,6 +166,8 @@ void AFCPlayerController::BeginPlay()
 		
 		UE_LOG(LogFallenCompassPlayerController, Log, TEXT("BeginPlay: Controller ready, input mode will be set by game state transitions"));
 	}
+
+	// Note: MenuCamera reference will be set in Blueprint (BP_FC_PlayerController)
 }void AFCPlayerController::SetupInputComponent()
 {
 	Super::SetupInputComponent();
@@ -221,9 +230,10 @@ void AFCPlayerController::BeginPlay()
 
 void AFCPlayerController::HandleInteractPressed()
 {
-	UE_LOG(LogFallenCompassPlayerController, Verbose, TEXT("HandleInteractPressed | Camera=%s"), *StaticEnum<EFCPlayerCameraMode>()->GetNameStringByValue(static_cast<int64>(CameraMode)));
+	EFCPlayerCameraMode CurrentMode = CameraManager ? CameraManager->GetCameraMode() : EFCPlayerCameraMode::FirstPerson;
+	UE_LOG(LogFallenCompassPlayerController, Verbose, TEXT("HandleInteractPressed | Camera=%s"), *StaticEnum<EFCPlayerCameraMode>()->GetNameStringByValue(static_cast<int64>(CurrentMode)));
 
-	if (CameraMode == EFCPlayerCameraMode::FirstPerson)
+	if (CurrentMode == EFCPlayerCameraMode::FirstPerson)
 	{
 		// Use the interaction component on the character
 		AFCFirstPersonCharacter* FPCharacter = Cast<AFCFirstPersonCharacter>(GetPawn());
@@ -256,12 +266,24 @@ void AFCPlayerController::HandleInteractPressed()
 
 void AFCPlayerController::HandlePausePressed()
 {
-	// If viewing a table object with widget, ESC closes widget and returns to table view
-	// If in table view without widget, ESC returns to first-person
-	if (CameraMode == EFCPlayerCameraMode::TableView)
+	// If viewing a table object with widget, ESC closes widget and stays in TableView
+	// If in TableView without widget, ESC returns to first-person
+	if (GetCameraMode() == EFCPlayerCameraMode::TableView)
 	{
-		UE_LOG(LogFallenCompassPlayerController, Log, TEXT("ESC pressed in table view mode"));
-		CloseTableWidget(); // Handles both widget close and table view exit
+		UE_LOG(LogFallenCompassPlayerController, Log, TEXT("ESC pressed in TableView mode"));
+		
+		// If widget is open, close it (stays in TableView)
+		if (CurrentTableWidget)
+		{
+			CloseTableWidget();
+			UE_LOG(LogFallenCompassPlayerController, Log, TEXT("Closed table widget, staying in TableView"));
+		}
+		else
+		{
+			// No widget open - return to FirstPerson
+			UE_LOG(LogFallenCompassPlayerController, Log, TEXT("No widget open, returning to FirstPerson"));
+			SetCameraModeLocal(EFCPlayerCameraMode::FirstPerson, 2.0f);
+		}
 		return;
 	}
 
@@ -366,21 +388,27 @@ void AFCPlayerController::ResumeGame()
 
 void AFCPlayerController::SetFallenCompassCameraMode(EFCPlayerCameraMode NewMode)
 {
-	if (CameraMode == NewMode)
+	if (!CameraManager)
+	{
+		UE_LOG(LogFallenCompassPlayerController, Error, TEXT("SetFallenCompassCameraMode: CameraManager is null"));
+		return;
+	}
+
+	if (CameraManager->GetCameraMode() == NewMode)
 	{
 		UE_LOG(LogFallenCompassPlayerController, Log, TEXT("SetFallenCompassCameraMode: Already in camera mode %d"), static_cast<int32>(NewMode));
 		return;
 	}
-	UE_LOG(LogFallenCompassPlayerController, Log, TEXT("SetFallenCompassCameraMode: Changing camera mode from %d to %d"), static_cast<int32>(CameraMode), static_cast<int32>(NewMode));
+	UE_LOG(LogFallenCompassPlayerController, Log, TEXT("SetFallenCompassCameraMode: Changing camera mode from %d to %d"), static_cast<int32>(CameraManager->GetCameraMode()), static_cast<int32>(NewMode));
 
-	CameraMode = NewMode;
+	SetCameraModeLocal(NewMode);
 	LogStateChange(TEXT("Camera mode updated"));
 }
 
 void AFCPlayerController::LogStateChange(const FString& Context) const
 {
 	const UEnum* ModeEnum = StaticEnum<EFCPlayerCameraMode>();
-	const FString ModeLabel = ModeEnum ? ModeEnum->GetNameStringByValue(static_cast<int64>(CameraMode)) : TEXT("Unknown");
+	const FString ModeLabel = (CameraManager && ModeEnum) ? ModeEnum->GetNameStringByValue(static_cast<int64>(CameraManager->GetCameraMode())) : TEXT("Unknown");
 	UE_LOG(LogFallenCompassPlayerController, Log, TEXT("%s | CameraMode=%s | PauseMenu=%s"),
 		*Context,
 		*ModeLabel,
@@ -454,46 +482,31 @@ void AFCPlayerController::SetInputMappingMode(EFCInputMappingMode NewMode)
 
 void AFCPlayerController::SetCameraModeLocal(EFCPlayerCameraMode NewMode, float BlendTime)
 {
-	if (CameraMode == NewMode)
+	if (!CameraManager)
+	{
+		UE_LOG(LogFallenCompassPlayerController, Error, TEXT("SetCameraModeLocal: CameraManager is null"));
+		return;
+	}
+
+	if (CameraManager->GetCameraMode() == NewMode)
 	{
 		return; // Already in this mode
 	}
 
-	UE_LOG(LogFallenCompassPlayerController, Log, TEXT("SetCameraMode: Transitioning to mode %d with blend time %.2f"), static_cast<int32>(NewMode), BlendTime);
-
-	ACameraActor* TargetCamera = nullptr;
-
+	// Delegate to CameraManager based on mode
 	switch (NewMode)
 	{
 		case EFCPlayerCameraMode::MainMenu:
-			TargetCamera = MenuCamera;
+			CameraManager->BlendToMenuCamera(BlendTime);
 			break;
 
-	case EFCPlayerCameraMode::FirstPerson:
-		// Use the pawn's camera (smooth blend back from table view)
-		if (GetPawn())
-		{
-			// Start the blend back to first-person (2 seconds cubic blend)
-			SetViewTargetWithBlend(GetPawn(), BlendTime, VTBlend_Cubic);
-			CameraMode = NewMode;
+		case EFCPlayerCameraMode::FirstPerson:
+			CameraManager->BlendToFirstPerson(BlendTime);
 			
-			// Clean up temp camera after blend starts
+			// Handle table view cleanup (input/cursor state)
 			if (bIsInTableView)
 			{
-				AActor* CurrentViewTarget = GetViewTarget();
-				if (CurrentViewTarget && CurrentViewTarget->IsA<ACameraActor>())
-				{
-					// Destroy the temporary camera actor after a delay to allow blend to complete
-					FTimerHandle CleanupTimerHandle;
-					GetWorldTimerManager().SetTimer(CleanupTimerHandle, [CurrentViewTarget]()
-					{
-						if (CurrentViewTarget && CurrentViewTarget->IsValidLowLevel())
-						{
-							CurrentViewTarget->Destroy();
-						}
-					}, BlendTime + 0.1f, false);
-				}
-				bIsInTableView = false; // Exiting table view
+				bIsInTableView = false;
 				
 				// Disable cursor and mouse events
 				bShowMouseCursor = false;
@@ -505,77 +518,54 @@ void AFCPlayerController::SetCameraModeLocal(EFCPlayerCameraMode NewMode, float 
 				SetInputMode(InputMode);
 			}
 			
-			// Restore FirstPerson input mapping (movement + ESC)
+			// Restore FirstPerson input mapping
 			if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer()))
 			{
 				Subsystem->ClearAllMappings();
 				Subsystem->AddMappingContext(FirstPersonMappingContext, 0);
 			}
-			
-			LogStateChange(TEXT("Camera switched to FirstPerson"));
-			UE_LOG(LogFallenCompassPlayerController, Log, TEXT("FirstPerson: Camera smoothly blending back from table view (%.2fs)"), BlendTime);
-			return;
-		}
-		break;	case EFCPlayerCameraMode::TableView:
-	case EFCPlayerCameraMode::SaveSlotView:
-		// Find BP_OfficeDesk in the level to get CameraTargetPoint
-		{
-			TArray<AActor*> FoundDesks;
-			UGameplayStatics::GetAllActorsOfClass(GetWorld(), AActor::StaticClass(), FoundDesks);
-			
-			for (AActor* Actor : FoundDesks)
+			break;
+
+		case EFCPlayerCameraMode::TableView:
+		case EFCPlayerCameraMode::SaveSlotView:
+			// Find BP_OfficeDesk in the level to get CameraTargetPoint
 			{
-				if (Actor->GetName().Contains(TEXT("BP_OfficeDesk")))
+				TArray<AActor*> FoundDesks;
+				UGameplayStatics::GetAllActorsOfClass(GetWorld(), AActor::StaticClass(), FoundDesks);
+				
+				for (AActor* Actor : FoundDesks)
 				{
-					// Find the CameraTargetPoint component
-					USceneComponent* CameraTarget = nullptr;
-					TArray<USceneComponent*> Components;
-					Actor->GetComponents<USceneComponent>(Components);
-					
-					for (USceneComponent* Component : Components)
+					if (Actor->GetName().Contains(TEXT("BP_OfficeDesk")))
 					{
-						if (Component->GetName().Contains(TEXT("CameraTargetPoint")))
+						// Find the CameraTargetPoint component
+						USceneComponent* CameraTarget = nullptr;
+						TArray<USceneComponent*> Components;
+						Actor->GetComponents<USceneComponent>(Components);
+						
+						for (USceneComponent* Component : Components)
 						{
-							CameraTarget = Component;
-							break;
+							if (Component->GetName().Contains(TEXT("CameraTargetPoint")))
+							{
+								CameraTarget = Component;
+								break;
+							}
 						}
-					}
-					
-					if (CameraTarget)
-					{
-						// Get the world transform of the CameraTargetPoint
-						FVector TargetLocation = CameraTarget->GetComponentLocation();
-						FRotator TargetRotation = CameraTarget->GetComponentRotation();
 						
-						// Debug: Log the rotation values
-						UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("TableView Debug: CameraTargetPoint Rotation = %s"), *TargetRotation.ToString());
-						UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("TableView Debug: CameraTargetPoint Location = %s"), *TargetLocation.ToString());
-						
-						// Spawn a temporary camera actor at the target point's transform
-						FActorSpawnParameters SpawnParams;
-						SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-						
-						ACameraActor* TableCamera = GetWorld()->SpawnActor<ACameraActor>(ACameraActor::StaticClass(), TargetLocation, TargetRotation, SpawnParams);
-						
-						if (TableCamera)
+						if (CameraTarget)
 						{
-							// Debug: Verify spawned camera rotation
-							UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("TableView Debug: Spawned Camera Rotation = %s"), *TableCamera->GetActorRotation().ToString());
+							// Delegate table object camera to CameraManager
+							CameraManager->BlendToTableObject(Actor, BlendTime);
 							
-							// Smoothly blend to the table camera
-							SetViewTargetWithBlend(TableCamera, BlendTime, VTBlend_Cubic);
-							
-							CameraMode = NewMode;
 							bIsInTableView = true;
 							
-							// Switch to StaticScene input mapping (disables movement, keeps ESC)
+							// Switch to StaticScene input mapping
 							if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer()))
 							{
 								Subsystem->ClearAllMappings();
 								Subsystem->AddMappingContext(StaticSceneMappingContext, 0);
 							}
 							
-							// Enable cursor and click events for table interaction
+							// Enable cursor and click events
 							bShowMouseCursor = true;
 							bEnableClickEvents = true;
 							bEnableMouseOverEvents = true;
@@ -586,38 +576,26 @@ void AFCPlayerController::SetCameraModeLocal(EFCPlayerCameraMode NewMode, float 
 							InputMode.SetHideCursorDuringCapture(false);
 							SetInputMode(InputMode);
 							
-							LogStateChange(TEXT("Camera switched to TableView"));
-							UE_LOG(LogFallenCompassPlayerController, Log, TEXT("TableView: Camera smoothly blending to CameraTargetPoint at location %s, rotation %s"), 
-								*TargetLocation.ToString(), *TargetRotation.ToString());
-							
-							// Store reference to clean up later
-							// Note: Camera will be cleaned up when we switch back to FirstPerson
-							return;
-						}
-						else
-						{
-							UE_LOG(LogFallenCompassPlayerController, Error, TEXT("TableView: Failed to spawn camera actor"));
+							LogStateChange(FString::Printf(TEXT("Camera switched to mode %d"), static_cast<int32>(NewMode)));
 							return;
 						}
 					}
 				}
+				
+				UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("TableView: Could not find BP_OfficeDesk or CameraTargetPoint"));
+				return;
 			}
-			
-			UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("TableView: Could not find BP_OfficeDesk or CameraTargetPoint"));
+
+		case EFCPlayerCameraMode::TopDown:
+			CameraManager->BlendToTopDown(BlendTime);
+			break;
+
+		default:
+			UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("SetCameraModeLocal: Unknown camera mode %d"), static_cast<int32>(NewMode));
 			return;
-		}
 	}
 
-	if (TargetCamera)
-	{
-		SetViewTargetWithBlend(TargetCamera, BlendTime, VTBlend_Cubic);
-		CameraMode = NewMode;
-		LogStateChange(FString::Printf(TEXT("Camera switched to mode %d"), static_cast<int32>(NewMode)));
-	}
-	else
-	{
-		UE_LOG(LogFallenCompassPlayerController, Error, TEXT("SetCameraModeLocal: Target camera is null for mode %d"), static_cast<int32>(NewMode));
-	}
+	LogStateChange(FString::Printf(TEXT("Camera switched to mode %d"), static_cast<int32>(NewMode)));
 }
 
 void AFCPlayerController::InitializeMainMenu()
@@ -951,12 +929,8 @@ void AFCPlayerController::OnTableObjectClicked(AActor* TableObject)
 		return;
 	}
 
-	// Store original view target ONLY if not already set (first table object click)
-	if (!OriginalViewTarget || OriginalViewTarget == this)
-	{
-		OriginalViewTarget = GetViewTarget();
-		UE_LOG(LogFallenCompassPlayerController, Log, TEXT("Stored original view target: %s"), *GetNameSafe(OriginalViewTarget));
-	}
+	// Camera management now handled by CameraManager component
+	// Store original view target handled by CameraManager
 
 	// Close current widget if one is open (switching between table objects)
 	if (CurrentTableWidget)
@@ -969,20 +943,12 @@ void AFCPlayerController::OnTableObjectClicked(AActor* TableObject)
 	// Get camera target transform from table object
 	FTransform CameraTargetTransform = IFCTableInteractable::Execute_GetCameraTargetTransform(TableObject);
 
-	// Create or reuse camera actor at target transform
-	if (!TableViewCamera)
+	// Camera transitions now handled by CameraManager component
+	// Delegate to CameraManager for camera spawning and blending
+	if (CameraManager)
 	{
-		FActorSpawnParameters SpawnParams;
-		SpawnParams.Owner = this;
-		TableViewCamera = GetWorld()->SpawnActor<ACameraActor>(ACameraActor::StaticClass(), CameraTargetTransform, SpawnParams);
+		CameraManager->BlendToTableObject(TableObject, 2.0f);
 	}
-	else
-	{
-		TableViewCamera->SetActorTransform(CameraTargetTransform);
-	}
-
-	// Always blend camera to table view (2s cubic, Week 1 pattern) - ensures smooth transition between objects
-	SetViewTargetWithBlend(TableViewCamera, 2.0f, EViewTargetBlendFunction::VTBlend_Cubic);
 
 	UE_LOG(LogFallenCompassPlayerController, Log, TEXT("Blending camera to table object: %s"), *TableObject->GetName());
 
@@ -1041,27 +1007,12 @@ void AFCPlayerController::CloseTableWidget()
 		SetInputMode(InputMode);
 		bShowMouseCursor = true;
 
-		// Blend camera back to original table view
-		if (OriginalViewTarget)
+		// Restore previous table camera (e.g., from Map back to OfficeDesk)
+		if (CameraManager)
 		{
-			SetViewTargetWithBlend(OriginalViewTarget, 2.0f, EViewTargetBlendFunction::VTBlend_Cubic);
-			UE_LOG(LogFallenCompassPlayerController, Log, TEXT("Blending camera back to table view"));
-		}
-
-		// Reset state for next interaction
-		OriginalViewTarget = nullptr;
-
-		// Cleanup: Destroy table view camera if exists
-		if (TableViewCamera)
-		{
-			TableViewCamera->Destroy();
-			TableViewCamera = nullptr;
+			CameraManager->RestorePreviousTableCamera(2.0f);
+			UE_LOG(LogFallenCompassPlayerController, Log, TEXT("Widget closed, restoring previous table camera"));
 		}
 	}
-	else
-	{
-		// No widget open, ESC pressed in TableView - return to FirstPerson
-		UE_LOG(LogFallenCompassPlayerController, Log, TEXT("No widget open, returning to first-person"));
-		SetCameraModeLocal(EFCPlayerCameraMode::FirstPerson, 2.0f);
-	}
+	// Note: If no widget is open, ESC is handled by HandlePausePressed() which returns to FirstPerson
 }
