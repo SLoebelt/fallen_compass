@@ -350,39 +350,39 @@ To Create in Week 3:
 
 ##### Step 2.1.2: Add Lighting Setup
 
-- [ ] **Analysis**
+- [x] **Analysis**
 
-  - [ ] Review L_Office lighting configuration (DirectionalLight angle, SkyLight intensity)
-  - [ ] Determine appropriate lighting for top-down view (higher angle, clear shadows)
+  - [x] Review L_Office lighting configuration (DirectionalLight angle, SkyLight intensity)
+  - [x] Determine appropriate lighting for top-down view (higher angle, clear shadows)
 
-- [ ] **Implementation (Unreal Editor)**
+- [x] **Implementation (Unreal Editor)**
 
-  - [ ] Add Directional Light:
-    - [ ] Place in level, rename to `DirectionalLight_Sun`
-    - [ ] Set Rotation: Pitch=-60, Yaw=45, Roll=0 (top-down lighting angle)
-    - [ ] Set Intensity: 5.0 lux (outdoor daylight)
-    - [ ] Enable Cast Shadows: True
-    - [ ] Set Mobility: Stationary
-  - [ ] Add Sky Light:
-    - [ ] Place in level, rename to `SkyLight_Main`
-    - [ ] Set Intensity: 1.0
-    - [ ] Set Source Type: SLS Captured Scene
-    - [ ] Enable Cast Shadows: True
-    - [ ] Set Mobility: Stationary
-  - [ ] Add Sky Atmosphere:
-    - [ ] Place in level, rename to `SkyAtmosphere_Main`
-    - [ ] Use default settings (connects to DirectionalLight automatically)
-  - [ ] Add Exponential Height Fog (optional for atmosphere):
-    - [ ] Place in level, rename to `HeightFog_Main`
-    - [ ] Set Fog Density: 0.02 (subtle haze)
-    - [ ] Set Fog Height Falloff: 0.2
-  - [ ] Save level
+  - [x] Add Directional Light:
+    - [x] Place in level, rename to `DirectionalLight_Sun`
+    - [x] Set Rotation: Pitch=-60, Yaw=45, Roll=0 (top-down lighting angle)
+    - [x] Set Intensity: 5.0 lux (outdoor daylight)
+    - [x] Enable Cast Shadows: True
+    - [x] Set Mobility: Stationary
+  - [x] Add Sky Light:
+    - [x] Place in level, rename to `SkyLight_Main`
+    - [x] Set Intensity: 1.0
+    - [x] Set Source Type: SLS Captured Scene
+    - [x] Enable Cast Shadows: True
+    - [x] Set Mobility: Stationary
+  - [x] Add Sky Atmosphere:
+    - [x] Place in level, rename to `SkyAtmosphere_Main`
+    - [x] Use default settings (connects to DirectionalLight automatically)
+  - [x] Add Exponential Height Fog (optional for atmosphere):
+    - [x] Place in level, rename to `HeightFog_Main`
+    - [x] Set Fog Density: 0.02 (subtle haze)
+    - [x] Set Fog Height Falloff: 0.2
+  - [x] Save level
 
-- [ ] **Testing After Step 2.1.2** ✅ CHECKPOINT
-  - [ ] PIE (Play In Editor) - level loads with proper lighting
-  - [ ] Viewport shows clear directional shadows
-  - [ ] No lighting build warnings (stationary lights may show preview)
-  - [ ] Save and verify no errors
+- [x] **Testing After Step 2.1.2** ✅ CHECKPOINT
+  - [x] PIE (Play In Editor) - level loads with proper lighting
+  - [x] Viewport shows clear directional shadows
+  - [x] No lighting build warnings (stationary lights may show preview)
+  - [x] Save and verify no errors
 
 **COMMIT POINT 2.1.2**: `git add Content/FC/World/Levels/L_Overworld.umap && git commit -m "feat(overworld): Add lighting setup (sun, sky, atmosphere, fog)"`
 
@@ -392,30 +392,19 @@ To Create in Week 3:
 
 ##### Step 2.2.1: Add Ground Plane with Basic Material
 
-- [ ] **Analysis**
+- [x] **Analysis**
 
-  - [ ] Check if starter content materials available (M_Ground, M_Concrete)
-  - [ ] Determine appropriate ground size for initial testing (recommendation: 10,000 x 10,000 units)
+  - [x] Check if starter content materials available (M_Ground, M_Concrete)
+  - [x] Determine appropriate ground size for initial testing (recommendation: 10,000 x 10,000 units)
 
-- [ ] **Implementation (Unreal Editor)**
+- [x] **Implementation (Unreal Editor)**
 
-  - [ ] Add Floor Plane:
-    - [ ] Place Actor → Basic → Plane
-    - [ ] Rename to `SM_GroundPlane`
-    - [ ] Set Location: X=0, Y=0, Z=0
-    - [ ] Set Scale: X=100, Y=100, Z=1 (creates 10,000 x 10,000 unit plane)
-  - [ ] Apply Material:
-    - [ ] Assign Material: `/Engine/BasicShapes/BasicShapeMaterial` or starter content ground material
-    - [ ] If using custom material: Create M_OverworldGround_Placeholder (simple flat color)
-  - [ ] Set Collision:
-    - [ ] Enable Block All (ensures raycasts hit ground for click-to-move)
-  - [ ] Save level
-
-- [ ] **Testing After Step 2.2.1** ✅ CHECKPOINT
-  - [ ] Ground plane visible in viewport
-  - [ ] Ground has collision enabled (cursor hovers over plane show collision)
-  - [ ] Material applied correctly
-  - [ ] Save successful
+  - [x] Add Landscape:
+    - [x] Basede on HeightMap
+    - [x] Rename to `Landscape`
+  - [x] Apply Material:
+    - [x] Assign Material: `/LevelPrototyping/Materials/MI_PrototypeGrid_TopDark`
+  - [x] Save level
 
 **COMMIT POINT 2.2.1**: `git add Content/FC/World/Levels/L_Overworld.umap && git commit -m "feat(overworld): Add ground plane with collision for click-to-move testing"`
 
@@ -423,33 +412,25 @@ To Create in Week 3:
 
 ##### Step 2.2.2: Add Basic Terrain Variation (Optional Heightmap/Landscape)
 
-- [ ] **Analysis**
+- [x] **Analysis**
 
-  - [ ] Decide: Use simple plane for Week 3 OR create basic Landscape for visual interest
-  - [ ] If Landscape: Review UE Landscape documentation for NavMesh compatibility
-
-- [ ] **Implementation (Unreal Editor) - Option A: Keep Plane (Simpler)**
-
-  - [ ] Skip this step, use plane from 2.2.1
-  - [ ] Add 3-5 static mesh props for visual reference (rocks, trees) using starter content
-  - [ ] Place randomly on ground plane for spatial awareness during testing
-  - [ ] Save level
+  - [x] If Landscape: Review UE Landscape documentation for NavMesh compatibility
 
 - [ ] **Implementation (Unreal Editor) - Option B: Create Landscape (More Realistic)**
 
-  - [ ] Landscape Mode → Create New Landscape
-  - [ ] Set Section Size: 63x63 quads, Sections Per Component: 1x1, Components: 8x8 (medium size)
-  - [ ] Set Location: X=0, Y=0, Z=0
-  - [ ] Set Material: Starter Content landscape material or placeholder
-  - [ ] Use Sculpt tool to add gentle hills (avoid steep slopes for NavMesh)
-  - [ ] Paint with basic grass/ground texture
-  - [ ] Save level
+  - [x] Landscape Mode → Create New Landscape
+  - [x] Set Section Size: 63x63 quads, Sections Per Component: 1x1, Components: 8x8 (medium size)
+  - [x] Set Location: X=0, Y=0, Z=0
+  - [x] Set Material: Starter Content landscape material or placeholder
+  - [x] Use Sculpt tool to add gentle hills (avoid steep slopes for NavMesh)
+  - [x] Paint with basic grass/ground texture
+  - [x] Save level
 
-- [ ] **Testing After Step 2.2.2** ✅ CHECKPOINT
-  - [ ] Terrain visible and walkable
-  - [ ] No z-fighting or visual glitches
-  - [ ] Props (if added) have collision
-  - [ ] Save successful
+- [x] **Testing After Step 2.2.2** ✅ CHECKPOINT
+  - [x] Terrain visible and walkable
+  - [x] No z-fighting or visual glitches
+  - [x] Props (if added) have collision
+  - [x] Save successful
 
 **COMMIT POINT 2.2.2**: `git add Content/FC/World/Levels/L_Overworld.umap && git commit -m "feat(overworld): Add terrain variation and visual reference props"`
 

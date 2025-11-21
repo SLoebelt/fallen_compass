@@ -42,82 +42,90 @@ Every week aims to leave the game **playable and compiling**. Multi-week feature
 
 ---
 
-### Week 2 – Office Scene & Map Table Interaction (Meta Layer Start) - 19.11.-26.11.2025
+### Week 2 – Office Scene & Map Table Interaction (Meta Layer Start) ✅ COMPLETE - 19.11.-21.11.2025
 
-- **Feature: Expedition Data Model – Part 1 (Foundation Classes)**
+- **Feature: Expedition Data Model – Part 1 (Foundation Classes)** ✅ **COMPLETE**
 
-  - Create `UFCExpeditionData` C++ class (UObject):
-    - Properties: ExpeditionName, StartDate, TargetRegion (placeholder string).
-    - Properties: StartingSupplies (int32), ExpeditionStatus (enum: Planning, InProgress, Completed, Failed).
-  - Create `UFCExpeditionManager` subsystem (UGameInstanceSubsystem):
-    - Manages current active expedition data.
-    - Methods: `StartNewExpedition()`, `GetCurrentExpedition()`, `EndExpedition(bool bSuccess)`.
-  - Store expedition data in GameInstance for persistence across level transitions.
+  - Create `UFCExpeditionData` C++ class (UObject): ✅
+    - Properties: ExpeditionName, StartDate, TargetRegion (placeholder string). ✅
+    - Properties: StartingSupplies (int32), ExpeditionStatus (enum: Planning, InProgress, Completed, Failed). ✅
+  - Create `UFCExpeditionManager` subsystem (UGameInstanceSubsystem): ✅
+    - Manages current active expedition data. ✅
+    - Methods: `CreateExpedition()`, `GetActiveExpedition()`, `EndExpedition(bool bSuccess)`. ✅
+  - Store expedition data in GameInstance for persistence across level transitions. ✅
 
-- **Feature: Table Object Interaction System – Part 1 (Foundation)**
+- **Feature: Table Object Interaction System – Part 1 (Foundation)** ✅ **COMPLETE**
 
-  - Create `IFCTableInteractable` C++ interface (BlueprintNativeEvent):
-    - Functions: `OnTableObjectClicked()`, `GetCameraTargetTransform()`, `CanInteract()`.
-  - Create `BP_TableObject` base Blueprint class:
-    - Implements `IFCTableInteractable`.
-    - Has SceneComponent for camera target position.
-    - Clickable via ray trace from first-person view.
-  - Create specific table objects in L_Office:
-    - `BP_TableObject_Map` (world map, positioned on table).
-    - `BP_TableObject_Logbook` (expedition reports book, placeholder).
-    - `BP_TableObject_Letters` (message stack, placeholder).
-    - `BP_TableObject_Glass` (expedition start trigger, placeholder).
+  - Create `IFCTableInteractable` C++ interface (BlueprintNativeEvent): ✅
+    - Functions: `OnTableInteract()`, `GetCameraTargetTransform()`, `CanInteract()`. ✅
+  - Create `BP_TableObject` base Blueprint class: ✅
+    - Implements `IFCTableInteractable`. ✅
+    - Has SceneComponent for camera target position. ✅
+    - Clickable via ray trace from first-person view. ✅
+  - Create specific table objects in L_Office: ✅
+    - `BP_TableObject_Map` (world map, positioned on table). ✅
+    - `BP_TableObject_Logbook` (expedition reports book, placeholder). ✅
+    - `BP_TableObject_Letters` (message stack, placeholder). ✅
+    - `BP_TableObject_Compass` (expedition start trigger, placeholder). ✅
 
-- **Feature: Map Table Widget – Part 1 (Placeholder UI)**
+- **Feature: Map Table Widget – Part 1 (Placeholder UI)** ✅ **COMPLETE**
 
-  - Create `WBP_MapTable` widget at `/Game/FC/UI/MapTable/`:
-    - Canvas with parchment/map background texture.
-    - Placeholder world map image (static, non-interactive).
-    - UI elements:
-      - Text display: "Expedition Planning" (title).
-      - Text display: Current supplies count (reads from GameInstance).
-      - Button: "Start Test Expedition" (enabled when supplies > 0).
-      - Button: "Back" (returns to first-person view).
-  - Implement Blueprint bindings to read/display supplies from GameInstance.
+  - Create `WBP_TableMap` widget at `/Game/FC/UI/TableMap/`: ✅
+    - Canvas with parchment/map background texture. ✅
+    - Placeholder world map image (static, non-interactive). ✅
+    - UI elements: ✅
+      - Text display: "Expedition Planning" (title). ✅
+      - Text display: Current supplies count (reads from GameInstance). ✅
+      - Button: "Start Test Expedition" (enabled when supplies > 0). ✅
+      - Button: "Back" (returns to first-person view). ✅
+  - Implement Blueprint bindings to read/display supplies from GameInstance. ✅
 
-- **Feature: Table Interaction Flow – Part 1 (Widget Integration)**
+- **Feature: Table Interaction Flow – Part 1 (Widget Integration)** ✅ **COMPLETE**
 
-  - Implement `AFCPlayerController::OnTableObjectClicked(AActor* TableObject)`:
-    - Get camera target from table object.
-    - Blend camera to focus on object (2s, cubic).
-    - Show appropriate widget based on object type.
-    - Set input mode to UI-only.
-  - Implement `AFCPlayerController::CloseTableWidget()`:
-    - Hide current widget.
-    - Blend camera back to first-person.
-    - Restore gameplay input mode.
-  - Wire `BP_TableObject_Map::OnTableObjectClicked()` to show `WBP_MapTable`.
+  - Implement camera-to-widget flow via UFCCameraManager and UFCUIManager: ✅
+    - Get camera target from table object via `IFCTableInteractable::GetCameraTargetTransform()`. ✅
+    - Blend camera to TableView mode (2s, cubic) via `UFCCameraManager`. ✅
+    - Show appropriate widget via `UFCUIManager::ShowTableMapWidget()`. ✅
+    - Set input mode to UI-only via Enhanced Input subsystem. ✅
+  - Implement `UFCUIManager::HideTableMapWidget()`: ✅
+    - Hide widget and restore camera to FirstPerson mode. ✅
+    - Restore gameplay input mode. ✅
+  - Wire `BP_TableObject_Map::OnTableInteract()` to trigger widget display. ✅
 
-- **Feature: Level Transition Architecture – Part 1 (Loading Framework)**
+- **Feature: Level Transition Architecture – Part 1 (Loading Framework)** ✅ **COMPLETE**
 
-  - Create `UFCLevelManager` subsystem (UGameInstanceSubsystem) if not exists:
-    - Method: `LoadLevel(FName LevelName, bool bShowLoadingScreen)`.
-    - Delegates to `UFCTransitionManager` for fade/loading effects.
-    - Stores metadata about current level and previous level for back navigation.
-  - Implement "Start Test Expedition" button logic:
-    - Calls `ExpeditionManager->StartNewExpedition()` (sets status to InProgress).
-    - Calls `LevelManager->LoadLevel(TEXT("L_Overworld_Test"), true)`.
-    - Shows loading screen during transition.
-  - **No Overworld level yet** (Week 3) - button shows "Coming Soon" message for now.
+  - Extend `UFCLevelManager` subsystem (already created in Week 1): ✅
+    - Method: `LoadLevel(FName LevelName)` with UFCTransitionManager integration. ✅
+    - Delegates to `UFCTransitionManager` for fade-out/fade-in effects. ✅
+    - Stores metadata about current level and previous level for back navigation. ✅
+  - Implement "Start Test Expedition" button logic: ✅
+    - Calls `ExpeditionManager->CreateExpedition()` (sets status to Planning). ✅
+    - Calls `LevelManager->LoadLevel(TEXT("L_Overworld_Test"))` (planned for Week 3). ✅
+    - Shows fade-out/fade-in transition during level load. ✅
+  - **Note**: Overworld level implementation deferred to Week 3. ✅
 
-- **Feature: Persistent Game State Foundation – Part 1**
+- **Feature: Persistent Game State Foundation – Part 1** ✅ **COMPLETE**
 
-  - Extend `UFCGameInstance`:
-    - Add property: `CurrentSupplies` (int32, default: 100 for testing).
-    - Add methods: `AddSupplies(int32 Amount)`, `ConsumeSupplies(int32 Amount, bool& bSuccess)`.
-  - Create `UFCGameStateData` struct (C++):
-    - Fields: Supplies, Money (int32, placeholder), Day (int32, starts at 1).
-  - Store `UFCGameStateData` in GameInstance.
-  - Display current supplies in `WBP_MapTable`.
+  - Extend `UFCGameInstance`: ✅
+    - Add property: `CurrentSupplies` (int32, default: 100 for testing). ✅
+    - Add methods: `AddSupplies(int32 Amount)`, `ConsumeSupplies(int32 Amount, bool& bSuccess)`. ✅
+  - Create `FFCGameStateData` struct (C++): ✅
+    - Fields: Supplies, Money (int32, placeholder), Day (int32, starts at 1). ✅
+  - Store `FFCGameStateData` in GameInstance. ✅
+  - Display current supplies in `WBP_TableMap`. ✅
+
+**Week 2 Refactoring Completed**: ✅
+
+- **Priority 6: UFCInputManager Component** - Extracted input mapping context management from PlayerController to reusable component. ✅
+  - Component location: `Source/FC/Components/FCInputManager.h/.cpp` ✅
+  - Supports 4 input modes: FirstPerson, TopDown, Fight, StaticScene ✅
+  - PlayerController delegates to component via `SetInputMappingMode()` ✅
+  - Blueprint configuration: IMC references assigned in InputManager component properties ✅
+  - Ready for Week 3 Overworld TopDownPlayerController integration ✅
 
 ---
 
-### Week 3 – Overworld Level & Basic Convoy Movement
+### Week 3 – Overworld Level & Basic Convoy Movement - 21.11.-28.11.2025
 
 - **Feature: Overworld Level – Part 1 (Basic Terrain & Camera)**
 
@@ -141,6 +149,7 @@ Every week aims to leave the game **playable and compiling**. Multi-week feature
     - If yes, call `SetPause(true)` to freeze 3D map movement/physics.
     - Office pause menu continues without engine pause (current behavior).
   - Implementation location: `UFCUIManager::ShowPauseMenu()` - add state check after setting input mode.
+
 ---
 
 ### Week 4 – Overworld Map Widget & Basic Expedition Flow
