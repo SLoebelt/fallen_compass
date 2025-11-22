@@ -26,10 +26,9 @@
 #include "GameFramework/Character.h"
 #include "Components/FCCameraManager.h"
 #include "World/FCOverworldCamera.h"
-#include "World/FCOverworldConvoy.h"
+#include "Characters/Convoy/FCOverworldConvoy.h"
 #include "AIController.h"
 #include "NavigationSystem.h"
-#include "Interaction/FCInteractablePOIInterface.h"
 
 DEFINE_LOG_CATEGORY(LogFallenCompassPlayerController);
 
@@ -263,7 +262,7 @@ void AFCPlayerController::HandleInteractPressed()
 	// Week 3: Route to Overworld interaction if in TopDown mode
 	if (CurrentMode == EFCPlayerCameraMode::TopDown)
 	{
-		HandleOverworldInteract(FInputActionValue());
+		UE_LOG(LogFallenCompassPlayerController, Log, TEXT("HandleInteractPressed: TopDown mode - feature not yet implemented"));
 		return;
 	}
 
@@ -971,77 +970,13 @@ void AFCPlayerController::HandleClick(const FInputActionValue& Value)
 	// TopDown mode: Click-to-move convoy
 	if (CurrentMode == EFCPlayerCameraMode::TopDown)
 	{
-		HandleOverworldClickMove();
+		//HandleOverworldClickMove();
 	}
 	// TableView/FirstPerson mode: Interact with table objects
 	else if (CurrentMode == EFCPlayerCameraMode::TableView || CurrentMode == EFCPlayerCameraMode::FirstPerson)
 	{
 		HandleTableObjectClick();
 	}
-}
-
-void AFCPlayerController::HandleOverworldClickMove()
-{
-	// Ensure mouse cursor is visible
-	if (!bShowMouseCursor)
-	{
-		bShowMouseCursor = true;
-		UE_LOG(LogFallenCompassPlayerController, Log, TEXT("HandleOverworldClickMove: Enabled mouse cursor"));
-	}
-
-	// Find the convoy pawn in the level (don't possess it - let AIController control it)
-	AFCOverworldConvoy* ConvoyPawn = nullptr;
-	TArray<AActor*> FoundActors;
-	UGameplayStatics::GetAllActorsOfClass(GetWorld(), AFCOverworldConvoy::StaticClass(), FoundActors);
-	
-	if (FoundActors.Num() > 0)
-	{
-		ConvoyPawn = Cast<AFCOverworldConvoy>(FoundActors[0]);
-	}
-	
-	if (!ConvoyPawn)
-	{
-		UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("HandleOverworldClickMove: No convoy pawn found in level"));
-		return;
-	}
-
-	// Get AI controller from convoy
-	AAIController* AIController = ConvoyPawn->GetConvoyAIController();
-	if (!AIController)
-	{
-		UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("HandleOverworldClickMove: No AI controller on convoy"));
-		return;
-	}
-
-	// Raycast from cursor to world
-	FHitResult HitResult;
-	bool bHit = GetHitResultUnderCursor(ECC_Visibility, false, HitResult);
-	if (!bHit)
-	{
-		UE_LOG(LogFallenCompassPlayerController, Verbose, TEXT("HandleOverworldClickMove: No hit under cursor"));
-		return;
-	}
-
-	// Validate NavMesh exists before moving
-	UNavigationSystemV1* NavSys = FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld());
-	if (!NavSys)
-	{
-		UE_LOG(LogFallenCompassPlayerController, Error, TEXT("HandleOverworldClickMove: No NavigationSystem found - add NavMeshBoundsVolume to level!"));
-		return;
-	}
-
-	// Check if clicked location is on NavMesh
-	FNavLocation NavLocation;
-	bool bOnNavMesh = NavSys->ProjectPointToNavigation(HitResult.Location, NavLocation, FVector(500.0f, 500.0f, 500.0f));
-	if (!bOnNavMesh)
-	{
-		UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("HandleOverworldClickMove: Clicked location not on NavMesh"));
-		return;
-	}
-
-	// Move to location using AI controller (AIController controls the pawn, PlayerController just sends commands)
-	AIController->MoveToLocation(NavLocation.Location);
-	UE_LOG(LogFallenCompassPlayerController, Log, TEXT("HandleOverworldClickMove: Commanded convoy to move to %s"), *NavLocation.Location.ToString());
 }
 
 void AFCPlayerController::HandleTableObjectClick()
@@ -1155,69 +1090,4 @@ void AFCPlayerController::CloseTableWidget()
 		}
 	}
 	// Note: If no widget is open, ESC is handled by HandlePausePressed() which returns to FirstPerson
-}
-
-void AFCPlayerController::HandleOverworldInteract(const FInputActionValue& Value)
-{
-	// Only allow interaction in TopDown mode
-	if (!CameraManager || CameraManager->GetCameraMode() != EFCPlayerCameraMode::TopDown)
-	{
-		return;
-	}
-
-	// Raycast from cursor to world
-	FHitResult HitResult;
-	bool bHit = GetHitResultUnderCursor(ECC_Visibility, false, HitResult);
-	if (!bHit)
-	{
-		return;
-	}
-
-	AActor* HitActor = HitResult.GetActor();
-	if (HitActor)
-	{
-		// Check if actor implements POI interface
-		if (HitActor->GetClass()->ImplementsInterface(UFCInteractablePOIInterface::StaticClass()))
-		{
-			RequestInteraction(HitActor);
-		}
-	}
-}
-
-void AFCPlayerController::RequestInteraction(AActor* Target)
-{
-	if (!Target)
-	{
-		return;
-	}
-
-	// Check interface again to be safe
-	if (!Target->GetClass()->ImplementsInterface(UFCInteractablePOIInterface::StaticClass()))
-	{
-		UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("RequestInteraction: Target %s does not implement POI interface"), *Target->GetName());
-		return;
-	}
-
-	// Get available actions
-	TArray<FFCPOIAction> Actions = IFCInteractablePOIInterface::Execute_GetAvailableActions(Target);
-	FText POIName = IFCInteractablePOIInterface::Execute_GetPOIName(Target);
-
-	if (Actions.Num() == 0)
-	{
-		UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("RequestInteraction: POI %s has no actions"), *POIName.ToString());
-		return;
-	}
-
-	if (Actions.Num() == 1)
-	{
-		// Single action - execute immediately
-		UE_LOG(LogFallenCompassPlayerController, Log, TEXT("RequestInteraction: Executing single action '%s' on %s"), *Actions[0].ActionName, *POIName.ToString());
-		IFCInteractablePOIInterface::Execute_ExecuteAction(Target, 0);
-	}
-	else
-	{
-		// Multiple actions - show widget
-		UE_LOG(LogFallenCompassPlayerController, Log, TEXT("RequestInteraction: Showing widget for %s with %d actions"), *POIName.ToString(), Actions.Num());
-		ShowInteractionWidget(Target, Actions);
-	}
 }

@@ -178,6 +178,7 @@ protected:
 	void HandleQuickLoadPressed();
 	void HandleOverworldPan(const FInputActionValue& Value);
 	void HandleOverworldZoom(const FInputActionValue& Value);
+	void HandleClick(const FInputActionValue& Value);
 
 	/** Handle game state changes (bind to GameStateManager.OnStateChanged) */
 	UFUNCTION()
