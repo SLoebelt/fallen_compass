@@ -25,7 +25,7 @@
    - Manages camera attachment (camera follows convoy center)
    - Coordinates movement commands to leader
 
-2. **AConvoyMember** (C++ Base Class) + **BP_ConvoyMember** (Blueprint Child)
+2. **AConvoyMember** (C++ Base Class) + **BP_FC_ConvoyMember** (Blueprint Child)
 
    - C++ base class handles:
      - Capsule collision and overlap detection logic
@@ -84,7 +84,7 @@ IMC_FC_TopDown`
 
 ---
 
-### Step 5.2: Create BP_ConvoyMember Actor
+### Step 5.2: Create BP_FC_ConvoyMember Actor
 
 #### Step 5.2.1: Create C++ AConvoyMember Class
 
@@ -238,43 +238,43 @@ IMC_FC_TopDown`
 
 ---
 
-#### Step 5.2.2: Create BP_ConvoyMember Blueprint Child Class
+#### Step 5.2.2: Create BP_FC_ConvoyMember Blueprint Child Class
 
-- [ ] **Analysis**
+- [x] **Analysis**
 
-  - [ ] Blueprint derived from AConvoyMember C++ class
-  - [ ] Configures mesh, materials, and CharacterMovement parameters
-  - [ ] POI overlap logic already handled in C++ parent
+  - [x] Blueprint derived from AConvoyMember C++ class
+  - [x] Configures mesh, materials, and CharacterMovement parameters
+  - [x] POI overlap logic already handled in C++ parent
 
-- [ ] **Implementation (Unreal Editor)**
+- [x] **Implementation (Unreal Editor)**
 
-  - [ ] Content Browser → `/Game/FC/Characters/Convoy/Blueprints/`
-  - [ ] Right-click → Blueprint Class → Select **ConvoyMember** (C++ class)
-  - [ ] Name: `BP_ConvoyMember`
-  - [ ] Open BP_ConvoyMember
-  - [ ] Components Panel:
-    - [ ] Select Mesh component (inherited from Character)
-      - [ ] Rename to "MemberMesh"
-      - [ ] Set Skeletal Mesh: Choose placeholder (mannequin or starter content)
-      - [ ] Set Scale: X=1, Y=1, Z=1
-      - [ ] Set Material: Unique color per member type (e.g., blue for prototype)
-    - [ ] Select CharacterMovement component (inherited):
-      - [ ] Max Walk Speed: 300.0
-      - [ ] Max Acceleration: 500.0
-      - [ ] Braking Deceleration Walking: 1000.0
-      - [ ] Enable **Orient Rotation to Movement**: True
-      - [ ] Disable **Use Controller Desired Rotation**: False
-  - [ ] Class Defaults:
-    - [ ] AI Controller Class: BP_ConvoyAIController (will create in next step)
-  - [ ] Compile and save
+  - [x] Content Browser → `/Game/FC/Characters/Convoy/Blueprints/`
+  - [x] Right-click → Blueprint Class → Select **ConvoyMember** (C++ class)
+  - [x] Name: `BP_FC_ConvoyMember`
+  - [x] Open BP_FC_ConvoyMember
+  - [x] Components Panel:
+    - [x] Select Mesh component (inherited from Character)
+      - [x] Rename to "MemberMesh"
+      - [x] Set Skeletal Mesh: Choose placeholder (mannequin or starter content)
+      - [x] Set Scale: X=1, Y=1, Z=1
+      - [x] Set Material: Unique color per member type (e.g., blue for prototype)
+    - [x] Select CharacterMovement component (inherited):
+      - [x] Max Walk Speed: 300.0
+      - [x] Max Acceleration: 500.0
+      - [x] Braking Deceleration Walking: 1000.0
+      - [x] Enable **Orient Rotation to Movement**: True
+      - [x] Disable **Use Controller Desired Rotation**: False
+  - [x] Class Defaults:
+    - [x] AI Controller Class: BP_ConvoyAIController (will create in next step)
+  - [x] Compile and save
 
-- [ ] **Testing After Step 5.2.2** ✅ CHECKPOINT
-  - [ ] Blueprint compiles without errors
-  - [ ] Inherits from AConvoyMember C++ class
-  - [ ] Mesh and materials configured
-  - [ ] Can place in level viewport (test, then remove)
+- [x] **Testing After Step 5.2.2** ✅ CHECKPOINT
+  - [x] Blueprint compiles without errors
+  - [x] Inherits from AConvoyMember C++ class
+  - [x] Mesh and materials configured
+  - [x] Can place in level viewport (test, then remove)
 
-**COMMIT POINT 5.2.2**: `git add Content/FC/Characters/Convoy/Blueprints/BP_ConvoyMember.uasset && git commit -m "feat(convoy): Create BP_ConvoyMember Blueprint child class"`
+**COMMIT POINT 5.2.2**: `git add Content/FC/Characters/Convoy/Blueprints/BP_FC_ConvoyMember.uasset && git commit -m "feat(convoy): Create BP_FC_ConvoyMember Blueprint child class"`
 
 ---
 
@@ -1020,7 +1020,7 @@ IMC_FC_TopDown`
 ### Task 5 Acceptance Criteria
 
 - [ ] Left Mouse Button bound to IA_Interact in IMC_FC_TopDown
-- [ ] BP_ConvoyMember character created with mesh, collision, AI controller support, and POI overlap detection
+- [ ] BP_FC_ConvoyMember character created with mesh, collision, AI controller support, and POI overlap detection
 - [ ] BP_ConvoyAIController created with MoveToLocation method
 - [ ] BP_OverworldConvoy parent actor created with 3 child convoy members (leader + 2 followers)
 - [ ] Convoy members spawn and attach correctly via Construction Script
@@ -1474,11 +1474,11 @@ IMC_FC_TopDown`
 
 **Architecture**:
 
-- **BP_ConvoyMember** (Leader):
+- **BP_FC_ConvoyMember** (Leader):
   - Add Timer: Drop breadcrumb every 0.5 seconds or 100 units traveled
   - Breadcrumb data: FVector location + timestamp
   - Store in BP_OverworldConvoy breadcrumb array
-- **BP_ConvoyMember** (Followers):
+- **BP_FC_ConvoyMember** (Followers):
   - AI controller retrieves next breadcrumb from parent convoy
   - MoveToLocation using breadcrumb position
   - OnMoveCompleted: Request next breadcrumb
@@ -1563,7 +1563,7 @@ IMC_FC_TopDown`
 **Architecture**:
 
 - **EConvoyMemberType** enum: Leader, Guard, SupplyWagon, Scout
-- **BP_ConvoyMember**:
+- **BP_FC_ConvoyMember**:
   - MemberType variable (EConvoyMemberType)
   - Struct for member properties (speed, collision size, POI detection radius)
   - ApplyMemberTypeSettings() method (called in BeginPlay)
@@ -1575,7 +1575,7 @@ IMC_FC_TopDown`
 
 1. Create EConvoyMemberType enum
 2. Create FConvoyMemberProperties struct (speed, size, detection radius, mesh ref)
-3. Add MemberType variable and properties map to BP_ConvoyMember
+3. Add MemberType variable and properties map to BP_FC_ConvoyMember
 4. Implement ApplyMemberTypeSettings method
 5. Update BP_OverworldConvoy Construction Script to spawn typed members
 6. Create unique meshes/materials for each type
