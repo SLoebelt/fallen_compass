@@ -38,13 +38,17 @@ void AFCOverworldConvoy::BeginPlay()
 	Super::BeginPlay();
 
 	UE_LOG(LogFCOverworldConvoy, Log, TEXT("OverworldConvoy %s: BeginPlay"), *GetName());
+
+	// Spawn convoy members at runtime
+	SpawnConvoyMembers();
 }
 
 void AFCOverworldConvoy::OnConstruction(const FTransform& Transform)
 {
 	Super::OnConstruction(Transform);
 
-	SpawnConvoyMembers();
+	// Note: Spawning moved to BeginPlay to avoid editor duplication
+	// OnConstruction spawns actors in editor, but they get destroyed at PIE start
 }
 
 void AFCOverworldConvoy::SpawnConvoyMembers()
@@ -62,6 +66,14 @@ void AFCOverworldConvoy::SpawnConvoyMembers()
 	UWorld* World = GetWorld();
 	if (!World)
 	{
+		UE_LOG(LogFCOverworldConvoy, Warning, TEXT("OverworldConvoy %s: No world context"), *GetName());
+		return;
+	}
+
+	// Check if ConvoyMemberClass is set
+	if (!ConvoyMemberClass)
+	{
+		UE_LOG(LogFCOverworldConvoy, Error, TEXT("OverworldConvoy %s: ConvoyMemberClass not set! Please set it in Blueprint."), *GetName());
 		return;
 	}
 
@@ -72,7 +84,7 @@ void AFCOverworldConvoy::SpawnConvoyMembers()
 
 	// Spawn leader
 	AFCConvoyMember* Leader = World->SpawnActor<AFCConvoyMember>(
-		AFCConvoyMember::StaticClass(),
+		ConvoyMemberClass,
 		LeaderSpawnPoint->GetComponentLocation(),
 		LeaderSpawnPoint->GetComponentRotation(),
 		SpawnParams
@@ -89,7 +101,7 @@ void AFCOverworldConvoy::SpawnConvoyMembers()
 
 	// Spawn follower 1
 	AFCConvoyMember* Follower1 = World->SpawnActor<AFCConvoyMember>(
-		AFCConvoyMember::StaticClass(),
+		ConvoyMemberClass,
 		Follower1SpawnPoint->GetComponentLocation(),
 		Follower1SpawnPoint->GetComponentRotation(),
 		SpawnParams
@@ -105,7 +117,7 @@ void AFCOverworldConvoy::SpawnConvoyMembers()
 
 	// Spawn follower 2
 	AFCConvoyMember* Follower2 = World->SpawnActor<AFCConvoyMember>(
-		AFCConvoyMember::StaticClass(),
+		ConvoyMemberClass,
 		Follower2SpawnPoint->GetComponentLocation(),
 		Follower2SpawnPoint->GetComponentRotation(),
 		SpawnParams

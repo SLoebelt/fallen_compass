@@ -2,7 +2,7 @@
 
 ## Updated Task 5: Convoy Actor System with AI Navigation
 
-**Purpose**: Create `BP_OverworldConvoy` as a parent actor containing multiple child convoy member actors, each with their own mesh and AI controller. The leader follows player commands via NavMesh, and followers use a breadcrumb system. The convoy manages camera constraints and POI overlap detection.
+**Purpose**: Create `BP_FC_OverworldConvoy` as a parent actor containing multiple child convoy member actors, each with their own mesh and AI controller. The leader follows player commands via NavMesh, and followers use a breadcrumb system. The convoy manages camera constraints and POI overlap detection.
 
 ---
 
@@ -10,7 +10,7 @@
 
 #### Core Components
 
-1. **AOverworldConvoy** (C++ Base Class) + **BP_OverworldConvoy** (Blueprint Child)
+1. **AOverworldConvoy** (C++ Base Class) + **BP_FC_OverworldConvoy** (Blueprint Child)
 
    - C++ base class handles:
      - Convoy member array (TArray<AConvoyMember\*>)
@@ -154,7 +154,7 @@ IMC_FC_TopDown`
 
     ```cpp
     #include "Characters/Convoy/ConvoyMember.h"
-    #include "World/OverworldConvoy.h"
+    #include "World/FCOverworldConvoy.h"
     #include "Components/CapsuleComponent.h"
 
     AConvoyMember::AConvoyMember()
@@ -321,29 +321,29 @@ IMC_FC_TopDown`
 
 ---
 
-### Step 5.4: Create BP_OverworldConvoy Parent Actor
+### Step 5.4: Create BP_FC_OverworldConvoy Parent Actor
 
 #### Step 5.4.1: Create C++ AOverworldConvoy Class
 
-- [ ] **Analysis**
+- [x] **Analysis**
 
-  - [ ] C++ base class inheriting from AActor
-  - [ ] Manages array of AConvoyMember pointers
-  - [ ] Handles member spawning and POI overlap aggregation
-  - [ ] Provides GetLeaderMember() and NotifyPOIOverlap() methods
-  - [ ] Blueprint child will configure spawn point locations
+  - [x] C++ base class inheriting from AActor
+  - [x] Manages array of AConvoyMember pointers
+  - [x] Handles member spawning and POI overlap aggregation
+  - [x] Provides GetLeaderMember() and NotifyPOIOverlap() methods
+  - [x] Blueprint child will configure spawn point locations
 
-- [ ] **Implementation (Visual Studio - OverworldConvoy.h)**
+- [x] **Implementation (Visual Studio - FCOverworldConvoy.h)**
 
-  - [ ] Create `Source/FC/World/OverworldConvoy.h`
-  - [ ] Add class declaration:
+  - [x] Create `Source/FC/Characters/Convoy/FCOverworldConvoy.h`
+  - [x] Add class declaration:
 
     ```cpp
     #pragma once
 
     #include "CoreMinimal.h"
     #include "GameFramework/Actor.h"
-    #include "OverworldConvoy.generated.h"
+    #include "FCOverworldConvoy.generated.h"
 
     class AConvoyMember;
     class USceneComponent;
@@ -351,12 +351,12 @@ IMC_FC_TopDown`
     DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnConvoyPOIOverlap, AActor*, POIActor);
 
     UCLASS()
-    class FC_API AOverworldConvoy : public AActor
+    class FC_API AFCOverworldConvoy : public AActor
     {
         GENERATED_BODY()
 
     public:
-        AOverworldConvoy();
+        AFCOverworldConvoy();
 
     protected:
         virtual void BeginPlay() override;
@@ -365,27 +365,31 @@ IMC_FC_TopDown`
     private:
         /** Array of convoy member actors */
         UPROPERTY()
-        TArray<TObjectPtr<AConvoyMember>> ConvoyMembers;
+        TArray<AFCConvoyMember*> ConvoyMembers;
 
         /** Reference to leader member */
         UPROPERTY()
-        TObjectPtr<AConvoyMember> LeaderMember;
+        AFCConvoyMember* LeaderMember;
+
+        /** Blueprint class to spawn for convoy members */
+        UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "FC|Convoy", meta = (AllowPrivateAccess = "true"))
+        TSubclassOf<AFCConvoyMember> ConvoyMemberClass;
 
         /** Blueprint-exposed spawn points */
         UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "FC|Convoy", meta = (AllowPrivateAccess = "true"))
-        TObjectPtr<USceneComponent> ConvoyRoot;
+        USceneComponent* ConvoyRoot;
 
         UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "FC|Convoy", meta = (AllowPrivateAccess = "true"))
-        TObjectPtr<USceneComponent> CameraAttachPoint;
+        USceneComponent* CameraAttachPoint;
 
         UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "FC|Convoy", meta = (AllowPrivateAccess = "true"))
-        TObjectPtr<USceneComponent> LeaderSpawnPoint;
+        USceneComponent* LeaderSpawnPoint;
 
         UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "FC|Convoy", meta = (AllowPrivateAccess = "true"))
-        TObjectPtr<USceneComponent> Follower1SpawnPoint;
+        USceneComponent* Follower1SpawnPoint;
 
         UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "FC|Convoy", meta = (AllowPrivateAccess = "true"))
-        TObjectPtr<USceneComponent> Follower2SpawnPoint;
+        USceneComponent* Follower2SpawnPoint;
 
         /** Spawn convoy members at spawn points */
         void SpawnConvoyMembers();
@@ -393,7 +397,7 @@ IMC_FC_TopDown`
     public:
         /** Get leader member reference */
         UFUNCTION(BlueprintCallable, Category = "FC|Convoy")
-        AConvoyMember* GetLeaderMember() const { return LeaderMember; }
+        AFCConvoyMember* GetLeaderMember() const { return LeaderMember; }
 
         /** Called by convoy members when they overlap a POI */
         UFUNCTION(BlueprintCallable, Category = "FC|Convoy")
@@ -405,20 +409,23 @@ IMC_FC_TopDown`
     };
     ```
 
-  - [ ] Save file
+  - [x] Save file
 
-- [ ] **Implementation (Visual Studio - OverworldConvoy.cpp)**
+- [x] **Implementation (Visual Studio - FCOverworldConvoy.cpp)**
 
-  - [ ] Create `Source/FC/World/OverworldConvoy.cpp`
-  - [ ] Add implementation:
+  - [x] Create `Source/FC/Characters/Convoy/FCOverworldConvoy.cpp`
+  - [x] Add implementation:
 
     ```cpp
-    #include "World/OverworldConvoy.h"
-    #include "Characters/Convoy/ConvoyMember.h"
+    #include "Characters/Convoy/FCOverworldConvoy.h"
+    #include "Characters/Convoy/FCConvoyMember.h"
     #include "Components/SceneComponent.h"
     #include "Engine/World.h"
+    #include "FC.h"
 
-    AOverworldConvoy::AOverworldConvoy()
+    DEFINE_LOG_CATEGORY_STATIC(LogFCOverworldConvoy, Log, All);
+
+    AFCOverworldConvoy::AFCOverworldConvoy()
     {
         PrimaryActorTick.bCanEverTick = false;
 
@@ -443,25 +450,28 @@ IMC_FC_TopDown`
         Follower2SpawnPoint->SetRelativeLocation(FVector(-300.0f, 0.0f, 0.0f));
     }
 
-    void AOverworldConvoy::BeginPlay()
+    void AFCOverworldConvoy::BeginPlay()
     {
         Super::BeginPlay();
 
-        // Attach camera to convoy (Blueprint will handle this)
-        UE_LOG(LogTemp, Log, TEXT("OverworldConvoy: BeginPlay"));
-    }
+        UE_LOG(LogFCOverworldConvoy, Log, TEXT("OverworldConvoy %s: BeginPlay"), *GetName());
 
-    void AOverworldConvoy::OnConstruction(const FTransform& Transform)
-    {
-        Super::OnConstruction(Transform);
-
+        // Spawn convoy members at runtime
         SpawnConvoyMembers();
     }
 
-    void AOverworldConvoy::SpawnConvoyMembers()
+    void AFCOverworldConvoy::OnConstruction(const FTransform& Transform)
+    {
+        Super::OnConstruction(Transform);
+
+        // Note: Spawning moved to BeginPlay to avoid editor duplication
+        // OnConstruction spawns actors in editor, but they get destroyed at PIE start
+    }
+
+    void AFCOverworldConvoy::SpawnConvoyMembers()
     {
         // Clear existing members
-        for (AConvoyMember* Member : ConvoyMembers)
+        for (AFCConvoyMember* Member : ConvoyMembers)
         {
             if (Member)
             {
@@ -473,16 +483,25 @@ IMC_FC_TopDown`
         UWorld* World = GetWorld();
         if (!World)
         {
+            UE_LOG(LogFCOverworldConvoy, Warning, TEXT("OverworldConvoy %s: No world context"), *GetName());
             return;
         }
 
-        // Spawn leader
+        // Check if ConvoyMemberClass is set
+        if (!ConvoyMemberClass)
+        {
+            UE_LOG(LogFCOverworldConvoy, Error, TEXT("OverworldConvoy %s: ConvoyMemberClass not set! Please set it in Blueprint."), *GetName());
+            return;
+        }
+
+        // Spawn parameters
         FActorSpawnParameters SpawnParams;
         SpawnParams.Owner = this;
         SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 
-        AConvoyMember* Leader = World->SpawnActor<AConvoyMember>(
-            AConvoyMember::StaticClass(),
+        // Spawn leader
+        AFCConvoyMember* Leader = World->SpawnActor<AFCConvoyMember>(
+            ConvoyMemberClass,
             LeaderSpawnPoint->GetComponentLocation(),
             LeaderSpawnPoint->GetComponentRotation(),
             SpawnParams
@@ -494,11 +513,12 @@ IMC_FC_TopDown`
             Leader->SetParentConvoy(this);
             LeaderMember = Leader;
             ConvoyMembers.Add(Leader);
+            UE_LOG(LogFCOverworldConvoy, Log, TEXT("OverworldConvoy %s: Spawned leader"), *GetName());
         }
 
         // Spawn follower 1
-        AConvoyMember* Follower1 = World->SpawnActor<AConvoyMember>(
-            AConvoyMember::StaticClass(),
+        AFCConvoyMember* Follower1 = World->SpawnActor<AFCConvoyMember>(
+            ConvoyMemberClass,
             Follower1SpawnPoint->GetComponentLocation(),
             Follower1SpawnPoint->GetComponentRotation(),
             SpawnParams
@@ -509,11 +529,12 @@ IMC_FC_TopDown`
             Follower1->AttachToComponent(Follower1SpawnPoint, FAttachmentTransformRules::SnapToTargetNotIncludingScale);
             Follower1->SetParentConvoy(this);
             ConvoyMembers.Add(Follower1);
+            UE_LOG(LogFCOverworldConvoy, Log, TEXT("OverworldConvoy %s: Spawned follower 1"), *GetName());
         }
 
         // Spawn follower 2
-        AConvoyMember* Follower2 = World->SpawnActor<AConvoyMember>(
-            AConvoyMember::StaticClass(),
+        AFCConvoyMember* Follower2 = World->SpawnActor<AFCConvoyMember>(
+            ConvoyMemberClass,
             Follower2SpawnPoint->GetComponentLocation(),
             Follower2SpawnPoint->GetComponentRotation(),
             SpawnParams
@@ -524,79 +545,98 @@ IMC_FC_TopDown`
             Follower2->AttachToComponent(Follower2SpawnPoint, FAttachmentTransformRules::SnapToTargetNotIncludingScale);
             Follower2->SetParentConvoy(this);
             ConvoyMembers.Add(Follower2);
+            UE_LOG(LogFCOverworldConvoy, Log, TEXT("OverworldConvoy %s: Spawned follower 2"), *GetName());
         }
 
-        UE_LOG(LogTemp, Log, TEXT("OverworldConvoy: Spawned %d members"), ConvoyMembers.Num());
+        UE_LOG(LogFCOverworldConvoy, Log, TEXT("OverworldConvoy %s: Spawned %d total members"), *GetName(), ConvoyMembers.Num());
     }
 
-    void AOverworldConvoy::NotifyPOIOverlap(AActor* POIActor)
+    void AFCOverworldConvoy::NotifyPOIOverlap(AActor* POIActor)
     {
         if (!POIActor)
         {
             return;
         }
 
-        // Get POI name (Blueprint interface call - simplified)
+        // Get POI name (simplified - will use interface later)
         FString POIName = POIActor->GetName();
 
-        UE_LOG(LogTemp, Log, TEXT("Convoy detected POI: %s"), *POIName);
-        GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Cyan, FString::Printf(TEXT("Convoy detected POI: %s"), *POIName));
+        UE_LOG(LogFCOverworldConvoy, Log, TEXT("Convoy %s detected POI: %s"), *GetName(), *POIName);
+
+        // Display on-screen message
+        if (GEngine)
+        {
+            GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Cyan,
+                FString::Printf(TEXT("Convoy detected POI: %s"), *POIName));
+        }
 
         // Broadcast event
         OnConvoyPOIOverlap.Broadcast(POIActor);
     }
     ```
 
-  - [ ] Save file
+  - [x] Save file
 
-- [ ] **Compilation**
+- [x] **Compilation**
 
-  - [ ] Build solution in Visual Studio
-  - [ ] Verify no compilation errors
-  - [ ] Check includes and forward declarations
+  - [x] Build solution in Visual Studio
+  - [x] Verify no compilation errors
+  - [x] Check includes and forward declarations
 
-- [ ] **Testing After Step 5.4.1** ✅ CHECKPOINT
-  - [ ] Compilation succeeds
-  - [ ] AOverworldConvoy class visible in Unreal Editor
-  - [ ] Can derive Blueprint from AOverworldConvoy
+- [x] **Testing After Step 5.4.1** ✅ CHECKPOINT
+  - [x] Compilation succeeds
+  - [x] AOverworldConvoy class visible in Unreal Editor
+  - [x] Can derive Blueprint from AOverworldConvoy
 
-**COMMIT POINT 5.4.1**: `git add Source/FC/World/OverworldConvoy.h Source/FC/World/OverworldConvoy.cpp && git commit -m "feat(convoy): Create C++ AOverworldConvoy base class"`
+**COMMIT POINT 5.4.1**: `git add Source/FC/Characters/Convoy/FCOverworldConvoy.h Source/FC/Characters/Convoy/FCOverworldConvoy.cpp && git commit -m "feat(convoy): Create C++ AOverworldConvoy base class"`
 
 ---
 
-#### Step 5.4.2: Create BP_OverworldConvoy Blueprint Child Class
+#### Step 5.4.2: Create BP_FC_OverworldConvoy Blueprint Child Class
 
-- [ ] **Analysis**
+- [x] **Analysis**
 
-  - [ ] Blueprint derived from AOverworldConvoy C++ class
-  - [ ] Member spawning already handled in C++ OnConstruction
-  - [ ] Blueprint can override spawn point locations if needed
-  - [ ] Will configure camera attachment in Event Graph
+  - [x] Blueprint derived from AOverworldConvoy C++ class
+  - [x] Member spawning already handled in C++ OnConstruction
+  - [x] Blueprint can override spawn point locations if needed
+  - [x] Will configure camera attachment in Event Graph
 
-- [ ] **Implementation (Unreal Editor)**
+- [x] **Implementation (Unreal Editor)**
 
-  - [ ] Content Browser → `/Game/FC/Characters/Convoy/Blueprints/`
-  - [ ] Right-click → Blueprint Class → Select **OverworldConvoy** (C++ class)
-  - [ ] Name: `BP_OverworldConvoy`
-  - [ ] Open BP_OverworldConvoy
-  - [ ] Components Panel:
-    - [ ] Verify hierarchy inherited from C++ class:
-      - [ ] ConvoyRoot (Root)
-      - [ ] CameraAttachPoint (child)
-      - [ ] LeaderSpawnPoint (child)
-      - [ ] Follower1SpawnPoint (child)
-      - [ ] Follower2SpawnPoint (child)
-    - [ ] Optionally adjust spawn point locations in Details panel
-  - [ ] Compile and save
+  - [x] Content Browser → `/Game/FC/Characters/Convoy/Blueprints/`
+  - [x] Right-click → Blueprint Class → Select **FCOverworldConvoy** (C++ class)
+  - [x] Name: `BP_FC_OverworldConvoy`
+  - [x] Open BP_FC_OverworldConvoy
+  - [x] Components Panel:
+    - [x] Verify hierarchy inherited from C++ class:
+      - [x] ConvoyRoot (Root)
+      - [x] CameraAttachPoint (child)
+      - [x] LeaderSpawnPoint (child)
+      - [x] Follower1SpawnPoint (child)
+      - [x] Follower2SpawnPoint (child)
+    - [x] Optionally adjust spawn point locations in Details panel
+  - [x] Class Defaults → FC|Convoy category:
+    - [x] Set **Convoy Member Class** to `BP_FC_ConvoyMember`
+    - [x] This tells C++ which Blueprint class to spawn at runtime
+  - [x] Compile and save
 
-- [ ] **Testing After Step 5.4.2** ✅ CHECKPOINT
-  - [ ] Blueprint compiles without errors
-  - [ ] Inherits from AOverworldConvoy C++ class
-  - [ ] Place in level viewport
-  - [ ] Verify 3 convoy members spawn automatically (C++ OnConstruction)
-  - [ ] Check World Outliner: Members appear as children
+- [x] **Testing After Step 5.4.2** ✅ CHECKPOINT
+  - [x] Blueprint compiles without errors
+  - [x] Inherits from AFCOverworldConvoy C++ class
+  - [x] Place in level viewport
+  - [x] Set Convoy Member Class property to BP_FC_ConvoyMember
+  - [x] PIE: Verify 3 convoy members spawn at runtime (C++ BeginPlay)
+  - [x] Check World Outliner: 3 members appear with meshes visible
+  - [x] Members have capsule collision and AI controllers
 
-**COMMIT POINT 5.4.2**: `git add Content/FC/Characters/Convoy/Blueprints/BP_OverworldConvoy.uasset && git commit -m "feat(convoy): Create BP_OverworldConvoy Blueprint child class"`
+**IMPLEMENTATION NOTES:**
+
+- C++ spawns members in `BeginPlay()` (not `OnConstruction()`) to avoid PIE destruction issues
+- C++ uses `ConvoyMemberClass` property (TSubclassOf<AFCConvoyMember>) to spawn Blueprint children
+- Must set `Convoy Member Class` in Blueprint Details panel to `BP_FC_ConvoyMember`
+- Spawning base C++ class directly shows no mesh; Blueprint child provides visual mesh
+
+**COMMIT POINT 5.4.2**: `git add Content/FC/Characters/Convoy/Blueprints/BP_FCOverworldConvoy.uasset && git commit -m "feat(convoy): Create BP_FC_OverworldConvoy Blueprint child class"`
 
 ---
 
@@ -611,7 +651,7 @@ IMC_FC_TopDown`
 
 - [ ] **Verification (Unreal Editor)**
 
-  - [ ] Open BP_OverworldConvoy
+  - [ ] Open BP_FC_OverworldConvoy
   - [ ] Verify NotifyPOIOverlap method visible in Blueprint (inherited from C++)
   - [ ] Verify OnConvoyPOIOverlap event dispatcher in Event Graph (My Blueprint panel)
   - [ ] No additional implementation needed
@@ -672,7 +712,7 @@ IMC_FC_TopDown`
     #include "NavigationSystem.h"
     #include "AIController.h"
     #include "GameFramework/Character.h"
-    #include "World/OverworldConvoy.h"
+    #include "World/FCOverworldConvoy.h"
     #include "Characters/Convoy/ConvoyMember.h"
     ```
   - [ ] Update BeginPlay to find convoy in level:
@@ -810,7 +850,7 @@ IMC_FC_TopDown`
 
 - [ ] **Verification (Unreal Editor)**
 
-  - [ ] Open BP_OverworldConvoy
+  - [ ] Open BP_FC_OverworldConvoy
   - [ ] Verify GetLeaderMember method visible in Blueprint (inherited from C++)
   - [ ] Test in Event Graph: Call GetLeaderMember → Print String with result
   - [ ] Remove test code after verification
@@ -872,7 +912,7 @@ IMC_FC_TopDown`
       }
       ```
   - [ ] **Option B: Blueprint Attachment (Simpler for Week 3)**
-    - [ ] Open BP_OverworldConvoy → Event Graph
+    - [ ] Open BP_FC_OverworldConvoy → Event Graph
     - [ ] Event BeginPlay:
       ```
       BeginPlay
@@ -889,7 +929,7 @@ IMC_FC_TopDown`
   - [ ] Camera follows convoy when it moves
   - [ ] No jittering or offset issues
 
-**COMMIT POINT 5.6.1**: `git add Content/FC/World/Blueprints/Pawns/BP_OverworldConvoy.uasset && git commit -m "feat(convoy): Attach camera to convoy CameraAttachPoint"`
+**COMMIT POINT 5.6.1**: `git add Content/FC/World/Blueprints/Pawns/BP_FCOverworldConvoy.uasset && git commit -m "feat(convoy): Attach camera to convoy CameraAttachPoint"`
 
 ---
 
@@ -917,7 +957,7 @@ IMC_FC_TopDown`
 
 ---
 
-### Step 5.7: Place BP_OverworldConvoy in L_Overworld
+### Step 5.7: Place BP_FC_OverworldConvoy in L_Overworld
 
 #### Step 5.7.1: Add Convoy to Level and Configure
 
@@ -931,11 +971,11 @@ IMC_FC_TopDown`
 
   - [ ] Open L_Overworld level
   - [ ] **Option A: Manual Placement**
-    - [ ] Drag BP_OverworldConvoy from Content Browser into viewport
+    - [ ] Drag BP_FC_OverworldConvoy from Content Browser into viewport
     - [ ] Position at PlayerStart location (X=0, Y=0, Z=100)
   - [ ] **Option B: Default Pawn Class (Recommended if convoy needs controller possession)**
     - [ ] Window → World Settings
-    - [ ] Game Mode → Default Pawn Class: BP_OverworldConvoy
+    - [ ] Game Mode → Default Pawn Class: BP_FC_OverworldConvoy
     - [ ] NOTE: This may conflict with controller not possessing pawn directly
     - [ ] For Week 3: Use Option A (manual placement, controller references convoy)
   - [ ] Save level
@@ -947,7 +987,7 @@ IMC_FC_TopDown`
   - [ ] Camera attaches to convoy
   - [ ] Level saves without errors
 
-**COMMIT POINT 5.7.1**: `git add Content/FC/World/Levels/L_Overworld.umap && git commit -m "feat(convoy): Place BP_OverworldConvoy in L_Overworld"`
+**COMMIT POINT 5.7.1**: `git add Content/FC/World/Levels/L_Overworld.umap && git commit -m "feat(convoy): Place BP_FC_OverworldConvoy in L_Overworld"`
 
 ---
 
@@ -1022,9 +1062,9 @@ IMC_FC_TopDown`
 - [ ] Left Mouse Button bound to IA_Interact in IMC_FC_TopDown
 - [ ] BP_FC_ConvoyMember character created with mesh, collision, AI controller support, and POI overlap detection
 - [ ] BP_FC_ConvoyAIController created with MoveTo method
-- [ ] BP_OverworldConvoy parent actor created with 3 child convoy members (leader + 2 followers)
+- [ ] BP_FC_OverworldConvoy parent actor created with 3 child convoy members (leader + 2 followers)
 - [ ] Convoy members spawn and attach correctly via Construction Script
-- [ ] POI overlap aggregation implemented in BP_OverworldConvoy
+- [ ] POI overlap aggregation implemented in BP_FC_OverworldConvoy
 - [ ] AFCOverworldPlayerController implements click-to-move for convoy leader
 - [ ] BP_OverworldCamera attached to convoy's CameraAttachPoint
 - [ ] Camera follows convoy smoothly during movement
@@ -1477,13 +1517,13 @@ IMC_FC_TopDown`
 - **BP_FC_ConvoyMember** (Leader):
   - Add Timer: Drop breadcrumb every 0.5 seconds or 100 units traveled
   - Breadcrumb data: FVector location + timestamp
-  - Store in BP_OverworldConvoy breadcrumb array
+  - Store in BP_FC_OverworldConvoy breadcrumb array
 - **BP_FC_ConvoyMember** (Followers):
   - AI controller retrieves next breadcrumb from parent convoy
   - MoveTo using breadcrumb position
   - OnMoveCompleted: Request next breadcrumb
   - Skip breadcrumbs if too close (formation spacing logic)
-- **BP_OverworldConvoy**:
+- **BP_FC_OverworldConvoy**:
   - Breadcrumb queue (TArray<FVector>)
   - GetNextBreadcrumb(int FollowerIndex) method
   - CleanupOldBreadcrumbs() method (removes breadcrumbs passed by last follower)
@@ -1491,7 +1531,7 @@ IMC_FC_TopDown`
 **Implementation Steps**:
 
 1. Add breadcrumb dropping to leader movement
-2. Create GetNextBreadcrumb method in BP_OverworldConvoy
+2. Create GetNextBreadcrumb method in BP_FC_OverworldConvoy
 3. Implement breadcrumb following in follower AI controllers
 4. Add formation spacing logic (distance checks)
 5. Implement breadcrumb cleanup system
@@ -1499,7 +1539,7 @@ IMC_FC_TopDown`
 
 **Modularity Notes**:
 
-- Breadcrumb system encapsulated in BP_OverworldConvoy
+- Breadcrumb system encapsulated in BP_FC_OverworldConvoy
 - Follower AI controller logic separate from leader logic
 - Configuration variables exposed for spacing, breadcrumb frequency
 
@@ -1520,7 +1560,7 @@ IMC_FC_TopDown`
 
 **Architecture**:
 
-- **BP_OverworldConvoy**:
+- **BP_FC_OverworldConvoy**:
   - CalculateConvoyBounds() method (returns bounding box of all members)
   - OnConvoyBoundsChanged event dispatcher
 - **BP_OverworldCamera**:
@@ -1531,7 +1571,7 @@ IMC_FC_TopDown`
 
 **Implementation Steps**:
 
-1. Create CalculateConvoyBounds in BP_OverworldConvoy (tick or timer-based)
+1. Create CalculateConvoyBounds in BP_FC_OverworldConvoy (tick or timer-based)
 2. Add OnConvoyBoundsChanged event dispatcher
 3. Subscribe camera to event in BeginPlay
 4. Implement dynamic spring arm length adjustment
@@ -1567,7 +1607,7 @@ IMC_FC_TopDown`
   - MemberType variable (EConvoyMemberType)
   - Struct for member properties (speed, collision size, POI detection radius)
   - ApplyMemberTypeSettings() method (called in BeginPlay)
-- **BP_OverworldConvoy**:
+- **BP_FC_OverworldConvoy**:
   - Convoy composition array: TArray<EConvoyMemberType> (e.g., [Leader, Guard, SupplyWagon])
   - Spawn members based on composition array
 
@@ -1577,7 +1617,7 @@ IMC_FC_TopDown`
 2. Create FConvoyMemberProperties struct (speed, size, detection radius, mesh ref)
 3. Add MemberType variable and properties map to BP_FC_ConvoyMember
 4. Implement ApplyMemberTypeSettings method
-5. Update BP_OverworldConvoy Construction Script to spawn typed members
+5. Update BP_FC_OverworldConvoy Construction Script to spawn typed members
 6. Create unique meshes/materials for each type
 7. Test convoy with mixed member types
 

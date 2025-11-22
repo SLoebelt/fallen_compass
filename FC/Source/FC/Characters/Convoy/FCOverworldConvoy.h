@@ -38,6 +38,10 @@ private:
 	UPROPERTY()
 	AFCConvoyMember* LeaderMember;
 
+	/** Blueprint class to spawn for convoy members */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "FC|Convoy", meta = (AllowPrivateAccess = "true"))
+	TSubclassOf<AFCConvoyMember> ConvoyMemberClass;
+
 	/** Root component for convoy hierarchy */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "FC|Convoy", meta = (AllowPrivateAccess = "true"))
 	USceneComponent* ConvoyRoot;
