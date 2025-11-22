@@ -79,8 +79,7 @@ Implement the first version of the 3D Overworld level with top-down camera contr
 
 - `/Content/FC/Input/Actions/IA_OverworldPan.uasset` - WASD camera panning (Axis2D)
 - `/Content/FC/Input/Actions/IA_OverworldZoom.uasset` - Mouse wheel zoom (Axis1D)
-- `/Content/FC/Input/Actions/IA_OverworldClickMove.uasset` - Left-click move command (Boolean)
-- `/Content/FC/Input/Actions/IA_OverworldInteract.uasset` - Right-click interaction (Boolean)
+- `/Content/FC/Input/Actions/IA_Interact.uasset` - Right-click interaction (Boolean)
 
 ### Files to Modify This Week
 
@@ -170,10 +169,10 @@ Week 3 Implementation Patterns Identified:
 To Create in Week 3:
 - L_Overworld level with terrain, lighting, NavMesh
 - BP_OverworldCamera actor with pan/zoom logic
-- AFCOverworldPlayerController C++ class
+- AFCPlayerController C++ class
 - BP_OverworldConvoy pawn with click-to-move
 - BP_OverworldPOI interaction stub
-- Input Actions: IA_OverworldPan, IA_OverworldZoom, IA_OverworldClickMove, IA_OverworldInteract
+- Input Actions: IA_OverworldPan, IA_OverworldZoom, IA_Click (existing), IA_Interact
 - IMC_FC_TopDown asset (bind input actions)
 ```
 
@@ -189,9 +188,9 @@ To Create in Week 3:
   - [x] §4.3 Separation of Concerns: PlayerController → Pawn (movement) → POI (interaction)
 
 - [x] **Naming Conventions Review** (`/Docs/UE_NamingConventions.md`)
-  - [x] C++ Classes: `AFCOverworldPlayerController`, `AFCOverworldPawn` (A prefix for Actors)
+  - [x] C++ Classes: `AFCPlayerController`, `AFCOverworldPawn` (A prefix for Actors)
   - [x] Blueprints: `BP_OverworldCamera`, `BP_OverworldConvoy`, `BP_OverworldPOI` (BP\_ prefix)
-  - [x] Input Actions: `IA_OverworldPan`, `IA_OverworldZoom`, `IA_OverworldClickMove`, `IA_OverworldInteract` (IA\_ prefix)
+  - [x] Input Actions: `IA_OverworldPan`, `IA_OverworldZoom`, `IA_Click` (existing), `IA_Interact` (IA\_ prefix)
   - [x] Input Mapping Context: `IMC_FC_TopDown` (already exists from Week 2)
   - [x] Level: `L_Overworld` (L\_ prefix)
   - [x] Folders: `/Source/FC/Core/` (controllers), `/Source/FC/World/` (pawns/actors), `/Content/FC/World/Levels/`, `/Content/FC/World/Blueprints/`
@@ -203,11 +202,11 @@ To Create in Week 3:
    ```cpp
    // FCOverworldPlayerController.h
    UCLASS()
-   class FC_API AFCOverworldPlayerController : public APlayerController
+   class FC_API AFCPlayerController : public APlayerController
    {
        GENERATED_BODY()
    public:
-       AFCOverworldPlayerController();
+       AFCPlayerController();
    protected:
        UPROPERTY()
        TObjectPtr<UFCInputManager> InputManager;
@@ -229,7 +228,7 @@ To Create in Week 3:
 - Blueprint exposure: Only BlueprintCallable on user-facing methods
 - Event-driven: Delegates over Tick (PrimaryActorTick.bCanEverTick = false)
 - Clean APIs: Small public interfaces, hide implementation
-- Naming: All FC-prefixed (AFCOverworldPlayerController), BP* for Blueprints, IA* for input actions
+- Naming: All FC-prefixed (AFCPlayerController), BP* for Blueprints, IA* for input actions
 - Folders match asset types per UE_NamingConventions.md structure
 
 ##### Step 1.0.3: Architecture Planning & Implementation Strategy
@@ -238,7 +237,7 @@ To Create in Week 3:
 
   ```
   C++ Classes:
-  1. AFCOverworldPlayerController (Source/FC/Core/)
+  1. AFCPlayerController (Source/FC/Core/)
      - Inherits: APlayerController
      - Purpose: Handle Overworld input (pan, zoom, click-move, interact)
      - Components: UFCInputManager (set to TopDown mode)
@@ -266,8 +265,8 @@ To Create in Week 3:
   Input Assets:
   5. IA_OverworldPan (Axis2D) - WASD camera movement
   6. IA_OverworldZoom (Axis1D) - Mouse wheel zoom
-  7. IA_OverworldClickMove (Boolean) - Left mouse button
-  8. IA_OverworldInteract (Boolean) - Right mouse button
+  7. IA_Click (Boolean, existing) - Left mouse button
+  8. IA_Interact (Boolean) - Right mouse button
   9. IMC_FC_TopDown (configure with above actions)
   ```
 
@@ -279,18 +278,18 @@ To Create in Week 3:
   2. Button calls UFCLevelManager::LoadLevel("L_Overworld")
   3. UFCTransitionManager fades out, OpenLevel loads L_Overworld
   4. L_Overworld Level Blueprint calls UFCGameStateManager::TransitionTo(Overworld_Travel)
-  5. AFCOverworldPlayerController::BeginPlay() sets InputManager to TopDown mode
+  5. AFCPlayerController::BeginPlay() sets InputManager to TopDown mode
   6. Camera possesses BP_OverworldCamera, player can pan/zoom
 
   Convoy Movement:
   1. Player left-clicks on ground
-  2. AFCOverworldPlayerController::HandleClickMoveInput() raycasts to world
+  2. AFCPlayerController::HandleClickMoveInput() raycasts to world
   3. Calls ControlledConvoy->SimpleMoveToLocation(HitLocation)
   4. BP_OverworldConvoy uses NavMesh pathfinding to move
 
   POI Interaction:
   1. Player right-clicks on BP_OverworldPOI
-  2. AFCOverworldPlayerController::HandleInteractInput() raycasts to actors
+  2. AFCPlayerController::HandleInteractInput() raycasts to actors
   3. Finds BP_OverworldPOI, calls OnRightClick()
   4. BP_OverworldPOI prints "Interact with [POIName]" to log
   ```
@@ -1069,13 +1068,13 @@ void AFCOverworldCamera::DrawDebugLimits() const
   - [x] Verify camera works in isolation before controller integration (Task 4)
   - [x] Test input actions, distance limiting, north lock, debug visualization
   - [x] Manually set PlayerPawn reference for testing
-  - **SKIPPED**: Cannot test camera pan/zoom without controller (AFCOverworldPlayerController)
+  - **SKIPPED**: Cannot test camera pan/zoom without controller (AFCPlayerController)
   - **REASON**: BP_FC_GameMode uses BP_FC_PlayerController which doesn't have TopDown input bindings
   - **RESOLUTION**: Implement Task 4 first to create controller that binds IA_OverworldPan/Zoom to camera methods
 
 **COMMIT POINT 3.3.4**: `git add Content/FC/World/Levels/Overworld/L_Overworld.umap && git commit -m "test(overworld): Verify BP_OverworldCamera functionality in L_Overworld"`
 
-**Note**: Proper camera spawning and PlayerPawn assignment will be handled by AFCOverworldPlayerController in Task 4. This step confirms the camera C++ logic works correctly in isolation.
+**Note**: Proper camera spawning and PlayerPawn assignment will be handled by AFCPlayerController in Task 4. This step confirms the camera C++ logic works correctly in isolation.
 
 **Architecture Note**: AFCOverworldCamera (C++) handles all core logic (input, math, distance limiting, north lock, Tick performance), while BP_OverworldCamera (Blueprint) provides designer-friendly parameter defaults and component configuration. This split maximizes maintainability and performance while keeping design iteration fast.
 
@@ -1087,7 +1086,7 @@ void AFCOverworldCamera::DrawDebugLimits() const
 
 ### Task 4: Overworld Player Controller & Input Context
 
-**Purpose**: ~~Create AFCOverworldPlayerController C++ class~~ **REVISED**: Enhance existing AFCPlayerController to bind Overworld input actions and use UFCCameraManager's BlendToTopDown() method.
+**Purpose**: ~~Create AFCPlayerController C++ class~~ **REVISED**: Enhance existing AFCPlayerController to bind Overworld input actions and use UFCCameraManager's BlendToTopDown() method.
 
 **Architecture Decision**: After reviewing Technical Documentation, UFCCameraManager already exists with placeholder BlendToTopDown(). We'll:
 
@@ -1540,437 +1539,28 @@ This follows the same pattern used for Office states (Office_Exploration, Office
 
 ---
 
-#### Step 5.1: Create Input Action for Click-to-Move
+#### Step 5.1: Add Left Mouse Button Binding to IMC_FC_TopDown
 
-##### Step 5.1.1: Create IA_OverworldClickMove Input Action
+- [x] **Analysis**
 
-- [ ] **Analysis**
+  - [x] Left Mouse Button key name in Enhanced Input: "LeftMouseButton"
+  - [x] Will bind to existing IA_Click action
+  - [x] No modifiers needed for simple click detection
 
-  - [ ] Review existing input actions (IA_Interact from Week 1 uses Boolean type)
-  - [ ] Click-to-move needs Boolean trigger (press detection, not hold)
-  - [ ] Will be bound to Left Mouse Button in IMC_FC_TopDown
+- [x] **Implementation (Unreal Editor)**
 
-- [ ] **Implementation (Unreal Editor)**
+  - [x] Open `/Game/FC/Input/Contexts/IMC_FC_TopDown`
+  - [x] Add Mapping: IA_Click
+  - [x] Add Key: **Left Mouse Button**
+    - [x] No modifiers needed
+  - [x] Save IMC_FC_TopDown
 
-- [ ] **Implementation (FCOverworldPlayerController.h)**
+- [x] **Testing After Step 5.1** ✅ CHECKPOINT
+  - [x] Left Mouse Button bound to IA_Click
+  - [x] IMC_FC_TopDown now has 3 mappings (Pan, Zoom, Interact)
+  - [x] Asset saves without errors
 
-  - [ ] Create file: `W:\GameDev\FallenCompass\FC\Source\FC\Core\FCOverworldPlayerController.h`
-  - [ ] Add header guards and includes:
-
-    ```cpp
-    #pragma once
-
-    #include "CoreMinimal.h"
-    #include "GameFramework/PlayerController.h"
-    #include "FCOverworldPlayerController.generated.h"
-
-    class UFCInputManager;
-    class ACameraActor;
-
-    DECLARE_LOG_CATEGORY_EXTERN(LogFCOverworldController, Log, All);
-    ```
-
-  - [ ] Define class:
-
-    ```cpp
-    /**
-     * Player controller for Overworld level with top-down camera control
-     * Uses UFCInputManager to switch to TopDown input mapping context
-     * Possesses BP_OverworldCamera for WASD pan and zoom functionality
-     */
-    UCLASS()
-    class FC_API AFCOverworldPlayerController : public APlayerController
-    {
-        GENERATED_BODY()
-
-    public:
-        AFCOverworldPlayerController();
-
-    protected:
-        virtual void BeginPlay() override;
-        virtual void SetupInputComponent() override;
-
-    private:
-        /** Input manager component (handles TopDown input context) */
-        UPROPERTY()
-        TObjectPtr<UFCInputManager> InputManager;
-
-        /** Reference to possessed camera actor */
-        UPROPERTY()
-        TObjectPtr<ACameraActor> OverworldCamera;
-    };
-    ```
-
-  - [ ] Save file
-
-- [ ] **Implementation (FCOverworldPlayerController.cpp)**
-
-  - [ ] Create file: `W:\GameDev\FallenCompass\FC\Source\FC\Core\FCOverworldPlayerController.cpp`
-  - [ ] Add includes:
-
-    ```cpp
-    #include "FCOverworldPlayerController.h"
-    #include "FC/Components/FCInputManager.h"
-    #include "Camera/CameraActor.h"
-    #include "Kismet/GameplayStatics.h"
-    #include "EnhancedInputSubsystems.h"
-    #include "EnhancedInputComponent.h"
-
-    DEFINE_LOG_CATEGORY(LogFCOverworldController);
-    ```
-
-  - [ ] Implement constructor:
-
-    ```cpp
-    AFCOverworldPlayerController::AFCOverworldPlayerController()
-    {
-        // Create Input Manager component
-        InputManager = CreateDefaultSubobject<UFCInputManager>(TEXT("InputManager"));
-
-        UE_LOG(LogFCOverworldController, Log, TEXT("AFCOverworldPlayerController: Constructor executed"));
-    }
-    ```
-
-  - [ ] Implement BeginPlay:
-
-    ```cpp
-    void AFCOverworldPlayerController::BeginPlay()
-    {
-        Super::BeginPlay();
-
-        // Switch to TopDown input mode
-        if (InputManager)
-        {
-            InputManager->SetInputMappingMode(EFCInputMappingMode::TopDown);
-            UE_LOG(LogFCOverworldController, Log, TEXT("BeginPlay: Switched to TopDown input mode"));
-        }
-        else
-        {
-            UE_LOG(LogFCOverworldController, Warning, TEXT("BeginPlay: InputManager is null!"));
-        }
-
-        // Find and possess BP_OverworldCamera in level
-        TArray<AActor*> FoundCameras;
-        UGameplayStatics::GetAllActorsOfClass(GetWorld(), ACameraActor::StaticClass(), FoundCameras);
-
-        for (AActor* Actor : FoundCameras)
-        {
-            if (Actor->GetName().Contains(TEXT("OverworldCamera")))
-            {
-                OverworldCamera = Cast<ACameraActor>(Actor);
-                SetViewTarget(OverworldCamera);
-                UE_LOG(LogFCOverworldController, Log, TEXT("BeginPlay: Possessed OverworldCamera: %s"), *Actor->GetName());
-                break;
-            }
-        }
-
-        if (!OverworldCamera)
-        {
-            UE_LOG(LogFCOverworldController, Warning, TEXT("BeginPlay: No OverworldCamera found in level!"));
-        }
-    }
-    ```
-
-  - [ ] Implement SetupInputComponent:
-
-    ```cpp
-    void AFCOverworldPlayerController::SetupInputComponent()
-    {
-        Super::SetupInputComponent();
-
-        // Input binding will be handled by BP_OverworldCamera responding to IA_OverworldPan/Zoom
-        // Controller just needs to ensure TopDown IMC is active (done in BeginPlay)
-
-        UE_LOG(LogFCOverworldController, Log, TEXT("SetupInputComponent: Input component initialized"));
-    }
-    ```
-
-  - [ ] Save file
-
-- [ ] **Testing After Step 4.1.1** ✅ CHECKPOINT
-  - [ ] Files created at correct paths
-  - [ ] No syntax errors in IDE
-  - [ ] Ready to compile (will compile in next step)
-
-**COMMIT POINT 4.1.1**: `git add Source/FC/Core/FCOverworldPlayerController.h Source/FC/Core/FCOverworldPlayerController.cpp && git commit -m "feat(overworld): Create AFCOverworldPlayerController C++ class"`
-
----
-
-##### Step 4.1.2: Add to Build Configuration and Compile
-
-- [ ] **Analysis**
-
-  - [ ] Verify FC.Build.cs includes necessary modules (EnhancedInput, AIModule for NavMesh)
-  - [ ] Check if Live Coding is enabled for hot reload
-
-- [ ] **Implementation (FC.Build.cs)**
-
-  - [ ] Open `W:\GameDev\FallenCompass\FC\Source\FC\FC.Build.cs`
-  - [ ] Verify PublicDependencyModuleNames includes:
-    ```csharp
-    PublicDependencyModuleNames.AddRange(new string[] {
-        "Core",
-        "CoreUObject",
-        "Engine",
-        "InputCore",
-        "EnhancedInput",
-        "AIModule",  // For NavMesh pathfinding
-        "NavigationSystem",  // For navigation queries
-        "UMG"  // For UI widgets
-    });
-    ```
-  - [ ] If AIModule or NavigationSystem missing, add them
-  - [ ] Save FC.Build.cs
-
-- [ ] **Compilation**
-
-  - [ ] Close Unreal Editor (if open)
-  - [ ] Open Visual Studio solution (`FC.sln`)
-  - [ ] Build Solution (Ctrl+Shift+B or Build → Build Solution)
-  - [ ] Check Output window for compilation success
-  - [ ] Verify no errors or warnings for FCOverworldPlayerController
-
-- [ ] **Testing After Step 4.1.2** ✅ CHECKPOINT
-  - [ ] Compilation succeeds without errors
-  - [ ] No linker errors
-  - [ ] FC.Build.cs includes AIModule and NavigationSystem
-  - [ ] Can open Unreal Editor without crashes
-
-**COMMIT POINT 4.1.2**: `git add Source/FC/FC.Build.cs && git commit -m "build(overworld): Add AIModule and NavigationSystem to FC.Build.cs"`
-
----
-
-#### Step 4.2: Create BP_FCOverworldPlayerController Blueprint
-
-##### Step 4.2.1: Create Blueprint Derived from C++ Class
-
-- [ ] **Analysis**
-
-  - [ ] Check AFCPlayerController has BP_FC_PlayerController Blueprint counterpart
-  - [ ] Follow same pattern: C++ base class with Blueprint for editor configuration
-  - [ ] Confirm folder: `/Content/FC/Core/` (same as other controller Blueprints)
-
-- [ ] **Implementation (Unreal Editor)**
-
-  - [ ] Content Browser → `/Game/FC/Core/`
-  - [ ] Right-click → Blueprint Class → All Classes → search "FCOverworldPlayerController"
-  - [ ] Select AFCOverworldPlayerController as parent class
-  - [ ] Name: `BP_FCOverworldPlayerController`
-  - [ ] Open BP_FCOverworldPlayerController
-  - [ ] Class Defaults panel:
-    - [ ] Verify InputManager component visible in Components list
-  - [ ] Compile and save Blueprint
-
-- [ ] **Testing After Step 4.2.1** ✅ CHECKPOINT
-  - [ ] Blueprint compiles without errors
-  - [ ] InputManager component visible in hierarchy
-  - [ ] Asset saved at correct path
-  - [ ] Can place in level (test, then remove)
-
-**COMMIT POINT 4.2.1**: `git add Content/FC/Core/BP_FCOverworldPlayerController.uasset && git commit -m "feat(overworld): Create BP_FCOverworldPlayerController Blueprint"`
-
----
-
-##### Step 4.2.2: Configure InputManager Component in Blueprint
-
-- [ ] **Analysis**
-
-  - [ ] Review BP_FC_PlayerController InputManager configuration from Week 2
-  - [ ] InputManager needs IMC_FC_TopDown assigned to TopDownMappingContext property
-
-- [ ] **Implementation (BP_FCOverworldPlayerController)**
-
-  - [ ] Open BP_FCOverworldPlayerController
-  - [ ] Select InputManager component in Components panel
-  - [ ] Details panel → FC | Input | Contexts:
-    - [ ] Set TopDownMappingContext: `/Game/FC/Input/Contexts/IMC_FC_TopDown`
-    - [ ] Leave other contexts (FirstPerson, Fight, StaticScene) as None (not used in Overworld)
-  - [ ] Details panel → FC | Input | Settings:
-    - [ ] DefaultMappingPriority: 0 (default)
-  - [ ] Compile and save
-
-- [ ] **Testing After Step 4.2.2** ✅ CHECKPOINT
-  - [ ] TopDownMappingContext assigned to IMC_FC_TopDown
-  - [ ] Blueprint compiles without errors
-  - [ ] No "None" warnings for TopDownMappingContext
-
-**COMMIT POINT 4.2.2**: `git add Content/FC/Core/BP_FCOverworldPlayerController.uasset && git commit -m "feat(overworld): Configure InputManager TopDown context in BP_FCOverworldPlayerController"`
-
----
-
-#### Step 4.3: Assign BP_FCOverworldPlayerController to L_Overworld
-
-##### Step 4.3.1: Set PlayerController Override in World Settings
-
-- [ ] **Analysis**
-
-  - [ ] Check L_Office World Settings for PlayerController configuration pattern
-  - [ ] Confirm BP_FCOverworldPlayerController will be used only in L_Overworld
-
-- [ ] **Implementation (Unreal Editor)**
-
-  - [ ] Open L_Overworld level
-  - [ ] Window → World Settings
-  - [ ] Game Mode section → Find "Player Controller Class"
-  - [ ] Set Player Controller Class: BP_FCOverworldPlayerController
-  - [ ] Save level
-
-- [ ] **Testing After Step 4.3.1** ✅ CHECKPOINT
-  - [ ] World Settings shows BP_FCOverworldPlayerController
-  - [ ] Level saves without errors
-  - [ ] PIE in L_Overworld spawns correct controller
-
-**COMMIT POINT 4.3.1**: `git add Content/FC/World/Levels/L_Overworld.umap && git commit -m "feat(overworld): Assign BP_FCOverworldPlayerController to L_Overworld World Settings"`
-
----
-
-#### Step 4.4: Place BP_OverworldCamera in L_Overworld
-
-##### Step 4.4.1: Add Camera to Level and Position
-
-- [ ] **Analysis**
-
-  - [ ] Camera should be placed at CameraStart_Overworld marker location (from Task 2.4)
-  - [ ] Camera will be auto-possessed by AFCOverworldPlayerController::BeginPlay()
-
-- [ ] **Implementation (Unreal Editor)**
-
-  - [ ] Open L_Overworld level
-  - [ ] Drag BP_OverworldCamera from Content Browser into viewport
-  - [ ] Position at CameraStart_Overworld location (or manually set):
-    - [ ] Location: X=-1000, Y=0, Z=1500
-    - [ ] Rotation: Pitch=-70, Yaw=0, Roll=0
-  - [ ] Rename instance to: `BP_OverworldCamera_Instance` (or leave as default "BP_OverworldCamera")
-  - [ ] Details panel:
-    - [ ] Auto Activate: True (ensure camera is active)
-  - [ ] Save level
-
-- [ ] **Testing After Step 4.4.1** ✅ CHECKPOINT
-  - [ ] Camera visible in viewport at correct position
-  - [ ] Camera looking down at PlayerStart location
-  - [ ] Level saves without errors
-
-**COMMIT POINT 4.4.1**: `git add Content/FC/World/Levels/L_Overworld.umap && git commit -m "feat(overworld): Place BP_OverworldCamera in L_Overworld level"`
-
----
-
-#### Step 4.5: Test Input Context Switching
-
-##### Step 4.5.1: Full Overworld Input Test
-
-- [ ] **Analysis**
-
-  - [ ] Test that TopDown input context activates correctly
-  - [ ] Verify WASD pans camera and mouse wheel zooms
-  - [ ] Check Output Log for InputManager and controller logs
-
-- [ ] **Test Sequence**
-
-  - [ ] Open L_Overworld in editor
-  - [ ] PIE (Play In Editor)
-  - [ ] Check Output Log for:
-    - [ ] "AFCOverworldPlayerController: Constructor executed"
-    - [ ] "BeginPlay: Switched to TopDown input mode"
-    - [ ] "BeginPlay: Possessed OverworldCamera: [camera name]"
-    - [ ] UFCInputManager log: "SetInputMappingMode: TopDown"
-  - [ ] Test WASD keys:
-    - [ ] Press W → Camera pans forward (Y positive)
-    - [ ] Press S → Camera pans backward (Y negative)
-    - [ ] Press A → Camera pans left (X negative)
-    - [ ] Press D → Camera pans right (X positive)
-  - [ ] Test Mouse Wheel:
-    - [ ] Scroll up → Camera zooms in (height decreases or spring arm shortens)
-    - [ ] Scroll down → Camera zooms out (height increases or spring arm lengthens)
-    - [ ] Verify zoom stops at min/max limits
-  - [ ] Test ESC key (should open pause menu from Week 2):
-    - [ ] Press ESC → Pause menu appears
-    - [ ] Resume → Returns to Overworld
-  - [ ] Document any issues in "Known Issues & Backlog"
-
-- [ ] **Testing After Step 4.5.1** ✅ CHECKPOINT
-  - [ ] TopDown input context active (logs confirm)
-  - [ ] WASD pans camera smoothly
-  - [ ] Mouse wheel zooms correctly with limits
-  - [ ] ESC opens pause menu (if integrated)
-  - [ ] No "Accessed None" errors
-  - [ ] No input binding warnings
-
-**COMMIT POINT 4.5.1**: `git add -A && git commit -m "test(overworld): Verify TopDown input context and camera controls in L_Overworld"`
-
----
-
-### Task 4 Acceptance Criteria
-
-- [ ] AFCOverworldPlayerController C++ class created and compiles successfully
-- [ ] BP_FCOverworldPlayerController Blueprint created with InputManager component
-- [ ] InputManager configured with IMC_FC_TopDown in TopDownMappingContext slot
-- [ ] BP_FCOverworldPlayerController assigned to L_Overworld World Settings
-- [ ] BP_OverworldCamera placed in L_Overworld and auto-possessed
-- [ ] PIE in L_Overworld switches to TopDown input mode (confirmed in logs)
-- [ ] WASD pans camera correctly
-- [ ] Mouse wheel zooms camera with min/max limits
-- [ ] No compilation errors or Blueprint errors
-- [ ] All assets saved in correct folders
-
-**Task 4 complete. Ready for Task 5 sub-tasks (Convoy Pawn & Click-to-Move)? Respond with 'Go' to continue.**
-
----
-
-### Task 5: Convoy Pawn & Click-to-Move Pathfinding
-
-**Purpose**: Create BP_OverworldConvoy pawn with left-click movement using NavMesh pathfinding via SimpleMoveToLocation().
-
----
-
-#### Step 5.1: Create Input Action for Click-to-Move
-
-##### Step 5.1.1: Create IA_OverworldClickMove Input Action
-
-- [ ] **Analysis**
-
-  - [ ] Review existing input actions (IA_Interact from Week 1 uses Boolean type)
-  - [ ] Click-to-move needs Boolean trigger (press detection, not hold)
-  - [ ] Will be bound to Left Mouse Button in IMC_FC_TopDown
-
-- [ ] **Implementation (Unreal Editor)**
-
-  - [ ] Content Browser → `/Game/FC/Input/Actions/`
-  - [ ] Right-click → Input → Input Action
-  - [ ] Name: `IA_OverworldClickMove`
-  - [ ] Open IA_OverworldClickMove
-  - [ ] Set Value Type: Digital (bool)
-  - [ ] Save asset
-
-- [ ] **Testing After Step 5.1.1** ✅ CHECKPOINT
-  - [ ] Asset created at correct path
-  - [ ] Value Type set to Digital (bool)
-  - [ ] Asset saves without errors
-
-**COMMIT POINT 5.1.1**: `git add Content/FC/Input/Actions/IA_OverworldClickMove.uasset && git commit -m "feat(overworld): Create IA_OverworldClickMove input action"`
-
----
-
-##### Step 5.1.2: Add Left Mouse Button Binding to IMC_FC_TopDown
-
-- [ ] **Analysis**
-
-  - [ ] Left Mouse Button key name in Enhanced Input: "LeftMouseButton"
-  - [ ] No modifiers needed for simple click detection
-
-- [ ] **Implementation (Unreal Editor)**
-
-  - [ ] Open `/Game/FC/Input/Contexts/IMC_FC_TopDown`
-  - [ ] Add Mapping: IA_OverworldClickMove
-  - [ ] Add Key: **Left Mouse Button**
-    - [ ] No modifiers needed
-  - [ ] Save IMC_FC_TopDown
-
-- [ ] **Testing After Step 5.1.2** ✅ CHECKPOINT
-  - [ ] Left Mouse Button bound to IA_OverworldClickMove
-  - [ ] IMC_FC_TopDown now has 3 mappings (Pan, Zoom, ClickMove)
-  - [ ] Asset saves without errors
-
-**COMMIT POINT 5.1.2**: `git add Content/FC/Input/Contexts/IMC_FC_TopDown.uasset && git commit -m "feat(overworld): Add left mouse button binding for click-to-move in IMC_FC_TopDown"`
+**COMMIT POINT 5.1**: `git add Content/FC/Input/Contexts/IMC_FC_TopDown.uasset && git commit -m "feat(overworld): Add left mouse button binding for click-to-move in IMC_FC_TopDown"`
 
 ---
 
@@ -2018,11 +1608,11 @@ This follows the same pattern used for Office states (Office_Exploration, Office
 
 #### Step 5.3: Implement Click-to-Move Logic in Controller
 
-##### Step 5.3.1: Add Click-to-Move Handler to AFCOverworldPlayerController
+##### Step 5.3.1: Add Click-to-Move Handler to AFCPlayerController
 
 - [ ] **Analysis**
 
-  - [ ] Controller needs to handle IA_OverworldClickMove input
+  - [ ] Controller needs to handle IA_Click input
   - [ ] On click: Raycast from mouse position to world, move pawn to hit location
   - [ ] Use AI MoveTo functions: SimpleMoveToLocation() or AIController methods
 
@@ -2058,7 +1648,7 @@ This follows the same pattern used for Office states (Office_Exploration, Office
   - [ ] Update SetupInputComponent():
 
     ```cpp
-    void AFCOverworldPlayerController::SetupInputComponent()
+    void AFCPlayerController::SetupInputComponent()
     {
         Super::SetupInputComponent();
 
@@ -2066,7 +1656,7 @@ This follows the same pattern used for Office states (Office_Exploration, Office
         UEnhancedInputComponent* EnhancedInput = Cast<UEnhancedInputComponent>(InputComponent);
         if (EnhancedInput && ClickMoveAction)
         {
-            EnhancedInput->BindAction(ClickMoveAction, ETriggerEvent::Started, this, &AFCOverworldPlayerController::HandleClickMove);
+            EnhancedInput->BindAction(ClickMoveAction, ETriggerEvent::Started, this, &AFCPlayerController::HandleClickMove);
             UE_LOG(LogFCOverworldController, Log, TEXT("SetupInputComponent: Bound ClickMoveAction"));
         }
         else
@@ -2079,7 +1669,7 @@ This follows the same pattern used for Office states (Office_Exploration, Office
   - [ ] Implement HandleClickMove():
 
     ```cpp
-    void AFCOverworldPlayerController::HandleClickMove()
+    void AFCPlayerController::HandleClickMove()
     {
         // Get mouse cursor hit result
         FHitResult HitResult;
@@ -2144,7 +1734,7 @@ This follows the same pattern used for Office states (Office_Exploration, Office
   - [ ] HandleClickMove() method added correctly
   - [ ] Can open Unreal Editor
 
-**COMMIT POINT 5.3.1**: `git add Source/FC/Core/FCOverworldPlayerController.h Source/FC/Core/FCOverworldPlayerController.cpp && git commit -m "feat(overworld): Implement click-to-move pathfinding in AFCOverworldPlayerController"`
+**COMMIT POINT 5.3.1**: `git add Source/FC/Core/FCOverworldPlayerController.h Source/FC/Core/FCOverworldPlayerController.cpp && git commit -m "feat(overworld): Implement click-to-move pathfinding in AFCPlayerController"`
 
 ---
 
@@ -2152,22 +1742,22 @@ This follows the same pattern used for Office states (Office_Exploration, Office
 
 - [ ] **Analysis**
 
-  - [ ] ClickMoveAction property needs IA_OverworldClickMove assigned in Blueprint
+  - [ ] ClickMoveAction property needs IA_Click assigned in Blueprint
   - [ ] Follow same pattern as other input actions in BP_FC_PlayerController
 
 - [ ] **Implementation (Unreal Editor)**
 
   - [ ] Open BP_FCOverworldPlayerController
   - [ ] Class Defaults → FC | Input | Actions:
-    - [ ] Set ClickMoveAction: `/Game/FC/Input/Actions/IA_OverworldClickMove`
+    - [ ] Set ClickMoveAction: `/Game/FC/Input/Actions/IA_Click`
   - [ ] Compile and save
 
 - [ ] **Testing After Step 5.3.2** ✅ CHECKPOINT
-  - [ ] ClickMoveAction assigned to IA_OverworldClickMove
+  - [ ] ClickMoveAction assigned to IA_Click
   - [ ] Blueprint compiles without errors
   - [ ] No "None" warnings for ClickMoveAction
 
-**COMMIT POINT 5.3.2**: `git add Content/FC/Core/BP_FCOverworldPlayerController.uasset && git commit -m "feat(overworld): Assign IA_OverworldClickMove to ClickMoveAction in BP_FCOverworldPlayerController"`
+**COMMIT POINT 5.3.2**: `git add Content/FC/Core/BP_FCOverworldPlayerController.uasset && git commit -m "feat(overworld): Assign IA_Click to ClickMoveAction in BP_FCOverworldPlayerController"`
 
 ---
 
@@ -2248,11 +1838,10 @@ This follows the same pattern used for Office states (Office_Exploration, Office
 
 ### Task 5 Acceptance Criteria
 
-- [ ] IA_OverworldClickMove input action created (Digital/Boolean)
-- [ ] Left Mouse Button bound to IA_OverworldClickMove in IMC_FC_TopDown
+- [ ] Left Mouse Button bound to IA_Click in IMC_FC_TopDown
 - [ ] BP_OverworldConvoy pawn created with CapsuleComponent, mesh, and FloatingPawnMovement
-- [ ] AFCOverworldPlayerController implements HandleClickMove() with NavMesh pathfinding
-- [ ] ClickMoveAction assigned to IA_OverworldClickMove in BP_FCOverworldPlayerController
+- [ ] AFCPlayerController implements HandleClickMove() with NavMesh pathfinding
+- [ ] ClickMoveAction assigned to IA_Click in BP_FCOverworldPlayerController
 - [ ] BP_OverworldConvoy placed in L_Overworld and set as default pawn
 - [ ] Left-click on ground moves convoy to location using SimpleMoveToLocation()
 - [ ] Convoy follows NavMesh pathfinding (visible with `P` key)
@@ -2272,7 +1861,7 @@ This follows the same pattern used for Office states (Office_Exploration, Office
 
 #### Step 6.1: Create Input Action for POI Interaction
 
-##### Step 6.1.1: Create IA_OverworldInteractPOI Input Action
+##### Step 6.1.1: Create IA_InteractPOI Input Action
 
 - [ ] **Analysis**
 
@@ -2284,8 +1873,8 @@ This follows the same pattern used for Office states (Office_Exploration, Office
 
   - [ ] Content Browser → `/Game/FC/Input/Actions/`
   - [ ] Right-click → Input → Input Action
-  - [ ] Name: `IA_OverworldInteractPOI`
-  - [ ] Open IA_OverworldInteractPOI
+  - [ ] Name: `IA_InteractPOI`
+  - [ ] Open IA_InteractPOI
   - [ ] Set Value Type: Digital (bool)
   - [ ] Save asset
 
@@ -2294,7 +1883,7 @@ This follows the same pattern used for Office states (Office_Exploration, Office
   - [ ] Value Type set to Digital (bool)
   - [ ] Asset saves without errors
 
-**COMMIT POINT 6.1.1**: `git add Content/FC/Input/Actions/IA_OverworldInteractPOI.uasset && git commit -m "feat(overworld): Create IA_OverworldInteractPOI input action"`
+**COMMIT POINT 6.1.1**: `git add Content/FC/Input/Actions/IA_InteractPOI.uasset && git commit -m "feat(overworld): Create IA_InteractPOI input action"`
 
 ---
 
@@ -2308,13 +1897,13 @@ This follows the same pattern used for Office states (Office_Exploration, Office
 - [ ] **Implementation (Unreal Editor)**
 
   - [ ] Open `/Game/FC/Input/Contexts/IMC_FC_TopDown`
-  - [ ] Add Mapping: IA_OverworldInteractPOI
+  - [ ] Add Mapping: IA_InteractPOI
   - [ ] Add Key: **Right Mouse Button**
     - [ ] No modifiers needed
   - [ ] Save IMC_FC_TopDown
 
 - [ ] **Testing After Step 6.1.2** ✅ CHECKPOINT
-  - [ ] Right Mouse Button bound to IA_OverworldInteractPOI
+  - [ ] Right Mouse Button bound to IA_InteractPOI
   - [ ] IMC_FC_TopDown now has 4 mappings (Pan, Zoom, ClickMove, InteractPOI)
   - [ ] Asset saves without errors
 
@@ -2445,11 +2034,11 @@ This follows the same pattern used for Office states (Office_Exploration, Office
 
 ---
 
-##### Step 6.3.2: Add POI Interaction Handler to AFCOverworldPlayerController
+##### Step 6.3.2: Add POI Interaction Handler to AFCPlayerController
 
 - [ ] **Analysis**
 
-  - [ ] Controller needs to handle IA_OverworldInteractPOI input
+  - [ ] Controller needs to handle IA_InteractPOI input
   - [ ] On right-click: Raycast from mouse position, check if hit actor implements interface
   - [ ] If valid POI: Call OnPOIInteract() interface method
 
@@ -2475,7 +2064,7 @@ This follows the same pattern used for Office states (Office_Exploration, Office
   - [ ] Update SetupInputComponent():
 
     ```cpp
-    void AFCOverworldPlayerController::SetupInputComponent()
+    void AFCPlayerController::SetupInputComponent()
     {
         Super::SetupInputComponent();
 
@@ -2484,7 +2073,7 @@ This follows the same pattern used for Office states (Office_Exploration, Office
         // Bind POI interaction action
         if (EnhancedInput && InteractPOIAction)
         {
-            EnhancedInput->BindAction(InteractPOIAction, ETriggerEvent::Started, this, &AFCOverworldPlayerController::HandleInteractPOI);
+            EnhancedInput->BindAction(InteractPOIAction, ETriggerEvent::Started, this, &AFCPlayerController::HandleInteractPOI);
             UE_LOG(LogFCOverworldController, Log, TEXT("SetupInputComponent: Bound InteractPOIAction"));
         }
         else
@@ -2497,7 +2086,7 @@ This follows the same pattern used for Office states (Office_Exploration, Office
   - [ ] Implement HandleInteractPOI():
 
     ```cpp
-    void AFCOverworldPlayerController::HandleInteractPOI()
+    void AFCPlayerController::HandleInteractPOI()
     {
         // Get mouse cursor hit result
         FHitResult HitResult;
@@ -2548,7 +2137,7 @@ This follows the same pattern used for Office states (Office_Exploration, Office
   - [ ] Interface call syntax correct
   - [ ] Can open Unreal Editor
 
-**COMMIT POINT 6.3.2**: `git add Source/FC/Core/FCOverworldPlayerController.h Source/FC/Core/FCOverworldPlayerController.cpp && git commit -m "feat(overworld): Implement POI interaction handler in AFCOverworldPlayerController"`
+**COMMIT POINT 6.3.2**: `git add Source/FC/Core/FCOverworldPlayerController.h Source/FC/Core/FCOverworldPlayerController.cpp && git commit -m "feat(overworld): Implement POI interaction handler in AFCPlayerController"`
 
 ---
 
@@ -2556,22 +2145,22 @@ This follows the same pattern used for Office states (Office_Exploration, Office
 
 - [ ] **Analysis**
 
-  - [ ] InteractPOIAction property needs IA_OverworldInteractPOI assigned in Blueprint
+  - [ ] InteractPOIAction property needs IA_InteractPOI assigned in Blueprint
   - [ ] Follow same pattern as ClickMoveAction
 
 - [ ] **Implementation (Unreal Editor)**
 
   - [ ] Open BP_FCOverworldPlayerController
   - [ ] Class Defaults → FC | Input | Actions:
-    - [ ] Set InteractPOIAction: `/Game/FC/Input/Actions/IA_OverworldInteractPOI`
+    - [ ] Set InteractPOIAction: `/Game/FC/Input/Actions/IA_InteractPOI`
   - [ ] Compile and save
 
 - [ ] **Testing After Step 6.3.3** ✅ CHECKPOINT
-  - [ ] InteractPOIAction assigned to IA_OverworldInteractPOI
+  - [ ] InteractPOIAction assigned to IA_InteractPOI
   - [ ] Blueprint compiles without errors
   - [ ] No "None" warnings for InteractPOIAction
 
-**COMMIT POINT 6.3.3**: `git add Content/FC/Core/BP_FCOverworldPlayerController.uasset && git commit -m "feat(overworld): Assign IA_OverworldInteractPOI to InteractPOIAction in BP_FCOverworldPlayerController"`
+**COMMIT POINT 6.3.3**: `git add Content/FC/Core/BP_FCOverworldPlayerController.uasset && git commit -m "feat(overworld): Assign IA_InteractPOI to InteractPOIAction in BP_FCOverworldPlayerController"`
 
 ---
 
@@ -2666,14 +2255,14 @@ This follows the same pattern used for Office states (Office_Exploration, Office
 
 ### Task 6 Acceptance Criteria
 
-- [ ] IA_OverworldInteractPOI input action created (Digital/Boolean)
-- [ ] Right Mouse Button bound to IA_OverworldInteractPOI in IMC_FC_TopDown
+- [ ] IA_InteractPOI input action created (Digital/Boolean)
+- [ ] Right Mouse Button bound to IA_InteractPOI in IMC_FC_TopDown
 - [ ] BP_OverworldPOI actor created with mesh, InteractionBox (Block Visibility), and POIName property
 - [ ] BPI_InteractablePOI interface created with OnPOIInteract() and GetPOIName() methods
 - [ ] BP_OverworldPOI implements BPI_InteractablePOI interface
 - [ ] OnPOIInteract() displays Print String message with POI name (stub)
-- [ ] AFCOverworldPlayerController implements HandleInteractPOI() with raycast and interface check
-- [ ] InteractPOIAction assigned to IA_OverworldInteractPOI in BP_FCOverworldPlayerController
+- [ ] AFCPlayerController implements HandleInteractPOI() with raycast and interface check
+- [ ] InteractPOIAction assigned to IA_InteractPOI in BP_FCOverworldPlayerController
 - [ ] 3-5 POI instances placed in L_Overworld with unique names
 - [ ] Right-click on POI shows on-screen message and logs interaction
 - [ ] Right-click on non-POI actors/ground does not trigger POI interaction
@@ -2871,7 +2460,7 @@ This follows the same pattern used for Office states (Office_Exploration, Office
     - [ ] On-screen UI button
   - [ ] For Week 3: Debug key is fastest (Task 8 will add proper pause menu)
 
-- [ ] **Implementation (AFCOverworldPlayerController)**
+- [ ] **Implementation (AFCPlayerController)**
 
   - [ ] Open `FCOverworldPlayerController.h`
   - [ ] Add method declaration:
@@ -2884,14 +2473,14 @@ This follows the same pattern used for Office states (Office_Exploration, Office
   - [ ] Update SetupInputComponent():
 
     ```cpp
-    void AFCOverworldPlayerController::SetupInputComponent()
+    void AFCPlayerController::SetupInputComponent()
     {
         Super::SetupInputComponent();
 
         // Existing bindings...
 
         // Debug: Return to office (Tab key)
-        InputComponent->BindKey(EKeys::Tab, IE_Pressed, this, &AFCOverworldPlayerController::DebugReturnToOffice);
+        InputComponent->BindKey(EKeys::Tab, IE_Pressed, this, &AFCPlayerController::DebugReturnToOffice);
         UE_LOG(LogFCOverworldController, Log, TEXT("SetupInputComponent: Bound Tab key to DebugReturnToOffice"));
     }
     ```
@@ -2899,7 +2488,7 @@ This follows the same pattern used for Office states (Office_Exploration, Office
   - [ ] Implement DebugReturnToOffice():
 
     ```cpp
-    void AFCOverworldPlayerController::DebugReturnToOffice()
+    void AFCPlayerController::DebugReturnToOffice()
     {
         UE_LOG(LogFCOverworldController, Log, TEXT("DebugReturnToOffice: Returning to L_Office"));
 
@@ -3292,7 +2881,7 @@ This follows the same pattern used for Office states (Office_Exploration, Office
 
 #### Step 8.3: Implement Pause Logic in Overworld Controller
 
-##### Step 8.3.1: Add Pause Handling to AFCOverworldPlayerController
+##### Step 8.3.1: Add Pause Handling to AFCPlayerController
 
 - [ ] **Analysis**
 
@@ -3352,7 +2941,7 @@ This follows the same pattern used for Office states (Office_Exploration, Office
     ```
   - [ ] Update constructor to initialize bIsPaused:
     ```cpp
-    AFCOverworldPlayerController::AFCOverworldPlayerController()
+    AFCPlayerController::AFCPlayerController()
     {
         bIsPaused = false;
         PauseMenuInstance = nullptr;
@@ -3361,7 +2950,7 @@ This follows the same pattern used for Office states (Office_Exploration, Office
   - [ ] Update SetupInputComponent():
 
     ```cpp
-    void AFCOverworldPlayerController::SetupInputComponent()
+    void AFCPlayerController::SetupInputComponent()
     {
         Super::SetupInputComponent();
 
@@ -3371,7 +2960,7 @@ This follows the same pattern used for Office states (Office_Exploration, Office
         UEnhancedInputComponent* EnhancedInput = Cast<UEnhancedInputComponent>(InputComponent);
         if (EnhancedInput && PauseAction)
         {
-            EnhancedInput->BindAction(PauseAction, ETriggerEvent::Started, this, &AFCOverworldPlayerController::HandlePause);
+            EnhancedInput->BindAction(PauseAction, ETriggerEvent::Started, this, &AFCPlayerController::HandlePause);
             UE_LOG(LogFCOverworldController, Log, TEXT("SetupInputComponent: Bound PauseAction"));
         }
     }
@@ -3379,7 +2968,7 @@ This follows the same pattern used for Office states (Office_Exploration, Office
 
   - [ ] Implement HandlePause():
     ```cpp
-    void AFCOverworldPlayerController::HandlePause()
+    void AFCPlayerController::HandlePause()
     {
         if (bIsPaused)
         {
@@ -3394,7 +2983,7 @@ This follows the same pattern used for Office states (Office_Exploration, Office
   - [ ] Implement PauseGame():
 
     ```cpp
-    void AFCOverworldPlayerController::PauseGame()
+    void AFCPlayerController::PauseGame()
     {
         if (bIsPaused)
         {
@@ -3435,7 +3024,7 @@ This follows the same pattern used for Office states (Office_Exploration, Office
   - [ ] Implement UnpauseGame():
 
     ```cpp
-    void AFCOverworldPlayerController::UnpauseGame()
+    void AFCPlayerController::UnpauseGame()
     {
         if (!bIsPaused)
         {
@@ -3479,7 +3068,7 @@ This follows the same pattern used for Office states (Office_Exploration, Office
   - [ ] HandlePause() toggle logic correct
   - [ ] Can open Unreal Editor
 
-**COMMIT POINT 8.3.1**: `git add Source/FC/Core/FCOverworldPlayerController.h Source/FC/Core/FCOverworldPlayerController.cpp && git commit -m "feat(pause): Implement pause/unpause logic in AFCOverworldPlayerController"`
+**COMMIT POINT 8.3.1**: `git add Source/FC/Core/FCOverworldPlayerController.h Source/FC/Core/FCOverworldPlayerController.cpp && git commit -m "feat(pause): Implement pause/unpause logic in AFCPlayerController"`
 
 ---
 
@@ -3684,7 +3273,7 @@ This follows the same pattern used for Office states (Office_Exploration, Office
 - [ ] IA_Pause input action created (Digital/Boolean)
 - [ ] ESC key bound to IA_Pause in IMC_FC_TopDown only (not in IMC_FC_Office)
 - [ ] WBP_PauseMenu widget created with semi-transparent background, "PAUSED" text, Resume button, and Return to Office button
-- [ ] AFCOverworldPlayerController implements PauseGame() and UnpauseGame() methods
+- [ ] AFCPlayerController implements PauseGame() and UnpauseGame() methods
 - [ ] PauseGame() calls SetPause(true), shows WBP_PauseMenu, sets input mode to UI Only, shows cursor
 - [ ] UnpauseGame() calls SetPause(false), removes menu, restores game input mode
 - [ ] HandlePause() toggles between paused/unpaused states on ESC press
@@ -4098,10 +3687,10 @@ This follows the same pattern used for Office states (Office_Exploration, Office
   - [ ] Open `Docs/Technical_Documentation.md`
   - [ ] Add section: **Week 3: Overworld Systems**
   - [ ] Document:
-    - [ ] **AFCOverworldPlayerController**:
+    - [ ] **AFCPlayerController**:
       - [ ] Purpose: Top-down camera control, click-to-move, POI interaction, pause management
       - [ ] Key methods: BeginPlay (InputManager TopDown mode), HandleClickMove, HandleInteractPOI, HandlePause, PauseGame, UnpauseGame, DebugReturnToOffice
-      - [ ] Input actions: IA_OverworldClickMove, IA_OverworldInteractPOI, IA_Pause
+      - [ ] Input actions: IA_Click (existing), IA_InteractPOI, IA_Pause
       - [ ] Dependencies: UFCInputManager, UFCGameInstance
     - [ ] **BP_OverworldCamera**:
       - [ ] Blueprint Actor with camera component
@@ -4121,7 +3710,7 @@ This follows the same pattern used for Office states (Office_Exploration, Office
       - [ ] Methods: OnPOIInteract(), GetPOIName()
     - [ ] **IMC_FC_TopDown**:
       - [ ] Input Mapping Context for Overworld
-      - [ ] Mappings: IA_OverworldPan (WASD), IA_OverworldZoom (Mouse Wheel), IA_OverworldClickMove (LMB), IA_OverworldInteractPOI (RMB), IA_Pause (ESC)
+      - [ ] Mappings: IA_OverworldPan (WASD), IA_OverworldZoom (Mouse Wheel), IA_Click (LMB, existing), IA_InteractPOI (RMB), IA_Pause (ESC)
     - [ ] **WBP_PauseMenu**:
       - [ ] Widget with Resume and Return to Office buttons
       - [ ] Displayed during ESC pause in Overworld only
@@ -4178,7 +3767,7 @@ This follows the same pattern used for Office states (Office_Exploration, Office
     - [ ] ✅ ESC key conditional pause (Overworld only, not Office)
     - [ ] ✅ UFCInputManager automatic context switching (Office ↔ TopDown)
   - [ ] Add **Implementation Details** subsection (optional):
-    - [ ] List key classes: AFCOverworldPlayerController, BP_OverworldCamera, BP_OverworldConvoy, BP_OverworldPOI
+    - [ ] List key classes: AFCPlayerController, BP_OverworldCamera, BP_OverworldConvoy, BP_OverworldPOI
     - [ ] Note BPI_InteractablePOI interface pattern
     - [ ] Note IMC_FC_TopDown with 5 input mappings
   - [ ] Save file
@@ -4245,7 +3834,7 @@ This follows the same pattern used for Office states (Office_Exploration, Office
   - [ ] ✅ Task 1: Pre-Implementation (conventions review, architecture planning)
   - [ ] ✅ Task 2: L_Overworld level creation with terrain, lighting, NavMesh
   - [ ] ✅ Task 3: BP_OverworldCamera with WASD/zoom input
-  - [ ] ✅ Task 4: AFCOverworldPlayerController and BP derivation
+  - [ ] ✅ Task 4: AFCPlayerController and BP derivation
   - [ ] ✅ Task 5: BP_OverworldConvoy with click-to-move pathfinding
   - [ ] ✅ Task 6: BP_OverworldPOI with BPI_InteractablePOI interface
   - [ ] ✅ Task 7: Office ↔ Overworld transitions via UFCLevelManager
@@ -4271,7 +3860,7 @@ This follows the same pattern used for Office states (Office_Exploration, Office
 - [ ] Visual polish reviewed (lighting, terrain, convoy, POIs, UI clarity)
 - [ ] All bugs found during testing fixed
 - [ ] Technical_Documentation.md updated with:
-  - [ ] AFCOverworldPlayerController documentation
+  - [ ] AFCPlayerController documentation
   - [ ] BP_OverworldCamera, BP_OverworldConvoy, BP_OverworldPOI documentation
   - [ ] BPI_InteractablePOI interface documentation
   - [ ] IMC_FC_TopDown input context documentation
@@ -4438,15 +4027,15 @@ This follows the same pattern used for Office states (Office_Exploration, Office
 
 4. **Task 4: Overworld Player Controller** (5 steps, 11 sub-steps)
 
-   - Create AFCOverworldPlayerController C++, Blueprint derivation, InputManager TopDown setup, camera possession
+   - Create AFCPlayerController C++, Blueprint derivation, InputManager TopDown setup, camera possession
 
 5. **Task 5: Convoy Pawn & Click-to-Move** (5 steps, 11 sub-steps)
 
-   - Create IA_OverworldClickMove, BP_OverworldConvoy with FloatingPawnMovement, implement NavMesh pathfinding in controller
+   - Use existing IA_Click for click-to-move, BP_OverworldConvoy with FloatingPawnMovement, implement NavMesh pathfinding in controller
 
 6. **Task 6: POI Actor & Interaction Stub** (5 steps, 13 sub-steps)
 
-   - Create IA_OverworldInteractPOI, BP_OverworldPOI with InteractionBox, BPI_InteractablePOI interface, right-click handler in controller
+   - Create IA_InteractPOI, BP_OverworldPOI with InteractionBox, BPI_InteractablePOI interface, right-click handler in controller
 
 7. **Task 7: Office-to-Overworld Transition** (5 steps, 9 sub-steps)
 
