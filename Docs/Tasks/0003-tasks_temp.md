@@ -39,7 +39,7 @@
    - Leader: Receives NavMesh move commands
    - Followers: Follow breadcrumb trail left by leader
 
-3. **BP_ConvoyAIController** (AI Controller)
+3. **BP_FC_ConvoyAIController** (AI Controller)
 
    - Handles NavMesh pathfinding for leader
    - Implements breadcrumb following for followers
@@ -265,7 +265,7 @@ IMC_FC_TopDown`
       - [x] Enable **Orient Rotation to Movement**: True
       - [x] Disable **Use Controller Desired Rotation**: False
   - [x] Class Defaults:
-    - [x] AI Controller Class: BP_ConvoyAIController (will create in next step)
+    - [x] AI Controller Class: BP_FC_ConvoyAIController (will create in next step)
   - [x] Compile and save
 
 - [x] **Testing After Step 5.2.2** ✅ CHECKPOINT
@@ -278,46 +278,46 @@ IMC_FC_TopDown`
 
 ---
 
-### Step 5.3: Create BP_ConvoyAIController
+### Step 5.3: Create BP_FC_ConvoyAIController
 
 #### Step 5.3.1: Create AI Controller Blueprint
 
-- [ ] **Analysis**
+- [x] **Analysis**
 
-  - [ ] AI controller handles NavMesh pathfinding for convoy members
-  - [ ] Leader: Receives move-to-location commands from player controller
-  - [ ] Followers: Follow breadcrumb trail (deferred to Step 5.5)
-  - [ ] Uses built-in AI MoveTo nodes
+  - [x] AI controller handles NavMesh pathfinding for convoy members
+  - [x] Leader: Receives move-to-location commands from player controller
+  - [x] Followers: Follow breadcrumb trail (deferred to Step 5.5)
+  - [x] Uses built-in AI MoveTo nodes
 
-- [ ] **Implementation (Unreal Editor)**
+- [x] **Implementation (Unreal Editor)**
 
-  - [ ] Content Browser → `/Game/FC/World/Blueprints/AI/`
-  - [ ] Right-click → Blueprint Class → AIController
-  - [ ] Name: `BP_ConvoyAIController`
-  - [ ] Open BP_ConvoyAIController
-  - [ ] Event Graph:
-    - [ ] Event BeginPlay:
+  - [x] Content Browser → `/Game/FC/Characters/Convoy/Blueprints/`
+  - [x] Right-click → Blueprint Class → AIController
+  - [x] Name: `BP_FC_ConvoyAIController`
+  - [x] Open BP_FC_ConvoyAIController
+  - [x] Event Graph:
+    - [x] Event BeginPlay:
       ```
       BeginPlay → Print String "ConvoyAIController: Initialized"
       ```
-  - [ ] Create Custom Event: **MoveToLocation**
-    - [ ] Input: Vector (Target Location)
-    - [ ] Implementation:
+  - [x] Create Custom Event: **MoveTo**
+    - [x] Input: Vector (Target Location)
+    - [x] Implementation:
       ```
-      MoveToLocation (Vector input)
-      → AI MoveTo (Simple Move To Location)
+      MoveTo (Vector input)
+      → AI MoveToLocation (Simple Move To Location)
         - Pawn: Get Controlled Pawn
         - Goal Location: Target Location input
       → Print String "AI Controller moving to: [Target Location]"
       ```
-  - [ ] Compile and save
+  - [x] Compile and save
 
-- [ ] **Testing After Step 5.3.1** ✅ CHECKPOINT
-  - [ ] BP_ConvoyAIController created
-  - [ ] MoveToLocation custom event functional
-  - [ ] Blueprint compiles without errors
+- [x] **Testing After Step 5.3.1** ✅ CHECKPOINT
+  - [x] BP_FC_ConvoyAIController created
+  - [x] MoveTo custom event functional
+  - [x] Blueprint compiles without errors
 
-**COMMIT POINT 5.3.1**: `git add Content/FC/World/Blueprints/AI/BP_ConvoyAIController.uasset && git commit -m "feat(convoy): Create BP_ConvoyAIController with MoveToLocation"`
+**COMMIT POINT 5.3.1**: `git add Content/FC/World/Blueprints/AI/BP_FC_ConvoyAIController.uasset && git commit -m "feat(convoy): Create BP_FC_ConvoyAIController with MoveTo"`
 
 ---
 
@@ -771,7 +771,7 @@ IMC_FC_TopDown`
             if (bFoundPath)
             {
                 / Send move command to AI controller
-                AIController->MoveToLocation(NavLocation.Location);
+                AIController->MoveTo(NavLocation.Location);
                 UE_LOG(LogFCOverworldController, Log, TEXT("HandleClickMove: Moving convoy to %s"), *NavLocation.Location.ToString());
             }
             else
@@ -1021,7 +1021,7 @@ IMC_FC_TopDown`
 
 - [ ] Left Mouse Button bound to IA_Interact in IMC_FC_TopDown
 - [ ] BP_FC_ConvoyMember character created with mesh, collision, AI controller support, and POI overlap detection
-- [ ] BP_ConvoyAIController created with MoveToLocation method
+- [ ] BP_FC_ConvoyAIController created with MoveTo method
 - [ ] BP_OverworldConvoy parent actor created with 3 child convoy members (leader + 2 followers)
 - [ ] Convoy members spawn and attach correctly via Construction Script
 - [ ] POI overlap aggregation implemented in BP_OverworldConvoy
@@ -1480,7 +1480,7 @@ IMC_FC_TopDown`
   - Store in BP_OverworldConvoy breadcrumb array
 - **BP_FC_ConvoyMember** (Followers):
   - AI controller retrieves next breadcrumb from parent convoy
-  - MoveToLocation using breadcrumb position
+  - MoveTo using breadcrumb position
   - OnMoveCompleted: Request next breadcrumb
   - Skip breadcrumbs if too close (formation spacing logic)
 - **BP_OverworldConvoy**:
