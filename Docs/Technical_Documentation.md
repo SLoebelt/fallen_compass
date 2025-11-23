@@ -7359,7 +7359,7 @@ void AFCOverworldPOI::BeginPlay()
 {
     Super::BeginPlay();
 
-    UE_LOG(LogFCOverworldPOI, Log, TEXT("POI '%s' spawned at %s"), 
+    UE_LOG(LogFCOverworldPOI, Log, TEXT("POI '%s' spawned at %s"),
         *POIName, *GetActorLocation().ToString());
 }
 ```

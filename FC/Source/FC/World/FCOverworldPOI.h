@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
+#include "Interaction/IFCInteractablePOI.h"
 #include "FCOverworldPOI.generated.h"
 
 class USceneComponent;
@@ -17,9 +18,10 @@ DECLARE_LOG_CATEGORY_EXTERN(LogFCOverworldPOI, Log, All);
  * 
  * Provides collision for mouse raycast detection and convoy overlap.
  * Blueprint children configure specific mesh, materials, and POI names.
+ * Implements IFCInteractablePOI for action-based interaction.
  */
 UCLASS()
-class FC_API AFCOverworldPOI : public AActor
+class FC_API AFCOverworldPOI : public AActor, public IIFCInteractablePOI
 {
 	GENERATED_BODY()
 
@@ -46,12 +48,18 @@ private:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "FC|POI", meta = (AllowPrivateAccess = "true"))
 	FString POIName;
 
-public:
-	/** Get POI display name */
-	UFUNCTION(BlueprintCallable, Category = "FC|POI")
-	FString GetPOIName() const { return POIName; }
+	/** Available actions for this POI (configured in Blueprint) */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "FC|POI|Actions", meta = (AllowPrivateAccess = "true"))
+	TArray<FFCPOIActionData> AvailableActions;
 
-	/** Handle POI interaction (stub for Task 6 - will log to console) */
+public:
+	// IFCInteractablePOI interface implementation
+	virtual TArray<FFCPOIActionData> GetAvailableActions_Implementation() const override;
+	virtual void ExecuteAction_Implementation(EFCPOIAction Action, AActor* Interactor) override;
+	virtual FString GetPOIName_Implementation() const override;
+	virtual bool CanExecuteAction_Implementation(EFCPOIAction Action, AActor* Interactor) const override;
+
+	/** DEPRECATED: Old stub method - replaced by ExecuteAction() */
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "FC|POI")
 	void OnPOIInteract();
 };

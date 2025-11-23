@@ -33,6 +33,9 @@ AFCOverworldPOI::AFCOverworldPOI()
 
 	// Default POI name
 	POIName = TEXT("Unnamed POI");
+
+	// Default: no actions (must be configured in Blueprint)
+	AvailableActions.Empty();
 }
 
 void AFCOverworldPOI::BeginPlay()
@@ -43,14 +46,42 @@ void AFCOverworldPOI::BeginPlay()
 		*POIName, *GetActorLocation().ToString());
 }
 
-void AFCOverworldPOI::OnPOIInteract_Implementation()
+// IFCInteractablePOI interface implementation
+TArray<FFCPOIActionData> AFCOverworldPOI::GetAvailableActions_Implementation() const
 {
-	// Stub implementation - logs to console
-	UE_LOG(LogFCOverworldPOI, Log, TEXT("POI Interaction: %s"), *POIName);
+	return AvailableActions;
+}
+
+void AFCOverworldPOI::ExecuteAction_Implementation(EFCPOIAction Action, AActor* Interactor)
+{
+	// Stub implementation - log action
+	UE_LOG(LogFCOverworldPOI, Log, TEXT("POI '%s': Executing action %s"), 
+		*POIName, *UEnum::GetValueAsString(Action));
 
 	if (GEngine)
 	{
-		GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Yellow,
-			FString::Printf(TEXT("POI Interaction Stub: %s"), *POIName));
+		GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Cyan,
+			FString::Printf(TEXT("POI '%s': Action '%s' executed (STUB)"), 
+				*POIName, *UEnum::GetValueAsString(Action)));
 	}
+
+	// Future: Implement actual action logic (open dialog, start trade, etc.)
+}
+
+FString AFCOverworldPOI::GetPOIName_Implementation() const
+{
+	return POIName;
+}
+
+bool AFCOverworldPOI::CanExecuteAction_Implementation(EFCPOIAction Action, AActor* Interactor) const
+{
+	// Default: all actions allowed
+	// Override in Blueprint for quest requirements, locked doors, etc.
+	return true;
+}
+
+// Keep old OnPOIInteract for backward compatibility
+void AFCOverworldPOI::OnPOIInteract_Implementation()
+{
+	UE_LOG(LogFCOverworldPOI, Warning, TEXT("POI '%s': OnPOIInteract is deprecated, use ExecuteAction()"), *POIName);
 }

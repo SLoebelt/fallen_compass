@@ -1260,192 +1260,549 @@ IMC_FC_TopDown`
 
 ---
 
-### Step 6.3: Implement BPI_InteractablePOI Interface
+### Step 6.3: Implement IFCInteractablePOI C++ Interface and POI Action System
 
-#### Step 6.3.1: Create BPI_InteractablePOI Blueprint Interface
+#### Step 6.3.1: Create IFCInteractablePOI C++ Interface
 
-- [ ] **Analysis**
+- [x] **Analysis**
 
-  - [ ] Interface allows convoy and controller to interact with POI-like actors
-  - [ ] Provides GetPOIName() and OnPOIInteract() methods
-  - [ ] Enables future POI types (cities, ruins, encounters, etc.)
+  - [x] C++ interface for POI interaction (matches existing IFCInteractable pattern)
+  - [x] POIs can have multiple available actions (talk, ambush, enter, trade, harvest, observe)
+  - [x] Interface provides methods to query available actions and execute selected action
+  - [x] Enables different POI types with different action sets
+  - [x] Integrates with existing UFCInteractionComponent system
 
-- [ ] **Implementation (Unreal Editor - Blueprint Interface)**
+- [x] **Architecture Requirements**
 
-  - [ ] Content Browser → `/Game/FC/Core/Interfaces/`
-  - [ ] Right-click → Blueprints → Blueprint Interface
-  - [ ] Name: `BPI_InteractablePOI`
-  - [ ] Open BPI_InteractablePOI
-  - [ ] Add Function: `OnPOIInteract`
-    - [ ] No inputs/outputs (void function for stub)
-  - [ ] Add Function: `GetPOIName`
-    - [ ] Output: String (Return Value)
-  - [ ] Compile and save
+  - [x] **Action Selection Logic**:
+    - [x] 0 actions → Right-click ignored
+    - [x] 1 action → Right-click → convoy moves → overlap executes action automatically
+    - [x] 2+ actions → Right-click → action selection widget → click action → convoy moves → overlap executes selected action
+  - [x] **Overlap Triggers**:
+    - [x] Intentional right-click movement triggers action on overlap
+    - [x] Unintentional overlap (exploration, fleeing) also triggers actions
+    - [x] If unintentional overlap + multiple actions → show action selection dialog
+  - [x] **Enemy Encounters**:
+    - [x] Enemies can chase convoy
+    - [x] Enemy overlap triggers enemy's intended action (ambush)
+  - [x] **Action Types** (extensible enum):
+    - [x] Talk, Ambush, Enter, Trade, Harvest, Observe
+    - [x] Easy to add new action types in future
 
-- [ ] **Testing After Step 6.3.1** ✅ CHECKPOINT
-  - [ ] Interface created with 2 functions
-  - [ ] Functions have correct signatures
-  - [ ] Asset saves without errors
+- [x] **Implementation (C++)**
 
-**COMMIT POINT 6.3.1**: `git add Content/FC/Core/Interfaces/BPI_InteractablePOI.uasset && git commit -m "feat(overworld): Create BPI_InteractablePOI interface"`
-
----
-
-#### Step 6.3.2: Implement Interface in BP_OverworldPOI
-
-- [ ] **Analysis**
-
-  - [ ] BP_OverworldPOI implements BPI_InteractablePOI
-  - [ ] GetPOIName returns POIName variable
-  - [ ] OnPOIInteract displays stub message
-
-- [ ] **Implementation (BP_OverworldPOI)**
-
-  - [ ] Open BP_OverworldPOI
-  - [ ] Class Settings → Interfaces → Add → BPI_InteractablePOI
-  - [ ] Implement GetPOIName function:
-    - [ ] Event Graph → Right-click → Add Event → Event GetPOIName
-    - [ ] Connect POIName variable to Return Value
-  - [ ] Implement OnPOIInteract function:
-    - [ ] Event Graph → Right-click → Add Event → Event OnPOIInteract
-    - [ ] Add Print String node:
-      - [ ] In String: Append "POI Interaction Stub: " + POIName
-      - [ ] Text Color: Yellow
-      - [ ] Duration: 5.0
-  - [ ] Compile and save
-
-- [ ] **Testing After Step 6.3.2** ✅ CHECKPOINT
-  - [ ] BP_OverworldPOI implements interface
-  - [ ] GetPOIName returns POIName variable
-  - [ ] OnPOIInteract has Print String stub
-  - [ ] Blueprint compiles without errors
-
-**COMMIT POINT 6.3.2**: `git add Content/FC/World/Blueprints/Actors/BP_OverworldPOI.uasset && git commit -m "feat(overworld): Implement BPI_InteractablePOI in BP_OverworldPOI"`
-
----
-
-### Step 6.4: Implement POI Right-Click Interaction Handler
-
-#### Step 6.4.1: Add POI Interaction Handler to AFCPlayerController
-
-- [ ] **Analysis**
-
-  - [ ] Controller needs to handle IA_InteractPOI input
-  - [ ] On right-click: Raycast from mouse position, check if hit actor implements interface
-  - [ ] If valid POI: Call OnPOIInteract() interface method
-
-- [ ] **Implementation (FCPlayerController.h)**
-
-  - [ ] Open `Source/FC/Core/FCPlayerController.h`
-  - [ ] Add private members:
+  - [x] **Create Header File**: `Source/FC/Interaction/IFCInteractablePOI.h`
 
     ```cpp
+    #pragma once
+
+    #include "CoreMinimal.h"
+    #include "UObject/Interface.h"
+    #include "IFCInteractablePOI.generated.h"
+
+    /**
+     * EFCPOIAction - Enum for POI action types
+     * Extensible for future action types
+     */
+    UENUM(BlueprintType)
+    enum class EFCPOIAction : uint8
+    {
+        Talk        UMETA(DisplayName = "Talk"),
+        Ambush      UMETA(DisplayName = "Ambush"),
+        Enter       UMETA(DisplayName = "Enter"),
+        Trade       UMETA(DisplayName = "Trade"),
+        Harvest     UMETA(DisplayName = "Harvest"),
+        Observe     UMETA(DisplayName = "Observe")
+    };
+
+    /**
+     * FFCPOIActionData - Struct containing action display information
+     */
+    USTRUCT(BlueprintType)
+    struct FFCPOIActionData
+    {
+        GENERATED_BODY()
+
+        /** Action type */
+        UPROPERTY(EditAnywhere, BlueprintReadWrite)
+        EFCPOIAction ActionType;
+
+        /** Display text for action button (e.g., "Talk to Merchant") */
+        UPROPERTY(EditAnywhere, BlueprintReadWrite)
+        FText ActionText;
+
+        /** Optional icon for action (future UI) */
+        UPROPERTY(EditAnywhere, BlueprintReadWrite)
+        UTexture2D* ActionIcon = nullptr;
+
+        FFCPOIActionData()
+            : ActionType(EFCPOIAction::Talk)
+            , ActionText(FText::FromString(TEXT("Interact")))
+        {}
+    };
+
+    // UInterface class (required by Unreal)
+    UINTERFACE(MinimalAPI, Blueprintable)
+    class UIFCInteractablePOI : public UInterface
+    {
+        GENERATED_BODY()
+    };
+
+    /**
+     * IIFCInteractablePOI - Interface for overworld POI interaction
+     * Provides action-based interaction system for POIs
+     */
+    class FC_API IIFCInteractablePOI
+    {
+        GENERATED_BODY()
+
+    public:
+        /**
+         * Get all available actions for this POI
+         * Called when right-clicking POI or on convoy overlap
+         * @return Array of available actions with display data
+         */
+        UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Interaction|POI")
+        TArray<FFCPOIActionData> GetAvailableActions() const;
+
+        /**
+         * Execute a specific action on this POI
+         * Called when action is selected (or auto-executed if only one action)
+         * @param Action - The action to execute
+         * @param Interactor - The actor performing the action (typically convoy)
+         */
+        UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Interaction|POI")
+        void ExecuteAction(EFCPOIAction Action, AActor* Interactor);
+
+        /**
+         * Get POI display name for UI and logging
+         * @return Display name (e.g., "Village", "Ruins", "Enemy Camp")
+         */
+        UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Interaction|POI")
+        FString GetPOIName() const;
+
+        /**
+         * Check if action can be executed (conditions, requirements)
+         * Optional - default implementation returns true
+         * @param Action - Action to check
+         * @param Interactor - Actor attempting action
+         * @return true if action can be executed
+         */
+        UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Interaction|POI")
+        bool CanExecuteAction(EFCPOIAction Action, AActor* Interactor) const;
+    };
+    ```
+
+  - [x] **Create Source File**: `Source/FC/Interaction/IFCInteractablePOI.cpp`
+
+    ```cpp
+    #include "Interaction/IFCInteractablePOI.h"
+
+    // Interface default implementations are in the header file
+    // This file is intentionally minimal for interfaces
+    ```
+
+  - [x] Save files
+  - [x] Compile C++ code
+
+- [x] **Testing After Step 6.3.1** ✅ CHECKPOINT
+  - [x] C++ code compiles without errors
+  - [x] IFCInteractablePOI interface available in C++ and Blueprint
+  - [x] EFCPOIAction enum visible in Blueprint
+
+**COMMIT POINT 6.3.1**: `git add Source/FC/Interaction/IFCInteractablePOI.h Source/FC/Interaction/IFCInteractablePOI.cpp && git commit -m "feat(overworld): Create IFCInteractablePOI C++ interface with action system"`---
+
+#### Step 6.3.2: Implement IFCInteractablePOI in AFCOverworldPOI
+
+- [x] **Analysis**
+
+  - [x] AFCOverworldPOI implements IFCInteractablePOI interface in C++
+  - [x] Add available actions array (EditAnywhere for Blueprint configuration)
+  - [x] Implement interface methods
+  - [x] Blueprint children can override actions per POI type
+
+- [x] **Implementation (C++)**
+
+  - [x] **Update FCOverworldPOI.h**:
+
+    ```cpp
+    #pragma once
+
+    #include "CoreMinimal.h"
+    #include "GameFramework/Actor.h"
+    #include "Interaction/IFCInteractablePOI.h"  // Add interface include
+    #include "FCOverworldPOI.generated.h"
+
+    // ... existing forward declarations ...
+
+    /**
+     * AFCOverworldPOI - Base class for overworld Points of Interest
+     * Provides collision for mouse raycast detection and convoy overlap.
+     * Blueprint children configure specific mesh, materials, and POI names.
+     * Implements IFCInteractablePOI for action-based interaction
+     */
+    UCLASS()
+    class FC_API AFCOverworldPOI : public AActor, public IIFCInteractablePOI
+    {
+        GENERATED_BODY()
+
+    public:
+        AFCOverworldPOI();
+
+    protected:
+        virtual void BeginPlay() override;
+
     private:
-        /** Input action for POI interaction */
-        UPROPERTY(EditDefaultsOnly, Category = "FC|Input|Actions")
-        TObjectPtr<UInputAction> InteractPOIAction;
+        // ... existing component properties ...
 
-        /** Handle POI interaction input */
-        void HandleInteractPOI();
+        /** Display name for this Point of Interest */
+        UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "FC|POI", meta = (AllowPrivateAccess = "true"))
+        FString POIName;
+
+        /** Available actions for this POI (configured in Blueprint) */
+        UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "FC|POI|Actions", meta = (AllowPrivateAccess = "true"))
+        TArray<FFCPOIActionData> AvailableActions;
+
+    public:
+        // IFCInteractablePOI interface implementation
+        virtual TArray<FFCPOIActionData> GetAvailableActions_Implementation() const override;
+        virtual void ExecuteAction_Implementation(EFCPOIAction Action, AActor* Interactor) override;
+        virtual FString GetPOIName_Implementation() const override;
+        virtual bool CanExecuteAction_Implementation(EFCPOIAction Action, AActor* Interactor) const override;
+
+        /** DEPRECATED: Old stub method - replaced by ExecuteAction() */
+        UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "FC|POI")
+        void OnPOIInteract();
+    };
     ```
 
-  - [ ] Save file
-
-- [ ] **Implementation (FCPlayerController.cpp)**
-
-  - [ ] Update SetupInputComponent():
+  - [x] **Update FCOverworldPOI.cpp**:
 
     ```cpp
-    void AFCPlayerController::SetupInputComponent()
+    #include "World/FCOverworldPOI.h"
+    // ... existing includes ...
+
+    AFCOverworldPOI::AFCOverworldPOI()
     {
-        Super::SetupInputComponent();
+        // ... existing constructor code ...
 
-        / Existing click-to-move binding...
+        // Default POI name
+        POIName = TEXT("Unnamed POI");
 
-        / Bind POI interaction action
-        if (EnhancedInput && InteractPOIAction)
+        // Default: no actions (must be configured in Blueprint)
+        AvailableActions.Empty();
+    }
+
+    // ... existing BeginPlay ...
+
+    // IFCInteractablePOI interface implementation
+    TArray<FFCPOIActionData> AFCOverworldPOI::GetAvailableActions_Implementation() const
+    {
+        return AvailableActions;
+    }
+
+    void AFCOverworldPOI::ExecuteAction_Implementation(EFCPOIAction Action, AActor* Interactor)
+    {
+        // Stub implementation - log action
+        UE_LOG(LogFCOverworldPOI, Log, TEXT("POI '%s': Executing action %s"),
+            *POIName, *UEnum::GetValueAsString(Action));
+
+        if (GEngine)
         {
-            EnhancedInput->BindAction(InteractPOIAction, ETriggerEvent::Started, this, &AFCPlayerController::HandleInteractPOI);
-            UE_LOG(LogFCOverworldController, Log, TEXT("SetupInputComponent: Bound InteractPOIAction"));
+            GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Cyan,
+                FString::Printf(TEXT("POI '%s': Action '%s' executed (STUB)"),
+                    *POIName, *UEnum::GetValueAsString(Action)));
         }
+
+        // Future: Implement actual action logic (open dialog, start trade, etc.)
+    }
+
+    FString AFCOverworldPOI::GetPOIName_Implementation() const
+    {
+        return POIName;
+    }
+
+    bool AFCOverworldPOI::CanExecuteAction_Implementation(EFCPOIAction Action, AActor* Interactor) const
+    {
+        // Default: all actions allowed
+        // Override in Blueprint for quest requirements, locked doors, etc.
+        return true;
+    }
+
+    // Keep old OnPOIInteract for backward compatibility
+    void AFCOverworldPOI::OnPOIInteract_Implementation()
+    {
+        UE_LOG(LogFCOverworldPOI, Warning, TEXT("POI '%s': OnPOIInteract is deprecated, use ExecuteAction()"), *POIName);
     }
     ```
 
-  - [ ] Implement HandleInteractPOI():
+  - [x] Save files
+  - [x] Compile C++ code
 
-    ```cpp
-    void AFCPlayerController::HandleInteractPOI()
-    {
-        / Get mouse cursor hit result
-        FHitResult HitResult;
-        bool bHit = GetHitResultUnderCursor(ECC_Visibility, false, HitResult);
+- [x] **Testing After Step 6.3.2** ✅ CHECKPOINT
+  - [x] C++ code compiles without errors
+  - [x] AFCOverworldPOI implements IFCInteractablePOI
+  - [x] Available Actions array visible in Blueprint Details panel
 
-        if (!bHit)
-        {
-            UE_LOG(LogFCOverworldController, Warning, TEXT("HandleInteractPOI: No hit under cursor"));
-            return;
-        }
+**COMMIT POINT 6.3.2**: `git add Source/FC/World/FCOverworldPOI.h Source/FC/World/FCOverworldPOI.cpp && git commit -m "feat(overworld): Implement IFCInteractablePOI in AFCOverworldPOI with action system"`
 
-        / Check if hit actor implements POI interface
-        AActor* HitActor = HitResult.GetActor();
-        if (!HitActor)
-        {
-            UE_LOG(LogFCOverworldController, Warning, TEXT("HandleInteractPOI: No actor hit"));
-            return;
-        }
+---
 
-        / Check for interface (Blueprint interface check)
-        if (HitActor->GetClass()->ImplementsInterface(UBPI_InteractablePOI::StaticClass()))
-        {
-            / Call interface method via Blueprint
-            IBPI_InteractablePOI::Execute_OnPOIInteract(HitActor);
+#### Step 6.3.3: Configure Actions in BP_FC_OverworldPOI
 
-            / Get POI name for logging
-            FString POIName = IBPI_InteractablePOI::Execute_GetPOIName(HitActor);
-            UE_LOG(LogFCOverworldController, Log, TEXT("HandleInteractPOI: Interacted with POI '%s'"), *POIName);
-        }
-        else
-        {
-            UE_LOG(LogFCOverworldController, Log, TEXT("HandleInteractPOI: Hit actor '%s' is not a POI"), *HitActor->GetName());
-        }
-    }
-    ```
+- [ ] **Analysis**
 
-  - [ ] Save file
+  - [ ] Configure available actions in Blueprint for testing
+  - [ ] Create test POI with single action (auto-execute on overlap)
+  - [ ] Create test POI with multiple actions (show selection dialog)
 
-- [ ] **Compilation**
+- [ ] **Implementation (Unreal Editor)**
 
-  - [ ] Build solution in Visual Studio
-  - [ ] Verify no compilation errors
+  - [ ] Open BP_FC_OverworldPOI
+  - [ ] Class Defaults → FC | POI | Actions:
+    - [ ] Available Actions: Add 2 elements for testing
+      - [ ] Element 0:
+        - [ ] Action Type: Talk
+        - [ ] Action Text: "Talk to Merchant"
+      - [ ] Element 1:
+        - [ ] Action Type: Trade
+        - [ ] Action Text: "Open Trade Menu"
+  - [ ] Compile and save
+  - [ ] Create variant BP_FC_OverworldPOI_Village:
+    - [ ] Duplicate BP_FC_OverworldPOI
+    - [ ] Rename to BP_FC_OverworldPOI_Village
+    - [ ] POI Name: "Village"
+    - [ ] Available Actions: Keep 2 actions (Talk, Trade)
+  - [ ] Create variant BP_FC_OverworldPOI_Enemy:
+    - [ ] Duplicate BP_FC_OverworldPOI
+    - [ ] Rename to BP_FC_OverworldPOI_Enemy
+    - [ ] POI Name: "Enemy Camp"
+    - [ ] Available Actions: 1 action only
+      - [ ] Action Type: Ambush
+      - [ ] Action Text: "Ambush!"
+
+- [ ] **Testing After Step 6.3.3** ✅ CHECKPOINT
+  - [ ] BP_FC_OverworldPOI has 2 actions configured
+  - [ ] Variant Blueprints created with different action sets
+  - [ ] All Blueprints compile without errors
+
+**COMMIT POINT 6.3.3**: `git add Content/FC/World/Blueprints/Actors/POI/BP_FC_OverworldPOI*.uasset && git commit -m "feat(overworld): Configure POI actions in Blueprint variants"`
+
+---
+
+### Step 6.4: Implement POI Interaction with Multi-Action Selection
+
+#### Step 6.4.1: Create POI Action Selection Widget (Blueprint)
+
+- [ ] **Analysis**
+
+  - [ ] Widget displays available actions when POI has multiple options
+  - [ ] User clicks action button → stores selection → initiates convoy movement
+  - [ ] Widget shows when right-clicking multi-action POI or on unintentional overlap
+  - [ ] Blueprint implementation for UI flexibility
+
+- [ ] **Implementation (Unreal Editor - UMG Widget)**
+
+  - [ ] Content Browser → `/Game/FC/UI/Widgets/`
+  - [ ] Right-click → User Interface → Widget Blueprint
+  - [ ] Name: `WBP_POIActionSelection`
+  - [ ] Open WBP_POIActionSelection
+  - [ ] **Widget Hierarchy**:
+    - [ ] Canvas Panel (root)
+      - [ ] Overlay (center screen with auto-size)
+        - [ ] Border (background panel)
+          - [ ] Vertical Box
+            - [ ] Text Block (header: "Select Action")
+            - [ ] Scroll Box (action list container)
+  - [ ] **Widget Variables**:
+    - [ ] `AvailableActions` (TArray<FFCPOIActionData>, Instance Editable)
+    - [ ] `SelectedAction` (EFCPOIAction)
+    - [ ] `TargetPOI` (AActor, instance ref)
+    - [ ] `OnActionSelected` (Event Dispatcher with EFCPOIAction parameter)
+  - [ ] **Graph: PopulateActions()**
+    - [ ] Input: AvailableActions array
+    - [ ] ForEach loop through actions:
+      - [ ] Create WBP_POIActionButton widget
+      - [ ] Set button text to ActionData.ActionText
+      - [ ] Bind button click to OnActionButtonClicked(ActionType)
+      - [ ] Add button to Scroll Box
+  - [ ] **Graph: OnActionButtonClicked(EFCPOIAction Action)**
+    - [ ] Set SelectedAction = Action
+    - [ ] Call OnActionSelected dispatcher
+    - [ ] Remove widget from viewport
+  - [ ] Compile and save
+
+- [ ] **Implementation (WBP_POIActionButton child widget)**
+
+  - [ ] Create Widget Blueprint: `WBP_POIActionButton`
+  - [ ] Hierarchy:
+    - [ ] Button (root)
+      - [ ] Text Block (action text)
+  - [ ] Variables:
+    - [ ] `ActionType` (EFCPOIAction)
+    - [ ] `ActionText` (Text)
+    - [ ] `OnClicked` (Event Dispatcher with EFCPOIAction parameter)
+  - [ ] Event OnClicked (button):
+    - [ ] Call OnClicked dispatcher with ActionType
+  - [ ] Compile and save
 
 - [ ] **Testing After Step 6.4.1** ✅ CHECKPOINT
-  - [ ] Compilation succeeds
-  - [ ] HandleInteractPOI() method added correctly
-  - [ ] Interface call syntax correct
-  - [ ] Can open Unreal Editor
+  - [ ] Widgets created without errors
+  - [ ] Action selection widget compiles
+  - [ ] Event dispatchers configured correctly
 
-**COMMIT POINT 6.4.1**: `git add Source/FC/Core/FCPlayerController.h Source/FC/Core/FCPlayerController.cpp && git commit -m "feat(overworld): Implement POI right-click interaction handler"`
+**COMMIT POINT 6.4.1**: `git add Content/FC/UI/Widgets/WBP_POIActionSelection.uasset Content/FC/UI/Widgets/WBP_POIActionButton.uasset && git commit -m "feat(overworld): Create POI action selection widget"`
 
 ---
 
-#### Step 6.4.2: Configure InteractPOIAction in BP_FC_PlayerController
+#### Step 6.4.2: Add POI Right-Click Handler in AFCPlayerController
 
 - [ ] **Analysis**
 
-  - [ ] InteractPOIAction property needs IA_InteractPOI assigned in Blueprint
+  - [ ] Raycast on right-click to detect POI actors
+  - [ ] Query available actions via IFCInteractablePOI interface
+  - [ ] Action logic:
+    - [ ] 0 actions → ignore click (no interaction)
+    - [ ] 1 action → store action, move convoy to POI, execute on overlap
+    - [ ] 2+ actions → show action selection widget, wait for selection, move convoy, execute on overlap
+  - [ ] Store pending action and target POI for overlap execution
+
+- [ ] **Implementation (C++)**
+
+  - [ ] **Update FCPlayerController.h**:
+
+    ```cpp
+    #pragma once
+
+    #include "CoreMinimal.h"
+    #include "GameFramework/PlayerController.h"
+    #include "Interaction/IFCInteractablePOI.h"  // Add interface include
+    #include "FCPlayerController.generated.h"
+
+    // ... existing forward declarations ...
+    class UUserWidget;  // Add widget class declaration
+
+    UCLASS()
+    class FC_API AFCPlayerController : public APlayerController
+    {
+        GENERATED_BODY()
+
+    public:
+        // ... existing declarations ...
+
+    private:
+        // ... existing convoy and camera references ...
+
+        /** Widget class for POI action selection */
+        UPROPERTY(EditDefaultsOnly, Category = "FC|UI", meta = (AllowPrivateAccess = "true"))
+        TSubclassOf<UUserWidget> POIActionSelectionWidgetClass;
+
+        /** Current action selection widget instance */
+        UPROPERTY()
+        UUserWidget* POIActionSelectionWidget;
+
+        /** Pending POI interaction data */
+        UPROPERTY()
+        AActor* PendingInteractionPOI;
+
+        EFCPOIAction PendingInteractionAction;
+        bool bHasPendingInteraction;
+
+        /** Handle right-click on POI actor (query actions, show widget if needed) */
+        void HandleInteractPOI(AActor* POIActor);
+
+        /** Callback when user selects action from widget */
+        UFUNCTION()
+        void OnPOIActionSelected(EFCPOIAction SelectedAction);
+
+        /** Move convoy to POI location (called after action selection) */
+        void MoveConvoyToPOI(AActor* POIActor);
+
+    public:
+        /** Called by convoy when overlapping POI (executes pending action) */
+        void NotifyPOIOverlap(AActor* POIActor);
+
+        /** Get pending interaction data */
+        FORCEINLINE bool HasPendingInteraction() const { return bHasPendingInteraction; }
+        FORCEINLINE AActor* GetPendingInteractionPOI() const { return PendingInteractionPOI; }
+        FORCEINLINE EFCPOIAction GetPendingInteractionAction() const { return PendingInteractionAction; }
+    };
+    ```
+
+  - [ ] **Update FCPlayerController.cpp** (see full implementation in task details)
+  - [ ] Save files
+  - [ ] Compile C++ code
+
+- [ ] **Testing After Step 6.4.2** ✅ CHECKPOINT
+  - [ ] C++ code compiles without errors
+  - [ ] HandleInteractPOI() method added
+  - [ ] NotifyPOIOverlap() method added
+
+**COMMIT POINT 6.4.2**: `git add Source/FC/Core/FCPlayerController.h Source/FC/Core/FCPlayerController.cpp && git commit -m "feat(overworld): Add POI right-click handler with multi-action support"`
+
+---
+
+#### Step 6.4.3: Connect Convoy Overlap to Controller Notification
+
+- [ ] **Analysis**
+
+  - [ ] AFCConvoyMember already detects POI overlap (Step 6.2)
+  - [ ] Forward overlap event to controller for action execution
+
+- [ ] **Implementation (C++)**
+
+  - [ ] **Update FCConvoyMember.cpp** OnCapsuleBeginOverlap():
+    - [ ] Add controller notification after parent convoy notification
+    - [ ] Call PC->NotifyPOIOverlap(OtherActor)
+  - [ ] Save file
+  - [ ] Compile C++ code
+
+- [ ] **Testing After Step 6.4.3** ✅ CHECKPOINT
+  - [ ] C++ code compiles without errors
+  - [ ] Convoy overlap notifies controller
+
+**COMMIT POINT 6.4.3**: `git add Source/FC/Characters/Convoy/FCConvoyMember.cpp && git commit -m "feat(overworld): Connect convoy POI overlap to controller"`
+
+---
+
+#### Step 6.4.4: Configure Widget Class in BP_FC_PlayerController
+
+- [ ] **Analysis**
+
+  - [ ] Set POIActionSelectionWidgetClass in Blueprint
 
 - [ ] **Implementation (Unreal Editor)**
 
   - [ ] Open BP_FC_PlayerController
-  - [ ] Class Defaults → FC | Input | Actions: - [ ] Set InteractPOIAction: `/Game/FC/Input/Actions
-/Game/FC/Input/IA_InteractPOI`
+  - [ ] Class Defaults → FC | UI:
+    - [ ] POI Action Selection Widget Class: Select WBP_POIActionSelection
   - [ ] Compile and save
 
-- [ ] **Testing After Step 6.4.2** ✅ CHECKPOINT
-  - [ ] InteractPOIAction assigned to IA_InteractPOI
-  - [ ] Blueprint compiles without errors
+- [ ] **Testing After Step 6.4.4** ✅ CHECKPOINT
+  - [ ] Widget class reference set
+  - [ ] Blueprint compiles
 
-**COMMIT POINT 6.4.2**: `git add Content/FC/Core/BP_FC_PlayerController.uasset && git commit -m "feat(overworld): Assign IA_InteractPOI to InteractPOIAction"`
+**COMMIT POINT 6.4.4**: `git add Content/FC/Core/Blueprints/BP_FC_PlayerController.uasset && git commit -m "feat(overworld): Configure POI action widget in controller"`
+
+---
+
+#### Step 6.4.5: Wire Widget OnActionSelected Event to Controller
+
+- [ ] **Analysis**
+
+  - [ ] Widget's OnActionSelected dispatcher calls controller's OnPOIActionSelected()
+
+- [ ] **Implementation (WBP_POIActionSelection)**
+
+  - [ ] Event Construct: Get Player Controller → Cast to AFCPlayerController → Save as variable
+  - [ ] Bind OnActionSelected → Call Controller→OnPOIActionSelected(SelectedAction)
+  - [ ] Compile and save
+
+- [ ] **Testing After Step 6.4.5** ✅ CHECKPOINT
+  - [ ] Widget binds to controller
+  - [ ] OnActionSelected fires callback
+
+**COMMIT POINT 6.4.5**: `git add Content/FC/UI/Widgets/WBP_POIActionSelection.uasset && git commit -m "feat(overworld): Wire action widget to controller callback"`
 
 ---
 
