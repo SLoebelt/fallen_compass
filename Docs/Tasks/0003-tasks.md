@@ -3897,93 +3897,235 @@ IMC_FC_TopDown`
 
 #### Step 7.3: Add Return Transition from Overworld to Office
 
-##### Step 7.3.1: Add UI Button or Debug Key for Return Transition
+##### Step 7.3.1: Create Reusable Confirmation Dialog Widget
 
-- [ ] **Analysis**
+- [x] **Analysis**
 
-  - [ ] Week 3 needs basic return mechanism (not full travel system)
-  - [ ] Options:
-    - [ ] ESC key opens pause menu with "Return to Office" button
-    - [ ] Debug key (Tab or M) for quick return
-    - [ ] On-screen UI button
-  - [ ] For Week 3: Debug key is fastest (Task 8 will add proper pause menu)
+  - [x] Create reusable confirmation dialog for various purposes
+  - [x] Dialog will be used for Abort Expedition (and potentially other confirmations)
+  - [x] Should accept customizable title, message, and button text
 
-- [ ] **Implementation (AFCPlayerController)**
+- [x] **Implementation Part 1: Create WBP_ConfirmationDialog Widget**
 
-  - [ ] Open `FCOverworldPlayerController.h`
-  - [ ] Add method declaration:
-    ```cpp
-    private:
-        /** Debug: Return to office level */
-        void DebugReturnToOffice();
-    ```
-  - [ ] Open `FCOverworldPlayerController.cpp`
-  - [ ] Update SetupInputComponent():
+  - [x] Created Widget Blueprint: `/Game/FC/UI/ReusableWidgets/WBP_ConfirmationDialog`
+  - [x] Designer Tab:
+    - [x] Added Canvas Panel as root
+    - [x] Added Overlay (semi-transparent background blocker)
+      - [x] Image (background): Black, Opacity 0.7
+    - [x] Added dialog container with:
+      - [x] Text Block: `TitleText` (bound variable)
+      - [x] Text Block: `InfoText` (bound variable)
+      - [x] Horizontal Box (buttons):
+        - [x] Button with Text Block: `DeclineText` (Btn_Decline)
+        - [x] Button with Text Block: `ConfirmText` (Btn_Confirm) - Warning color
+  - [x] Graph Tab:
+    - [x] Created Custom Function: `InitializeConfirmationDialog`
+      - [x] Parameters: Title (Text), InfoText (Text), ConfirmButtonText (Text), DeclineButtonText (Text)
+      - [x] Sets text for TitleText, InfoText, ConfirmText, DeclineText widgets
+    - [x] Added Event Dispatcher: "OnConfirmed" (bool isConfirmed)
+      - [x] isConfirmed = true when confirm button clicked
+      - [x] isConfirmed = false when decline button clicked
+    - [x] Btn_Decline OnClicked → Call OnConfirmed(false) → RemoveFromParent
+    - [x] Btn_Confirm OnClicked → Call OnConfirmed(true) → RemoveFromParent
+  - [x] Compiled and saved
 
-    ```cpp
-    void AFCPlayerController::SetupInputComponent()
-    {
-        Super::SetupInputComponent();
+- [x] **Implementation Part 2: Check if WBP_PauseMenu Exists**
 
-        // Existing bindings...
+  - [x] Check: `/Game/FC/UI/Menus/WBP_PauseMenu.uasset` ✅ EXISTS
+  - [x] WBP_PauseMenu exists and is used in L_Office
+  - [x] Continue to Step 7.3.2 (add Abort button to existing menu)
+  - [x] Note: ESC key may need to be wired for L_Overworld specifically
 
-        // Debug: Return to office (Tab key)
-        InputComponent->BindKey(EKeys::Tab, IE_Pressed, this, &AFCPlayerController::DebugReturnToOffice);
-        UE_LOG(LogFCOverworldController, Log, TEXT("SetupInputComponent: Bound Tab key to DebugReturnToOffice"));
-    }
-    ```
+- [x] **Testing After Step 7.3.1** ✅ CHECKPOINT
+  - [x] WBP_ConfirmationDialog widget created with reusable design
+  - [x] InitializeConfirmationDialog function accepts custom text
+  - [x] Dialog compiles without errors
+  - [x] OnConfirmed and OnDeclined events available for binding
 
-  - [ ] Implement DebugReturnToOffice():
-
-    ```cpp
-    void AFCPlayerController::DebugReturnToOffice()
-    {
-        UE_LOG(LogFCOverworldController, Log, TEXT("DebugReturnToOffice: Returning to L_Office"));
-
-        UFCGameInstance* GameInstance = Cast<UFCGameInstance>(GetGameInstance());
-        if (!GameInstance)
-        {
-            UE_LOG(LogFCOverworldController, Error, TEXT("DebugReturnToOffice: Failed to get GameInstance"));
-            return;
-        }
-
-        // Set game state back to Office
-        UFCGameStateManager* GameStateMgr = GameInstance->GetGameStateManager();
-        if (GameStateMgr)
-        {
-            GameStateMgr->SetGameState(EFCGameState::Office);
-            UE_LOG(LogFCOverworldController, Log, TEXT("DebugReturnToOffice: Set game state to Office"));
-        }
-
-        // Transition to Office level
-        UFCLevelManager* LevelMgr = GameInstance->GetLevelManager();
-        if (LevelMgr)
-        {
-            LevelMgr->TransitionToLevel(FName("L_Office"));
-            UE_LOG(LogFCOverworldController, Log, TEXT("DebugReturnToOffice: Transitioning to L_Office"));
-        }
-    }
-    ```
-
-  - [ ] Save files
-
-- [ ] **Compilation**
-
-  - [ ] Build solution in Visual Studio
-  - [ ] Verify no compilation errors
-  - [ ] Check UFCGameInstance.h has GetGameStateManager() and GetLevelManager() methods
-
-- [ ] **Testing After Step 7.3.1** ✅ CHECKPOINT
-  - [ ] Compilation succeeds
-  - [ ] DebugReturnToOffice() method added
-  - [ ] Tab key binding in SetupInputComponent
-  - [ ] Can open Unreal Editor
-
-**COMMIT POINT 7.3.1**: `git add Source/FC/Core/FCOverworldPlayerController.h Source/FC/Core/FCOverworldPlayerController.cpp && git commit -m "feat(transition): Add Tab key debug transition from Overworld to Office"`
+**COMMIT POINT 7.3.1**: `git add Content/FC/UI/ReusableWidgets/WBP_ConfirmationDialog.uasset && git commit -m "feat(ui): Create reusable WBP_ConfirmationDialog widget with initialization function"`
 
 ---
 
-#### Step 7.4: Verify Input Context Switches with Level Transitions
+##### Step 7.3.2: Add "Abort Expedition" Button to Existing WBP_PauseMenu
+
+- [ ] **Prerequisites**
+
+  - [x] WBP_PauseMenu exists at `/Game/FC/UI/Menus/WBP_PauseMenu` ✅
+  - [x] Currently used in L_Office scene
+
+- [ ] **Implementation (WBP_PauseMenu Widget)**
+
+  - [ ] Open `/Game/FC/UI/Menus/WBP_PauseMenu`
+  - [ ] Designer Tab:
+    - [ ] Review existing buttons (Resume, Settings, Quit, etc.)
+    - [ ] Add new Button: "AbortExpeditionButton"
+    - [ ] Position: Below "Resume" button or in appropriate location
+    - [ ] Add Text Block as child: "Abort Expedition"
+    - [ ] Set button style: Warning color (red/orange tint to indicate danger)
+  - [ ] Graph Tab:
+    - [ ] Select AbortExpeditionButton → Add Event → OnClicked
+    - [ ] In OnClicked event:
+      - [ ] Branch: Check current game state (only show if in Overworld_Travel)
+      - [ ] Create Widget: WBP_ConfirmationDialog
+      - [ ] Call InitializeConfirmationDialog:
+        - [ ] Title: "Abort Expedition?"
+        - [ ] InfoText: "Aborting will return you to the office. You will lose all progress and expend supplies for this journey."
+        - [ ] ConfirmButtonText: "Abort Expedition"
+        - [ ] DeclineButtonText: "Cancel"
+      - [ ] Add to Viewport (Z-order 101, above pause menu)
+      - [ ] Bind OnConfirmed event:
+        - [ ] Branch on isConfirmed parameter:
+          - [ ] True (Confirmed):
+            - [ ] Get Game Instance → Cast to BP_FCGameInstance
+            - [ ] Get GameStateManager → TransitionTo(Office_Exploration)
+            - [ ] Get LevelManager → LoadLevel("L_Office")
+            - [ ] Remove pause menu from parent
+          - [ ] False (Declined):
+            - [ ] (Optional: Log "Abort cancelled" - dialog auto-closes)
+  - [ ] **Optional: Conditional Visibility**
+    - [ ] In Event Construct or Event Pre-Construct:
+      - [ ] Get Game State
+      - [ ] Set AbortExpeditionButton visibility:
+        - [ ] Visible if Overworld_Travel
+        - [ ] Collapsed if Office_Exploration
+  - [ ] Compile and save
+
+- [ ] **Testing After Step 7.3.2** ✅ CHECKPOINT
+  - [ ] PIE in L_Office → ESC opens pause menu
+  - [ ] "Abort Expedition" button NOT visible (or disabled) in Office
+  - [ ] PIE in L_Overworld → ESC opens pause menu
+  - [ ] "Abort Expedition" button visible and styled with warning color
+  - [ ] Click "Abort Expedition" → Confirmation dialog appears
+  - [ ] Click "Cancel" → Dialog closes, pause menu still open
+  - [ ] Click "Abort Expedition" again → Click "Abort Expedition" (confirm)
+  - [ ] Verify: Transition to L_Office
+  - [ ] Verify: State changes to Office_Exploration
+
+**COMMIT POINT 7.3.2**: `git add Content/FC/UI/Menus/WBP_PauseMenu.uasset && git commit -m "feat(transition): Add Abort Expedition button to WBP_PauseMenu"`
+
+---
+
+##### Step 7.3.3: Ensure ESC Key Opens Pause Menu in Overworld
+
+- [ ] **Analysis**
+
+  - [ ] ESC key already opens pause menu in L_Office
+  - [ ] Need to verify ESC key works in L_Overworld
+  - [ ] Check PlayerController implementation
+
+- [ ] **Implementation (Verify/Add ESC Key Binding)**
+
+  - [ ] **Option A: Check Existing Implementation**
+
+    - [ ] Search codebase for ESC key binding in AFCPlayerController
+    - [ ] If found and works in both levels → Skip implementation
+
+  - [ ] **Option B: Add if Missing**
+    - [ ] Open BP_FCPlayerController (or C++ FCPlayerController)
+    - [ ] Event Graph (or SetupInputComponent in C++):
+      - [ ] Add Input Action: ESC key
+      - [ ] OnPressed:
+        - [ ] Branch: Is pause menu open?
+          - [ ] True: Close pause menu (Remove from Parent)
+          - [ ] False: Open pause menu (Create WBP_PauseMenu → Add to Viewport)
+        - [ ] Set Input Mode: UI Only when menu open, Game Only when closed
+        - [ ] Show/Hide mouse cursor accordingly
+
+- [ ] **Testing After Step 7.3.3** ✅ CHECKPOINT
+  - [ ] PIE in L_Overworld
+  - [ ] Press ESC → Pause menu opens
+  - [ ] Press ESC again → Pause menu closes
+  - [ ] Verify: Mouse cursor visible when menu open
+  - [ ] Verify: Can click buttons in pause menu
+  - [ ] Verify: Gameplay input disabled when menu open
+
+**COMMIT POINT 7.3.3**: `git add Source/FC/Player/FCPlayerController.* Content/Blueprints/BP_FCPlayerController.uasset && git commit -m "feat(pause): Ensure ESC key opens pause menu in Overworld"`
+
+---
+
+##### Step 7.3.4: Test Complete Office ↔ Overworld Flow
+
+- [ ] **Testing Full Transition Cycle** ✅ CHECKPOINT
+  - [ ] **Office → Overworld**:
+    - [ ] PIE in L_Office
+    - [ ] Click map table → WBP_ExpeditionPlanning opens
+    - [ ] Click "Start Journey" → Loads L_Overworld
+    - [ ] Verify: State = Overworld_Travel, Input = TopDown
+  - [ ] **Overworld → Office (Abort)**:
+    - [ ] Press ESC → Pause menu opens
+    - [ ] Click "Abort Expedition" → Confirmation dialog appears
+    - [ ] Click "Cancel" → Dialog closes, still in overworld
+    - [ ] Press ESC again → Click "Abort Expedition" → Click "Abort Expedition" (confirm)
+    - [ ] Verify: Returns to L_Office
+    - [ ] Verify: State = Office_Exploration, Input = FirstPerson
+  - [ ] **Round Trip**:
+    - [ ] Click map table again → Start another journey
+    - [ ] Verify: Can transition back and forth multiple times
+  - [ ] No crashes or errors
+
+**COMMIT POINT 7.3.4**: `git commit -m "test(transition): Verify complete Office ↔ Overworld transition cycle with abort confirmation"`
+
+---
+
+#### Step 7.4: Update Technical Documentation
+
+- [ ] **Update Technical_Documentation.md**
+
+  - [ ] Add section: "Office ↔ Overworld Level Transitions"
+  - [ ] Document:
+    - [ ] WBP_ExpeditionPlanning "Start Journey" button flow
+    - [ ] State transition: Office_Exploration → Overworld_Travel
+    - [ ] Level load: L_Office → L_Overworld
+    - [ ] WBP_PauseMenu "Abort Expedition" button
+    - [ ] WBP_ConfirmAbortDialog confirmation flow with warning
+    - [ ] Reverse transition: Overworld_Travel → Office_Exploration
+    - [ ] Automatic input mode switching (FirstPerson ↔ TopDown)
+    - [ ] Consequences of aborting expedition (lose progress/supplies)
+  - [ ] Add sequence diagram for transition flow (both directions)
+  - [ ] Note: Camera error in L_Overworld expected (Task 3 pending)
+
+**COMMIT POINT 7.4**: `git add Docs/Technical_Documentation.md && git commit -m "docs(transition): Document Office ↔ Overworld transition system with abort confirmation"`
+
+---
+
+### Task 7 Acceptance Criteria
+
+- [ ] **Office → Overworld Transition**
+
+  - [ ] Click map table in L_Office → Opens WBP_ExpeditionPlanning widget
+  - [ ] Click "Start Journey" button → Transitions to L_Overworld
+  - [ ] Game state changes: Office_Exploration → Overworld_Travel
+  - [ ] Input mode switches automatically: FirstPerson → TopDown
+  - [ ] Widget closes before transition
+
+- [ ] **Overworld → Office Transition**
+
+  - [ ] ESC key opens pause menu in L_Overworld
+  - [ ] "Abort Expedition" button visible in pause menu
+  - [ ] Click "Abort Expedition" → Confirmation dialog appears
+  - [ ] Confirmation dialog warns about consequences (lose progress/supplies)
+  - [ ] Cancel button closes dialog without action
+  - [ ] Confirm button returns to L_Office
+  - [ ] Game state changes: Overworld_Travel → Office_Exploration
+  - [ ] Input mode switches automatically: TopDown → FirstPerson
+
+- [ ] **Round Trip Testing**
+
+  - [ ] Can transition Office → Overworld → Office multiple times
+  - [ ] No memory leaks or widget duplication
+  - [ ] No crashes during transitions
+
+- [ ] **Documentation**
+  - [ ] Technical_Documentation.md includes transition flow
+  - [ ] Sequence diagrams for both directions
+  - [ ] Widget interaction documented
+  - [ ] Abort consequences documented
+
+**FINAL COMMIT - TASK 7**: `git add . && git commit -m "feat(transition): Complete Task 7 - Office ↔ Overworld transitions with abort confirmation"`
+
+---
+
+#### Step 7.5: Verify Input Context Switches with Level Transitions
 
 ##### Step 7.4.1: Ensure UFCInputManager Responds to GameState Changes
 
