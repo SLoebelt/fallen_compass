@@ -125,7 +125,7 @@ Every week aims to leave the game **playable and compiling**. Multi-week feature
 
 ---
 
-### Week 3 – Overworld Level & Basic Convoy Movement - 21.11.-28.11.2025
+### Week 3 – Overworld Level & Basic Convoy Movement - 21.11.-23.11.2025
 
 - **Feature: Overworld Level – Part 1 (Basic Terrain & Camera)**
 
