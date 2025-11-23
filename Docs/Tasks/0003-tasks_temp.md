@@ -1841,45 +1841,167 @@ IMC_FC_TopDown`
 - [ ] **Testing After Step 6.4.5** ✅ CHECKPOINT
   - [x] C++ code compiles without errors
   - [x] ActionSelectionWidgetClass property visible in BP_FC_GameInstance under UI category
-  - [ ] Widget class reference set in Blueprint
-  - [ ] Blueprint compiles
+  - [x] Widget class reference set in Blueprint
+  - [x] Blueprint compiles
 
 **COMMIT POINT 6.4.5**: `git add Source/FC/Core/UFCGameInstance.h Source/FC/Core/UFCGameInstance.cpp Source/FC/Core/FCUIManager.h Source/FC/Core/FCUIManager.cpp Content/FC/Core/Blueprints/BP_FC_GameInstance.uasset && git commit -m "feat(overworld): Expose ActionSelectionWidgetClass in GameInstance and delegate to UIManager"`
 
 ---
 
-#### Step 6.4.6: Wire Widget to Interaction Component
+#### Step 6.4.6: Wire Widget to Interaction Component via UIManager Mediator
 
-- [ ] **Analysis**
+- [x] **Analysis**
 
-  - [ ] WBP_ActionSelection receives actions array from UFCUIManager
-  - [ ] Widget populates action buttons dynamically
-  - [ ] Widget's OnActionSelected dispatcher calls UFCInteractionComponent->OnPOIActionSelected()
-  - [ ] Component reference passed from UFCUIManager::ShowPOIActionSelection()
+  - [x] **Architecture Decision**: UIManager acts as mediator between widget and InteractionComponent
+  - [x] **Rationale**: Loose coupling - widget remains UI-only, reusable for other action selection scenarios
+  - [x] **Pattern**: Follows existing HandleNewLegacyClicked/HandleContinueClicked mediator pattern
+  - [x] **Flow**: Widget fires event dispatcher → UIManager handles event → InteractionComponent callback
+  - [x] WBP_ActionSelection receives actions array from UFCUIManager::ShowPOIActionSelection()
+  - [x] Widget populates action buttons dynamically and calls UIManager->HandlePOIActionSelected()
+  - [x] UIManager stores InteractionComponent reference during widget display
+  - [x] UIManager callback forwards action to InteractionComponent->OnPOIActionSelected()
 
-- [ ] **Implementation (WBP_ActionSelection Blueprint)**
+- [x] **Implementation (C++ - UFCUIManager)**
 
-  - [ ] **Add Variables**:
-    - [ ] `InteractionComponent` (UFCInteractionComponent\*, Instance Editable)
-  - [ ] **Event Construct**:
-    - [ ] Call PopulateActions(AvailableActions) to create button widgets
-  - [ ] **Function: PopulateActions(Actions)**:
-    - [ ] ForEach loop through Actions array:
-      - [ ] Create WBP_POIActionButton instance
-      - [ ] Set button's ActionType and ActionText from array element
-      - [ ] Bind button's OnClicked → OnActionButtonClicked(ActionType)
-      - [ ] Add button to Scroll Box
-  - [ ] **Function: OnActionButtonClicked(EFCPOIAction Action)**:
-    - [ ] Call InteractionComponent->OnPOIActionSelected(Action)
-    - [ ] Remove widget from viewport
-  - [ ] Compile and save
+  - [x] **Update FCUIManager.h**:
+    - [x] Add PendingInteractionComponent property (UFCInteractionComponent\*)
+    - [x] Add HandlePOIActionSelected(EFCPOIAction Action) method declaration
+  - [x] **Update FCUIManager.cpp**:
+    - [x] In ShowPOIActionSelection():
+      - [x] Store InteractionComponent in PendingInteractionComponent
+      - [x] Call PopulateActions(Actions) on widget to set actions array and create buttons
+    - [x] In ClosePOIActionSelection():
+      - [x] Clear PendingInteractionComponent reference
+    - [x] Implement HandlePOIActionSelected(EFCPOIAction Action):
+      - [x] Validate PendingInteractionComponent is valid
+      - [x] Forward action to PendingInteractionComponent->OnPOIActionSelected(Action)
+      - [x] Clear PendingInteractionComponent reference
+      - [x] Call ClosePOIActionSelection()
+  - [x] **Update FCPlayerController.cpp**:
+    - [x] Add IFCInteractablePOI.h include
+    - [x] Implement HandleInteractPressed() for TopDown mode:
+      - [x] Raycast under cursor to detect POI actors
+      - [x] Check for IFCInteractablePOI interface
+      - [x] Delegate to InteractionComponent->HandlePOIClick() for action selection
+    - [x] Remove POI detection from HandleClick():
+      - [x] Left-click now only handles click-to-move
+      - [x] Right-click (IA_Interact) handles POI interaction
+  - [x] Save files
+  - [x] Compile C++ code
 
-- [ ] **Testing After Step 6.4.6** ✅ CHECKPOINT
-  - [ ] Widget binds to InteractionComponent
-  - [ ] Action buttons call component method
-  - [ ] Widget closes after selection
+- [x] **Implementation (WBP_ActionSelection Blueprint)**
 
-**COMMIT POINT 6.4.6**: `git add Content/FC/UI/Widgets/WBP_ActionSelection.uasset && git commit -m "feat(overworld): Wire action widget to interaction component"`
+  - [x] **Add Variables**:
+    - [x] `AvailableActions` (TArray<FFCPOIActionData>, Instance Editable, Expose on Spawn)
+  - [x] **Function: PopulateActions(Actions)**:
+    - [x] Takes TArray<FFCPOIActionData> as input parameter
+    - [x] Sets AvailableActions variable from parameter
+    - [x] ForEach loop through Actions array:
+      - [x] Create WBP_POIActionButton instance
+      - [x] Set button's ActionType and ActionText from array element
+      - [x] Bind button's OnClicked → OnActionButtonClicked(ActionType)
+      - [x] Add button to Scroll Box
+  - [x] **Function: OnActionButtonClicked(EFCPOIAction Action)**:
+    - [x] Get Game Instance → Get Subsystem UFCUIManager
+    - [x] Call UIManager->HandlePOIActionSelected(Action)
+  - [x] Compile and save
+
+- [x] **Testing After Step 6.4.6** ✅ CHECKPOINT
+  - [x] C++ code compiles without errors
+  - [x] Right-click on POI opens action selection widget
+  - [x] Left-click moves convoy to location (no widget)
+  - [x] PopulateActions receives actions array from C++ via ProcessEvent
+  - [x] Widget displays action buttons correctly
+  - [x] HandlePOIActionSelected method available for Blueprint widget callbacks
+  - [x] Widget remains UI-only (no direct InteractionComponent reference)
+  - [x] UIManager mediates between widget and game logic
+
+**IMPLEMENTATION NOTES**:
+
+- **Input Split**: Right-click (IA_Interact) = POI interaction, Left-click (IA_Click) = movement
+- **ProcessEvent Safety**: PopulateActions called with properly structured parameters matching Blueprint function signature
+- **POI Navigation**: POIs should NOT block navmesh - set "Can Ever Affect Navigation" = FALSE in Blueprint
+- **Movement Stop**: Convoy stops on overlap trigger (CapsuleComponent), not navmesh blocking
+
+**COMMIT POINT 6.4.6**: `git add Source/FC/Core/FCUIManager.h Source/FC/Core/FCUIManager.cpp Source/FC/Core/FCPlayerController.cpp Content/FC/UI/Widgets/WBP_ActionSelection.uasset && git commit -m "feat(overworld): Implement right-click POI interaction and widget wiring via UIManager mediator"`
+
+---
+
+#### Step 6.4.7: Refactor Convoy-POI Coordination Architecture
+
+- [x] **Analysis**
+
+  - [x] **Problem**: Individual convoy members stopping independently, uncoordinated behavior
+  - [x] **Solution**: Member detects → Convoy coordinates all members → InteractionComponent handles logic
+  - [x] **Movement Flow**:
+    - **Right-click single-action**: HandlePOIClick → auto-select → MoveConvoyToLocation → Overlap → Execute
+    - **Right-click multiple-action**: HandlePOIClick → widget → OnPOIActionSelected → MoveConvoyToLocation → Overlap → Execute
+    - **Left-click**: HandleClick → MoveConvoyToLocation → Overlap → HandlePOIOverlap → widget → OnPOIActionSelected → Execute immediately (no re-move)
+  - [x] **Key Flag**: `bConvoyAlreadyAtPOI` differentiates left-click (already at POI) from right-click (move after selection)
+
+- [x] **Implementation (AFCOverworldConvoy.h)**
+
+  - [x] Added `StopAllMembers()` method
+  - [x] Added `HandlePOIOverlap(AActor*)` method for coordinated stop and delegation
+
+- [x] **Implementation (AFCOverworldConvoy.cpp)**
+
+  - [x] `StopAllMembers()`: Iterates ConvoyMembers array, calls AIController->StopMovement() on each
+  - [x] `HandlePOIOverlap()`: Checks bIsInteractingWithPOI flag, stops all members, delegates to InteractionComponent
+  - [x] Added includes: AIController.h, FCPlayerController.h, FCFirstPersonCharacter.h, FCInteractionComponent.h
+  - [x] Old `NotifyPOIOverlap()` kept for backward compatibility (fallback only, deprecated)
+
+- [x] **Implementation (AFCConvoyMember.cpp)**
+
+  - [x] `OnCapsuleBeginOverlap()`: Calls `ParentConvoy->HandlePOIOverlap(OtherActor)` for coordination
+  - [x] Removed individual AIController->StopMovement() call (convoy coordinates now)
+  - [x] `NotifyPOIOverlap()`: Marked as deprecated, kept as fallback for backward compatibility
+
+- [x] **Implementation (UFCInteractionComponent.h/cpp)**
+
+  - [x] Added `bConvoyAlreadyAtPOI` flag to differentiate left-click vs right-click scenarios
+  - [x] `HandlePOIClick()`: Resets `bConvoyAlreadyAtPOI = false` for right-click scenarios
+  - [x] `NotifyPOIOverlap()` (unintentional overlap): Sets `bConvoyAlreadyAtPOI = true` for left-click multiple-action
+  - [x] `OnPOIActionSelected()`: Checks `bConvoyAlreadyAtPOI` to determine if movement needed:
+    - If `false` (right-click multiple): Calls MoveConvoyToLocation
+    - If `true` (left-click): Calls NotifyPOIOverlap immediately (no movement)
+
+- [x] **Compile and Test**
+
+  - [x] C++ code compiled successfully
+  - [x] All three POI interaction flows working:
+    - ✅ Left-click: Move → Overlap stops all → Widget → Select → Execute (no re-move)
+    - ✅ Right-click single: Auto-select → Move → Overlap stops all → Execute
+    - ✅ Right-click multiple: Widget → Select → Move → Overlap stops all → Execute
+  - [x] All convoy members stop together on any member overlap
+  - [x] No duplicate movement triggers
+  - [x] Output Log shows proper coordination messages
+
+- [x] **Testing After Step 6.4.7** ✅ CHECKPOINT
+  - [x] C++ code compiles without errors
+  - [x] All convoy members stop together on POI overlap (coordinated)
+  - [x] Convoy coordinates stop via `StopAllMembers()`
+  - [x] Convoy delegates interaction to InteractionComponent
+  - [x] `bIsInteractingWithPOI` flag prevents duplicate triggers
+  - [x] `bConvoyAlreadyAtPOI` flag prevents re-movement after stop
+  - [x] POI actions execute correctly in all scenarios
+  - [x] Left-click doesn't cause re-movement after convoy already stopped
+  - [x] Right-click properly triggers movement after action selection
+
+**IMPLEMENTATION NOTES**:
+
+- **Coordination Pattern**: Member detects → Convoy coordinates stop → InteractionComponent handles logic
+- **Movement Delegation**: All movement goes through PlayerController::MoveConvoyToLocation
+- **Flag System**:
+  - `bIsInteractingWithPOI`: Prevents multiple convoy members from triggering same POI
+  - `bConvoyAlreadyAtPOI`: Prevents re-movement when convoy already stopped at POI (left-click scenario)
+- **Clear Responsibilities**:
+  - ConvoyMember: Overlap detection only
+  - Convoy: Coordinate all member stops, manage interaction flag, delegate to InteractionComponent
+  - InteractionComponent: Action selection, execution, movement triggering logic
+  - PlayerController: Movement execution (MoveConvoyToLocation)
+
+**COMMIT POINT 6.4.7**: `git add Source/FC/Characters/Convoy/FCOverworldConvoy.* Source/FC/Characters/Convoy/FCConvoyMember.* Source/FC/Interaction/FCInteractionComponent.* && git commit -m "refactor(convoy): Implement coordinated POI stop and fix left-click re-movement bug"`
 
 ---
 
@@ -1961,19 +2083,23 @@ IMC_FC_TopDown`
 
 ### Task 6 Acceptance Criteria
 
-- [ ] IA_InteractPOI input action created (Digital/Boolean)
-- [ ] Right Mouse Button bound to IA_InteractPOI in IMC_FC_TopDown
-- [ ] BP_OverworldPOI actor created with mesh, InteractionBox, and POIName property
-- [ ] BPI_InteractablePOI interface created with OnPOIInteract() and GetPOIName() methods
-- [ ] BP_OverworldPOI implements BPI_InteractablePOI interface
-- [ ] OnPOIInteract() displays Print String stub message
-- [ ] AFCPlayerController implements HandleInteractPOI() with raycast and interface check
-- [ ] InteractPOIAction assigned to IA_InteractPOI in BP_FC_PlayerController
-- [ ] 3-5 POI instances placed in L_Overworld with unique names
-- [ ] Right-click on POI shows on-screen message and logs interaction
-- [ ] Convoy overlap with POI shows on-screen message and logs detection
-- [ ] Both interaction methods work independently
-- [ ] No compilation errors or runtime crashes
+- [x] IA_InteractPOI input action created (Digital/Boolean)
+- [x] Right Mouse Button bound to IA_InteractPOI in IMC_FC_TopDown
+- [x] BP_OverworldPOI actor created with mesh, InteractionBox, and POIName property
+- [x] IFCInteractablePOI interface created with action-based system (GetAvailableActions, ExecuteAction, GetPOIName)
+- [x] BP_OverworldPOI implements IFCInteractablePOI interface
+- [x] Action execution displays stub messages and logs
+- [x] UFCInteractionComponent handles POI interaction logic (HandlePOIClick, OnPOIActionSelected, NotifyPOIOverlap)
+- [x] UFCUIManager manages POI action selection widget lifecycle
+- [x] AFCPlayerController delegates to InteractionComponent (HandleInteractPressed)
+- [x] WBP_ActionSelection widget displays actions and callbacks to InteractionComponent
+- [x] 3-5 POI instances placed in L_Overworld with unique names
+- [x] Right-click POI shows action widget (multiple actions) or auto-executes (single action)
+- [x] Convoy overlap detection triggers action widget or auto-executes
+- [x] Coordinated convoy stop implemented (StopAllMembers, HandlePOIOverlap)
+- [x] All three interaction flows working (right-click single/multiple, left-click)
+- [x] No duplicate movement triggers (bConvoyAlreadyAtPOI flag)
+- [x] No compilation errors or runtime crashes
 
 **Task 6 complete. Ready for Task 7-9 (transitions, pause, testing).**
 

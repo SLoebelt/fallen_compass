@@ -102,4 +102,5 @@ private:
 
 	EFCPOIAction PendingInteractionAction;
 	bool bHasPendingPOIInteraction = false;
+	bool bConvoyAlreadyAtPOI = false; // True when convoy reached POI before action selection (left-click)
 };

@@ -8098,6 +8098,262 @@ void AFCOverworldConvoy::NotifyPOIOverlap(AActor* POIActor)
 }
 ```
 
+### Coordinated Convoy-POI Interaction System (Step 6.4.7)
+
+**Problem**: Initial implementation had individual convoy members stopping independently when overlapping POIs, leading to uncoordinated behavior where some members would stop while others continued moving.
+
+**Solution**: Implemented coordinated stop architecture where the convoy parent actor manages all member AI movement and delegates interaction handling to the InteractionComponent.
+
+#### Architecture Overview
+
+```mermaid
+sequenceDiagram
+    participant Member as ConvoyMember
+    participant Convoy as OverworldConvoy
+    participant PC as PlayerController
+    participant IC as InteractionComponent
+
+    Note over Member,IC: Convoy Moving to POI
+    Member->>Member: OnCapsuleBeginOverlap(POI)
+    Member->>Convoy: HandlePOIOverlap(POIActor)
+    Convoy->>Convoy: Check bIsInteractingWithPOI flag
+    Convoy->>Convoy: StopAllMembers()
+    Note over Convoy: Iterates ConvoyMembers array<br/>Calls StopMovement() on each AIController
+    Convoy->>PC: GetFirstPlayerController()
+    PC->>IC: GetInteractionComponent()
+    Convoy->>IC: NotifyPOIOverlap(POIActor)
+    IC->>IC: Execute action or show widget
+    IC->>Convoy: SetInteractingWithPOI(false)
+    Note over IC,Convoy: Clear flag after interaction complete
+```
+
+#### AFCOverworldConvoy::StopAllMembers()
+
+**Purpose**: Coordinates simultaneous stop of all convoy member AI controllers for synchronized behavior.
+
+```cpp
+void AFCOverworldConvoy::StopAllMembers()
+{
+    UE_LOG(LogFCOverworldConvoy, Log, TEXT("Convoy %s: Stopping all members"), *GetName());
+
+    for (AFCConvoyMember* Member : ConvoyMembers)
+    {
+        if (Member)
+        {
+            AAIController* AIController = Cast<AAIController>(Member->GetController());
+            if (AIController)
+            {
+                AIController->StopMovement();
+                UE_LOG(LogFCOverworldConvoy, Log, TEXT("  Stopped member: %s"), *Member->GetName());
+            }
+        }
+    }
+}
+```
+
+**Design Notes**:
+
+- Single point of control for all member movement
+- Prevents race conditions where members stop at different times
+- Logs each stopped member for debugging coordination issues
+
+#### AFCOverworldConvoy::HandlePOIOverlap()
+
+**Purpose**: Unified entry point for POI overlap handling with coordinated stop and delegation pattern.
+
+```cpp
+void AFCOverworldConvoy::HandlePOIOverlap(AActor* POIActor)
+{
+    if (!POIActor) return;
+
+    // Check if already interacting - prevent multiple triggers
+    if (bIsInteractingWithPOI)
+    {
+        UE_LOG(LogFCOverworldConvoy, Log, TEXT("Convoy %s: Already interacting with POI, ignoring overlap"), *GetName());
+        return;
+    }
+
+    // Set interaction flag
+    bIsInteractingWithPOI = true;
+
+    // Stop all convoy members immediately
+    StopAllMembers();
+
+    // Get player controller's InteractionComponent for delegation
+    AFCPlayerController* PC = Cast<AFCPlayerController>(GetWorld()->GetFirstPlayerController());
+    if (PC)
+    {
+        AFCFirstPersonCharacter* FPCharacter = Cast<AFCFirstPersonCharacter>(PC->GetPawn());
+        if (FPCharacter)
+        {
+            UFCInteractionComponent* InteractionComp = FPCharacter->GetInteractionComponent();
+            if (InteractionComp)
+            {
+                UE_LOG(LogFCOverworldConvoy, Log, TEXT("Convoy %s: Delegating POI overlap to InteractionComponent"), *GetName());
+                InteractionComp->NotifyPOIOverlap(POIActor);
+                return;
+            }
+        }
+    }
+
+    UE_LOG(LogFCOverworldConvoy, Warning, TEXT("Convoy %s: Failed to delegate to InteractionComponent"), *GetName());
+}
+```
+
+**Responsibility Separation**:
+
+- **Convoy**: Coordinates movement (stop all members), manages interaction flag
+- **InteractionComponent**: Handles interaction logic (action selection, execution)
+- **PlayerController**: Routes movement commands (MoveConvoyToLocation)
+
+#### AFCConvoyMember Overlap Detection
+
+**Updated OnCapsuleBeginOverlap** (simplified):
+
+```cpp
+void AFCConvoyMember::OnCapsuleBeginOverlap(/* parameters */)
+{
+    if (!OtherActor || OtherActor == this)
+    {
+        return;
+    }
+
+    // Check if actor implements IFCInteractablePOI interface
+    if (OtherActor->GetClass()->ImplementsInterface(UIFCInteractablePOI::StaticClass()))
+    {
+        UE_LOG(LogFCConvoyMember, Log, TEXT("ConvoyMember %s: Detected overlap with POI %s"),
+            *GetName(), *OtherActor->GetName());
+
+        // Notify parent convoy to coordinate stop and interaction
+        if (ParentConvoy)
+        {
+            ParentConvoy->HandlePOIOverlap(OtherActor);
+        }
+        else
+        {
+            UE_LOG(LogFCConvoyMember, Warning, TEXT("ConvoyMember %s: No parent convoy reference"), *GetName());
+        }
+    }
+}
+```
+
+**Key Changes**:
+
+- Removed individual AIController->StopMovement() call
+- Delegates to ParentConvoy->HandlePOIOverlap() for coordination
+- No direct InteractionComponent access (convoy handles delegation)
+
+#### POI Interaction Flow Scenarios
+
+##### Right-Click Single-Action POI
+
+```
+1. User right-clicks POI
+2. PlayerController::HandleInteractPressed() → raycasts for POI
+3. InteractionComponent::HandlePOIClick(POI)
+   - Single action detected
+   - Auto-selects action
+   - Sets bHasPendingPOIInteraction = true
+   - Resets bConvoyAlreadyAtPOI = false
+4. PlayerController::MoveConvoyToLocation(POI.Location)
+5. Convoy moves via NavMesh pathfinding
+6. ConvoyMember overlaps POI → Convoy::HandlePOIOverlap()
+   - Stops all members
+   - Delegates to InteractionComponent::NotifyPOIOverlap()
+7. InteractionComponent executes pending action (bHasPendingPOIInteraction == true)
+8. Clears convoy flag: Convoy->SetInteractingWithPOI(false)
+```
+
+##### Right-Click Multiple-Action POI
+
+```
+1. User right-clicks POI
+2. PlayerController::HandleInteractPressed() → raycasts for POI
+3. InteractionComponent::HandlePOIClick(POI)
+   - Multiple actions detected
+   - Sets PendingInteractionPOI
+   - Sets bHasPendingPOIInteraction = false (waiting for selection)
+   - Resets bConvoyAlreadyAtPOI = false
+4. UIManager::ShowPOIActionSelection() → displays widget
+5. User selects action from widget
+6. InteractionComponent::OnPOIActionSelected(SelectedAction)
+   - Checks bConvoyAlreadyAtPOI == false (not at POI yet)
+   - Stores action
+   - Sets bHasPendingPOIInteraction = true
+7. PlayerController::MoveConvoyToLocation(POI.Location)
+8. Convoy moves → overlaps → HandlePOIOverlap() → stops all → executes action
+9. Clears convoy flag
+```
+
+##### Left-Click Movement to POI (Unintentional Overlap)
+
+```
+1. User left-clicks on ground near POI
+2. PlayerController::HandleClick() → HandleOverworldClickMove()
+3. PlayerController::MoveConvoyToLocation(ClickLocation)
+4. Convoy moves via NavMesh pathfinding
+5. ConvoyMember overlaps POI → Convoy::HandlePOIOverlap()
+   - Stops all members
+   - Delegates to InteractionComponent::NotifyPOIOverlap()
+6. InteractionComponent detects unintentional overlap (bHasPendingPOIInteraction == false)
+   - If single action: Auto-executes immediately
+   - If multiple actions: Shows widget, sets bConvoyAlreadyAtPOI = true
+7. User selects action from widget
+8. InteractionComponent::OnPOIActionSelected(SelectedAction)
+   - Checks bConvoyAlreadyAtPOI == true (already stopped at POI)
+   - Calls NotifyPOIOverlap() immediately (no movement)
+   - Executes action
+9. Resets bConvoyAlreadyAtPOI = false
+10. Clears convoy flag
+```
+
+#### Key Flags and State Management
+
+**bIsInteractingWithPOI** (AFCOverworldConvoy):
+
+- **Purpose**: Prevents multiple convoy members from triggering same POI
+- **Set**: When first member overlaps POI (HandlePOIOverlap)
+- **Cleared**: When InteractionComponent completes action execution
+- **Managed by**: InteractionComponent via SetInteractingWithPOI()
+
+**bHasPendingPOIInteraction** (UFCInteractionComponent):
+
+- **Purpose**: Distinguishes intentional (right-click) vs unintentional (wander) overlap
+- **Set to true**: When user right-clicks single-action POI or selects action from widget
+- **Set to false**: When showing widget (waiting for user selection)
+- **Used by**: NotifyPOIOverlap() to determine action execution vs widget display
+
+**bConvoyAlreadyAtPOI** (UFCInteractionComponent):
+
+- **Purpose**: Prevents re-movement when convoy already stopped at POI (left-click scenario)
+- **Set to true**: When NotifyPOIOverlap() shows widget for unintentional multiple-action overlap
+- **Set to false**: When HandlePOIClick() is called (right-click scenarios)
+- **Used by**: OnPOIActionSelected() to determine if MoveConvoyToLocation() is needed
+
+#### Design Benefits
+
+**Coordinated Movement**:
+
+- All convoy members stop simultaneously (no straggling followers)
+- Single point of control via StopAllMembers()
+- Predictable, synchronized behavior
+
+**Clear Responsibility Separation**:
+
+- **ConvoyMember**: Detection only (OnCapsuleBeginOverlap)
+- **Convoy**: Coordination (stop all, manage flag, delegate)
+- **InteractionComponent**: Logic (action selection, execution, flag management)
+- **PlayerController**: Movement (MoveConvoyToLocation)
+
+**Prevents Edge Cases**:
+
+- No duplicate action executions (bIsInteractingWithPOI flag)
+- No re-movement after already stopped (bConvoyAlreadyAtPOI flag)
+- No widget spam from multiple members (convoy delegates once)
+- Handles both intentional (right-click) and unintentional (wander) overlap
+
+---
+
 **Design Notes**:
 
 - Flag set to true when first member triggers overlap

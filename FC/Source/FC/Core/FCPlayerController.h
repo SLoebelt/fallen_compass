@@ -131,6 +131,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "FC|Convoy")
 	AFCOverworldConvoy* GetPossessedConvoy() const { return PossessedConvoy; }
 
+	/** Move convoy to target location (called by InteractionComponent for POI navigation) */
+	UFUNCTION(BlueprintCallable, Category = "FC|Convoy")
+	void MoveConvoyToLocation(const FVector& TargetLocation);
+
 protected:
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "State")
 	bool bIsPauseMenuDisplayed;
@@ -191,10 +195,6 @@ protected:
 	void HandleOverworldZoom(const FInputActionValue& Value);
 	void HandleClick(const FInputActionValue& Value);
 	void HandleOverworldClickMove();
-
-	/** Move convoy to target location (called by InteractionComponent for POI navigation) */
-	UFUNCTION(BlueprintCallable, Category = "FC|Convoy")
-	void MoveConvoyToLocation(const FVector& TargetLocation);
 
 	/** Handle game state changes (bind to GameStateManager.OnStateChanged) */
 	UFUNCTION()

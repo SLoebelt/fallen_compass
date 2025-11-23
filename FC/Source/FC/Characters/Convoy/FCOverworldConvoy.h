@@ -85,9 +85,13 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "FC|Convoy")
 	void SetInteractingWithPOI(bool bInteracting) { bIsInteractingWithPOI = bInteracting; }
 
-	/** Called by convoy members when they overlap a POI */
+	/** Stop all convoy members' AI movement */
 	UFUNCTION(BlueprintCallable, Category = "FC|Convoy")
-	void NotifyPOIOverlap(AActor* POIActor);
+	void StopAllMembers();
+
+	/** Handle POI overlap detected by any convoy member (coordinates stop and delegates interaction) */
+	UFUNCTION(BlueprintCallable, Category = "FC|Convoy")
+	void HandlePOIOverlap(AActor* POIActor);
 
 	/** Event dispatcher for POI overlap */
 	UPROPERTY(BlueprintAssignable, Category = "FC|Convoy|Events")

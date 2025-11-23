@@ -16,6 +16,7 @@
 #include "Blueprint/UserWidget.h"
 #include "Kismet/KismetSystemLibrary.h"
 #include "../Interaction/FCInteractionComponent.h"
+#include "../Interaction/IFCInteractablePOI.h"
 #include "UFCGameInstance.h"
 #include "FCTransitionManager.h"
 #include "Core/FCLevelManager.h"
@@ -274,10 +275,47 @@ void AFCPlayerController::HandleInteractPressed()
 	EFCPlayerCameraMode CurrentMode = CameraManager ? CameraManager->GetCameraMode() : EFCPlayerCameraMode::FirstPerson;
 	UE_LOG(LogFallenCompassPlayerController, Verbose, TEXT("HandleInteractPressed | Camera=%s"), *StaticEnum<EFCPlayerCameraMode>()->GetNameStringByValue(static_cast<int64>(CurrentMode)));
 
-	// Week 3: Route to Overworld interaction if in TopDown mode
+	// Week 3: Route to Overworld POI interaction if in TopDown mode
 	if (CurrentMode == EFCPlayerCameraMode::TopDown)
 	{
-		UE_LOG(LogFallenCompassPlayerController, Log, TEXT("HandleInteractPressed: TopDown mode - feature not yet implemented"));
+		UE_LOG(LogFallenCompassPlayerController, Log, TEXT("HandleInteractPressed: TopDown mode - checking for POI interaction"));
+		
+		// Raycast to check if clicking on POI
+		FHitResult HitResult;
+		bool bHit = GetHitResultUnderCursor(ECC_Visibility, false, HitResult);
+		
+		if (bHit && HitResult.GetActor())
+		{
+			AActor* HitActor = HitResult.GetActor();
+			
+			// Check if actor implements IFCInteractablePOI interface
+			if (HitActor->GetClass()->ImplementsInterface(UIFCInteractablePOI::StaticClass()))
+			{
+				UE_LOG(LogFallenCompassPlayerController, Log, TEXT("HandleInteractPressed: POI detected - %s"), *HitActor->GetName());
+				
+				// Get InteractionComponent from FirstPersonCharacter
+				AFCFirstPersonCharacter* FPCharacter = Cast<AFCFirstPersonCharacter>(GetPawn());
+				if (FPCharacter)
+				{
+					UFCInteractionComponent* InteractionComp = FPCharacter->GetInteractionComponent();
+					if (InteractionComp)
+					{
+						// Delegate to InteractionComponent for POI handling
+						InteractionComp->HandlePOIClick(HitActor);
+						
+						// After action selection, movement will be triggered by HandleClick
+						// This maintains separation: Interact = select action, Click = move to location
+						return;
+					}
+					else
+					{
+						UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("HandleInteractPressed: No InteractionComponent on character"));
+					}
+				}
+			}
+		}
+		
+		UE_LOG(LogFallenCompassPlayerController, Verbose, TEXT("HandleInteractPressed: No POI under cursor"));
 		return;
 	}
 
@@ -982,39 +1020,9 @@ void AFCPlayerController::HandleClick(const FInputActionValue& Value)
 
 	EFCPlayerCameraMode CurrentMode = CameraManager->GetCameraMode();
 
-	// TopDown mode: Check for POI interaction or click-to-move convoy
+	// TopDown mode: Click-to-move convoy (POI interaction is handled by HandleInteractPressed)
 	if (CurrentMode == EFCPlayerCameraMode::TopDown)
 	{
-		// Raycast to detect what was clicked
-		FHitResult HitResult;
-		bool bHit = GetHitResultUnderCursor(ECC_Visibility, false, HitResult);
-
-		if (bHit && HitResult.GetActor())
-		{
-			AActor* HitActor = HitResult.GetActor();
-
-			// Check if hit actor implements IFCInteractablePOI
-			if (HitActor->GetClass()->ImplementsInterface(UIFCInteractablePOI::StaticClass()))
-			{
-				// Delegate to InteractionComponent (get from FirstPersonCharacter)
-				AFCFirstPersonCharacter* FPCharacter = Cast<AFCFirstPersonCharacter>(GetPawn());
-				if (FPCharacter)
-				{
-					UFCInteractionComponent* InteractionComp = FPCharacter->GetInteractionComponent();
-					if (InteractionComp)
-					{
-						InteractionComp->HandlePOIClick(HitActor);
-					}
-					else
-					{
-						UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("HandleClick: No InteractionComponent on character"));
-					}
-				}
-				return;
-			}
-		}
-
-		// If not POI, handle click-to-move
 		HandleOverworldClickMove();
 	}
 	// TableView/FirstPerson mode: Interact with table objects

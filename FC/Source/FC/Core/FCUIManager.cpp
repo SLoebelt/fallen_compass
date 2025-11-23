@@ -3,6 +3,7 @@
 #include "Core/FCUIManager.h"
 #include "Core/UFCGameInstance.h"
 #include "Core/FCPlayerController.h"
+#include "Interaction/FCInteractionComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "Kismet/KismetSystemLibrary.h"
 
@@ -380,9 +381,31 @@ UUserWidget* UFCUIManager::ShowPOIActionSelection(const TArray<FFCPOIActionData>
 		return nullptr;
 	}
 
-	// TODO: Set actions array on widget (requires Blueprint-exposed property)
-	// Widget needs to populate action buttons from Actions array
-	// Widget needs to bind OnActionSelected event to InteractionComponent->OnPOIActionSelected
+	// Store InteractionComponent reference for mediator pattern
+	PendingInteractionComponent = InteractionComponent;
+
+	// Call PopulateActions(TArray<FFCPOIActionData>) to initialize widget with actions
+	// This function sets AvailableActions variable and creates action buttons
+	UFunction* PopulateFunc = CurrentPOIActionSelectionWidget->FindFunction(FName("PopulateActions"));
+	if (PopulateFunc)
+	{
+		// Prepare parameters for PopulateActions(TArray<FFCPOIActionData> Actions)
+		// The function expects the Actions array as input
+		struct FPopulateActionsParams
+		{
+			TArray<FFCPOIActionData> InActions;
+		};
+		
+		FPopulateActionsParams Params;
+		Params.InActions = Actions;
+		
+		CurrentPOIActionSelectionWidget->ProcessEvent(PopulateFunc, &Params);
+		UE_LOG(LogFCUIManager, Log, TEXT("ShowPOIActionSelection: Called PopulateActions with %d actions"), Actions.Num());
+	}
+	else
+	{
+		UE_LOG(LogFCUIManager, Error, TEXT("ShowPOIActionSelection: PopulateActions function not found on widget"));
+	}
 
 	// Add to viewport
 	CurrentPOIActionSelectionWidget->AddToViewport();
@@ -403,6 +426,27 @@ void UFCUIManager::ClosePOIActionSelection()
 	CurrentPOIActionSelectionWidget->RemoveFromParent();
 	UE_LOG(LogFCUIManager, Log, TEXT("ClosePOIActionSelection: Removed POI action selection widget from viewport"));
 
-	// Clear reference
+	// Clear references
 	CurrentPOIActionSelectionWidget = nullptr;
+	PendingInteractionComponent = nullptr;
+}
+
+void UFCUIManager::HandlePOIActionSelected(EFCPOIAction Action)
+{
+	if (!PendingInteractionComponent)
+	{
+		UE_LOG(LogFCUIManager, Warning, TEXT("HandlePOIActionSelected: No pending interaction component!"));
+		return;
+	}
+
+	UE_LOG(LogFCUIManager, Log, TEXT("HandlePOIActionSelected: Forwarding action %d to InteractionComponent"), (uint8)Action);
+
+	// Forward action to InteractionComponent
+	PendingInteractionComponent->OnPOIActionSelected(Action);
+
+	// Clear reference
+	PendingInteractionComponent = nullptr;
+
+	// Close the widget
+	ClosePOIActionSelection();
 }

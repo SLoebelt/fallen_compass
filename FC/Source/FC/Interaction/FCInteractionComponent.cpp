@@ -241,6 +241,9 @@ void UFCInteractionComponent::HandlePOIClick(AActor* POIActor)
 
 	UE_LOG(LogFCInteraction, Log, TEXT("POI click on '%s', %d actions available"), *POIName, AvailableActions.Num());
 
+	// Reset convoy-at-POI flag for right-click scenarios
+	bConvoyAlreadyAtPOI = false;
+
 	// Handle based on action count
 	if (AvailableActions.Num() == 0)
 	{
@@ -250,7 +253,7 @@ void UFCInteractionComponent::HandlePOIClick(AActor* POIActor)
 	}
 	else if (AvailableActions.Num() == 1)
 	{
-		// Single action - auto-select for later execution
+		// Single action - auto-select and trigger movement
 		PendingInteractionPOI = POIActor;
 		PendingInteractionAction = AvailableActions[0].ActionType;
 		bHasPendingPOIInteraction = true;
@@ -258,8 +261,14 @@ void UFCInteractionComponent::HandlePOIClick(AActor* POIActor)
 		UE_LOG(LogFCInteraction, Log, TEXT("Auto-selected action '%s' for POI '%s'"), 
 			*UEnum::GetValueAsString(PendingInteractionAction), *POIName);
 
-		// Notify via broadcast that convoy should move to POI
-		// PlayerController will handle the movement command
+		// Trigger convoy movement to POI
+		AFCPlayerController* PC = Cast<AFCPlayerController>(GetWorld()->GetFirstPlayerController());
+		if (PC && PendingInteractionPOI)
+		{
+			FVector POILocation = PendingInteractionPOI->GetActorLocation();
+			PC->MoveConvoyToLocation(POILocation);
+			UE_LOG(LogFCInteraction, Log, TEXT("Triggered convoy movement to POI at %s (single action)"), *POILocation.ToString());
+		}
 	}
 	else
 	{
@@ -311,7 +320,25 @@ void UFCInteractionComponent::OnPOIActionSelected(EFCPOIAction SelectedAction)
 			*UEnum::GetValueAsString(SelectedAction), *POIName);
 	}
 
-	// Action selected, PlayerController should now move convoy to POI
+	// Only trigger movement if convoy not already at POI
+	if (!bConvoyAlreadyAtPOI)
+	{
+		// Right-click multiple-action scenario: move convoy to POI
+		AFCPlayerController* PC = Cast<AFCPlayerController>(GetWorld()->GetFirstPlayerController());
+		if (PC && PendingInteractionPOI)
+		{
+			FVector POILocation = PendingInteractionPOI->GetActorLocation();
+			PC->MoveConvoyToLocation(POILocation);
+			UE_LOG(LogFCInteraction, Log, TEXT("Triggered convoy movement to POI at %s (right-click multiple)"), *POILocation.ToString());
+		}
+	}
+	else
+	{
+		// Left-click scenario: convoy already at POI, execute immediately
+		UE_LOG(LogFCInteraction, Log, TEXT("Convoy already at POI, executing action immediately"));
+		bConvoyAlreadyAtPOI = false; // Reset flag
+		NotifyPOIOverlap(PendingInteractionPOI);
+	}
 }
 
 void UFCInteractionComponent::NotifyPOIOverlap(AActor* POIActor)
@@ -385,6 +412,7 @@ void UFCInteractionComponent::NotifyPOIOverlap(AActor* POIActor)
 
 			PendingInteractionPOI = POIActor;
 			bHasPendingPOIInteraction = false; // Wait for selection
+			bConvoyAlreadyAtPOI = true; // Convoy already at POI (left-click scenario)
 
 			// Get UIManager to show action selection widget
 			UFCGameInstance* GameInstance = Cast<UFCGameInstance>(GetWorld()->GetGameInstance());

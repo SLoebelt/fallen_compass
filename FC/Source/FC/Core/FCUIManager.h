@@ -59,6 +59,10 @@ public:
 	UPROPERTY()
 	TObjectPtr<UUserWidget> CurrentPOIActionSelectionWidget;
 
+	// Pending interaction component (stored during widget display for mediator pattern)
+	UPROPERTY()
+	class UFCInteractionComponent* PendingInteractionComponent;
+
 	// Widget lifecycle methods
 	UFUNCTION(BlueprintCallable, Category = "UI")
 	void ShowMainMenu();
@@ -105,6 +109,10 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "UI|POI")
 	bool IsPOIActionSelectionOpen() const { return CurrentPOIActionSelectionWidget != nullptr; }
+
+	// POI action callback (mediator between widget and InteractionComponent)
+	UFUNCTION(BlueprintCallable, Category = "UI|POI")
+	void HandlePOIActionSelected(EFCPOIAction Action);
 
 	// Button callback methods (called from Blueprint widgets)
 	UFUNCTION(BlueprintCallable, Category = "UI")

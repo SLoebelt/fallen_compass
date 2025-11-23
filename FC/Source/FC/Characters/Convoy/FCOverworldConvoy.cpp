@@ -4,6 +4,10 @@
 #include "Characters/Convoy/FCConvoyMember.h"
 #include "Components/SceneComponent.h"
 #include "Engine/World.h"
+#include "AIController.h"
+#include "Core/FCPlayerController.h"
+#include "Core/FCFirstPersonCharacter.h"
+#include "Interaction/FCInteractionComponent.h"
 #include "FC.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogFCOverworldConvoy, Log, All);
@@ -132,38 +136,60 @@ void AFCOverworldConvoy::SpawnConvoyMembers()
 		UE_LOG(LogFCOverworldConvoy, Log, TEXT("OverworldConvoy %s: Spawned follower 2"), *GetName());
 	}
 
-	UE_LOG(LogFCOverworldConvoy, Log, TEXT("OverworldConvoy %s: Spawned %d total members"), *GetName(), ConvoyMembers.Num());
+	UE_LOG(LogFCOverworldConvoy, Log, TEXT("OverworldConvoy %s: Spawned %d convoy members"), *GetName(), ConvoyMembers.Num());
 }
 
-void AFCOverworldConvoy::NotifyPOIOverlap(AActor* POIActor)
+void AFCOverworldConvoy::StopAllMembers()
 {
-	if (!POIActor)
+	UE_LOG(LogFCOverworldConvoy, Log, TEXT("Convoy %s: Stopping all members"), *GetName());
+	
+	for (AFCConvoyMember* Member : ConvoyMembers)
 	{
-		return;
+		if (Member)
+		{
+			AAIController* AIController = Cast<AAIController>(Member->GetController());
+			if (AIController)
+			{
+				AIController->StopMovement();
+				UE_LOG(LogFCOverworldConvoy, Log, TEXT("  Stopped member: %s"), *Member->GetName());
+			}
+		}
 	}
+}
 
+void AFCOverworldConvoy::HandlePOIOverlap(AActor* POIActor)
+{
+	if (!POIActor) return;
+	
 	// Check if already interacting - prevent multiple triggers
 	if (bIsInteractingWithPOI)
 	{
 		UE_LOG(LogFCOverworldConvoy, Log, TEXT("Convoy %s: Already interacting with POI, ignoring overlap"), *GetName());
 		return;
 	}
-
-	// Set interaction flag - InteractionComponent will clear this when done
+	
+	// Set interaction flag
 	bIsInteractingWithPOI = true;
-
-	// Get POI name (simplified - will use interface later)
-	FString POIName = POIActor->GetName();
 	
-	UE_LOG(LogFCOverworldConvoy, Log, TEXT("Convoy %s detected POI: %s"), *GetName(), *POIName);
+	// Stop all convoy members immediately
+	StopAllMembers();
 	
-	// Display on-screen message
-	if (GEngine)
+	// Get player controller's InteractionComponent for delegation
+	AFCPlayerController* PC = Cast<AFCPlayerController>(GetWorld()->GetFirstPlayerController());
+	if (PC)
 	{
-		GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Cyan, 
-			FString::Printf(TEXT("Convoy detected POI: %s"), *POIName));
+		AFCFirstPersonCharacter* FPCharacter = Cast<AFCFirstPersonCharacter>(PC->GetPawn());
+		if (FPCharacter)
+		{
+			UFCInteractionComponent* InteractionComp = FPCharacter->GetInteractionComponent();
+			if (InteractionComp)
+			{
+				UE_LOG(LogFCOverworldConvoy, Log, TEXT("Convoy %s: Delegating POI overlap to InteractionComponent"), *GetName());
+				InteractionComp->NotifyPOIOverlap(POIActor);
+				return;
+			}
+		}
 	}
-
-	// Broadcast event
-	OnConvoyPOIOverlap.Broadcast(POIActor);
+	
+	UE_LOG(LogFCOverworldConvoy, Warning, TEXT("Convoy %s: Failed to delegate to InteractionComponent"), *GetName());
 }

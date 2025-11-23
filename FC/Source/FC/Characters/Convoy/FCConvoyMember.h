@@ -44,7 +44,4 @@ private:
 public:
 	/** Set parent convoy reference */
 	void SetParentConvoy(AFCOverworldConvoy* InConvoy);
-
-	/** Notify parent convoy of POI overlap */
-	void NotifyPOIOverlap(AActor* POIActor);
 };
