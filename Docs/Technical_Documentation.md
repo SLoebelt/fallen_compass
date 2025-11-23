@@ -6899,10 +6899,97 @@ MoveToLocation (Vector input: Target Location)
 - **TopDown Input Context**: `IMC_FC_TopDown` includes left mouse button binding to `IA_Interact`
 - **Player Controller**: `AFCPlayerController::HandleOverworldClickMove()` implements click-to-move navigation for convoy leader
 
-#### Camera System
+#### Camera System (Task 5.6)
 
-- **UFCCameraManager**: Handles blending to TopDown camera attached to convoy's `CameraAttachPoint`
-- **AFCOverworldCamera**: Spring arm-based camera following convoy (pan/zoom controls)
+- **UFCCameraManager**: Handles blending to TopDown camera and automatic attachment to convoy's `CameraAttachPoint`
+- **AFCOverworldCamera**: Spring arm-based camera following convoy (pan/zoom controls via WASD and mouse wheel)
+- **Camera Attachment**: Automatically attached to convoy's `CameraAttachPoint` during `BlendToTopDown()` transition
+
+##### UFCCameraManager::BlendToTopDown() Camera Attachment
+
+- **Files**: `Source/FC/Components/FCCameraManager.cpp`
+- **Purpose**: Automatically attach OverworldCamera to convoy's CameraAttachPoint when transitioning to TopDown mode
+
+**Implementation**:
+
+```cpp
+void UFCCameraManager::BlendToTopDown(float BlendTime)
+{
+    // ... (find OverworldCamera in level)
+
+    // Attach camera to convoy's CameraAttachPoint (Task 5.6.1)
+    TArray<AActor*> FoundConvoys;
+    UGameplayStatics::GetAllActorsOfClass(World, AActor::StaticClass(), FoundConvoys);
+
+    AActor* Convoy = nullptr;
+    for (AActor* Actor : FoundConvoys)
+    {
+        if (Actor->GetClass()->GetName().Contains(TEXT("OverworldConvoy")))
+        {
+            Convoy = Actor;
+            break;
+        }
+    }
+
+    if (Convoy)
+    {
+        // Find CameraAttachPoint component via reflection
+        UFunction* GetAttachPointFunc = Convoy->FindFunction(FName("GetCameraAttachPoint"));
+        if (GetAttachPointFunc)
+        {
+            // Call GetCameraAttachPoint() via reflection
+            struct FGetCameraAttachPointParams
+            {
+                USceneComponent* ReturnValue;
+            };
+            FGetCameraAttachPointParams Params;
+            Params.ReturnValue = nullptr;
+            Convoy->ProcessEvent(GetAttachPointFunc, &Params);
+
+            if (Params.ReturnValue)
+            {
+                // Attach camera to CameraAttachPoint
+                OverworldCamera->AttachToComponent(Params.ReturnValue,
+                    FAttachmentTransformRules::SnapToTargetNotIncludingScale);
+                UE_LOG(LogFCCameraManager, Log,
+                    TEXT("BlendToTopDown: Attached camera to convoy's CameraAttachPoint"));
+            }
+        }
+    }
+
+    // ... (continue with view target blend)
+}
+```
+
+**Design Notes**:
+
+- Camera attachment occurs during TopDown mode transition (automatic, no Blueprint needed)
+- Uses reflection to call `GetCameraAttachPoint()` to avoid circular dependencies
+- `SnapToTargetNotIncludingScale` attachment rule maintains camera's relative transform
+- Gracefully handles missing convoy (logs message, continues without error)
+- Camera follows convoy center smoothly during leader movement
+
+**AFCOverworldConvoy::GetCameraAttachPoint()**:
+
+Added to `Source/FC/Characters/Convoy/FCOverworldConvoy.h`:
+
+```cpp
+/** Get camera attachment point for camera following */
+UFUNCTION(BlueprintCallable, Category = "FC|Convoy")
+USceneComponent* GetCameraAttachPoint() const { return CameraAttachPoint; }
+```
+
+**Testing Results**:
+
+- ✅ Camera automatically attaches to convoy during TopDown transition
+- ✅ Camera follows convoy smoothly when leader moves
+- ✅ No jittering or offset issues
+- ✅ Pan (WASD) and zoom (mouse wheel) controls work during movement
+
+**Prototype Scope**:
+
+- Current implementation uses fixed spring arm length and level-based pan boundaries
+- Dynamic camera constraints (based on convoy spread) deferred to Week 6+ (Backlog Item 2)
 
 #### Game State Integration
 
@@ -7113,15 +7200,44 @@ LogFCOverworldConvoy: Convoy BP_FC_OverworldConvoy_C_0 detected POI: BP_POI_Vill
 - **Spawning base class shows no mesh**: C++ spawning must use Blueprint child class (set via `ConvoyMemberClass` property)
 - **OnConstruction spawns disappear at PIE**: Expected behavior - spawning moved to `BeginPlay()` for runtime persistence
 - **6 members in Outliner but only 3 spawn**: Editor construction actors are destroyed at PIE start; runtime BeginPlay spawns the actual 3 members
+- **Camera not following convoy**: Ensure `BlendToTopDown()` is called when entering Overworld_Travel state; check Output Log for "Attached camera to convoy's CameraAttachPoint"
+- **Click-to-move not working**: Verify convoy placed in L_Overworld level; check AFCPlayerController found convoy in BeginPlay logs
 
-### Future Enhancements (Task 5.6+)
+### Level Setup (Task 5.7)
+
+#### L_Overworld Level Configuration
+
+- **Location**: `/Game/FC/World/Levels/L_Overworld.umap`
+- **Required Actors**:
+  - `BP_FC_OverworldConvoy` - Manually placed at spawn location
+  - `BP_OverworldCamera` - TopDown camera with spring arm
+  - `NavMeshBoundsVolume` - For AI pathfinding (press `P` in PIE to visualize)
+  - `PlayerStart` - Reference point for convoy placement
+
+**Convoy Placement**:
+
+- Position: Near PlayerStart (e.g., X=0, Y=0, Z=100)
+- Details Panel: Set `Convoy Member Class` to `BP_FC_ConvoyMember`
+- No manual camera attachment needed - handled by `UFCCameraManager::BlendToTopDown()`
+
+**Testing Checklist**:
+
+- ✅ Convoy spawns with 3 members at runtime
+- ✅ Camera attaches to convoy automatically
+- ✅ Left-click moves leader via NavMesh
+- ✅ Camera follows convoy during movement
+- ✅ Pan (WASD) and zoom (mouse wheel) work while moving
+
+### Future Enhancements (Task 5.8+)
 
 - ~~Click-to-move leader navigation via player controller~~ ✅ **Implemented in Task 5.5.1**
+- ~~Camera attachment to convoy CameraAttachPoint~~ ✅ **Implemented in Task 5.6.1**
+- ~~Convoy placement in L_Overworld level~~ ✅ **Implemented in Task 5.7.1**
 - Follower breadcrumb trail system (Task 5.8)
-- POI interaction UI prompts (Task 5.7+)
-- Camera constraints for convoy bounds (Task 5.6)
+- POI interaction UI prompts (Task 5.8+)
+- Dynamic camera constraints based on convoy bounds (Week 6+ - Backlog Item 2)
 - Save/load convoy state (Future task)
 
 ---
 
-_Last updated: November 23, 2025 (Week 3 Task 5.5 complete: Click-to-move navigation implemented with NavMesh pathfinding, convoy reference caching, and input routing through existing HandleClick architecture)_
+_Last updated: November 23, 2025 (Week 3 Task 5.7 complete: Camera attachment implemented in UFCCameraManager::BlendToTopDown(), convoy placed in L_Overworld, full click-to-move and camera following tested in PIE)_
