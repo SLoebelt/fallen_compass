@@ -806,68 +806,63 @@ IMC_FC_TopDown`
 
 #### Step 5.6.1: Attach BP_OverworldCamera to Convoy
 
-- [ ] **Analysis**
+- [x] **Analysis**
 
-  - [ ] Camera should follow convoy's CameraAttachPoint
-  - [ ] Spring arm and pan constraints bound to convoy center
-  - [ ] Camera remains smooth during movement
+  - [x] Camera should follow convoy's CameraAttachPoint
+  - [x] Spring arm and pan constraints bound to convoy center
+  - [x] Camera remains smooth during movement
 
-- [ ] **Implementation (BP_OverworldCamera or AFCOverworldPlayerController)**
+- [x] **Implementation (UFCCameraManager - Option C)**
 
-  - [ ] **Option A: Dynamic Attachment in Controller BeginPlay**
-    - [ ] Open `FCOverworldPlayerController.cpp` → BeginPlay()
-    - [ ] After finding convoy:
-      ```cpp
-      if (PossessedConvoy && OverworldCamera)
-      {
-          / Attach camera to convoy's camera attach point
-          USceneComponent* CameraAttachPoint = PossessedConvoy->FindComponentByClass<USceneComponent>();
-          / (Need proper component getter - will use Blueprint helper)
-          OverworldCamera->AttachToActor(PossessedConvoy, FAttachmentTransformRules::KeepWorldTransform);
-          UE_LOG(LogFCOverworldController, Log, TEXT("BeginPlay: Attached camera to convoy"));
-      }
-      ```
-  - [ ] **Option B: Blueprint Attachment (Simpler for Week 3)**
-    - [ ] Open BP_FC_OverworldConvoy → Event Graph
-    - [ ] Event BeginPlay:
-      ```
-      BeginPlay
-      → Get Actor of Class (BP_OverworldCamera)
-      → Attach Actor To Component (Camera → CameraAttachPoint, Keep World Transform)
-      → Print String "Convoy: Attached camera"
-      ```
-  - [ ] Choose Option B for simplicity
-  - [ ] Compile and save
+  - [x] **Actual Implementation: C++ in UFCCameraManager::BlendToTopDown()**
+    - [x] Added `GetCameraAttachPoint()` method to `AFCOverworldConvoy.h`
+    - [x] Modified `UFCCameraManager::BlendToTopDown()` in `FCCameraManager.cpp`:
+      - [x] Find convoy in level using `GetAllActorsOfClass` with name pattern matching
+      - [x] Call convoy's `GetCameraAttachPoint()` via reflection
+      - [x] Attach OverworldCamera to CameraAttachPoint using `AttachToComponent`
+      - [x] Uses `SnapToTargetNotIncludingScale` attachment rule
+      - [x] Logs success/warning messages for debugging
+    - [x] Camera automatically attaches when transitioning to TopDown mode
+    - [x] No Blueprint changes needed - pure C++ solution
 
-- [ ] **Testing After Step 5.6.1** ✅ CHECKPOINT
-  - [ ] Place convoy and camera in level
-  - [ ] PIE: Camera attaches to convoy
-  - [ ] Camera follows convoy when it moves
-  - [ ] No jittering or offset issues
+- [x] **Testing After Step 5.6.1** ✅ CHECKPOINT
+  - [x] Camera attaches to convoy's CameraAttachPoint during TopDown mode transition
+  - [x] Camera follows convoy smoothly when leader moves via click-to-move
+  - [x] No jittering or offset issues observed
+  - [x] Attachment logged in output: "Attached camera to convoy's CameraAttachPoint"
 
-**COMMIT POINT 5.6.1**: `git add Content/FC/World/Blueprints/Pawns/BP_FCOverworldConvoy.uasset && git commit -m "feat(convoy): Attach camera to convoy CameraAttachPoint"`
+**IMPLEMENTATION NOTES**:
+
+- Chose C++ implementation over Blueprint for consistency with existing camera system
+- Attachment occurs in `BlendToTopDown()` to ensure camera is attached before view transition
+- Uses reflection to call `GetCameraAttachPoint()` to avoid circular dependencies
+- Gracefully handles missing convoy (logs message, continues without error)
+
+**COMMIT POINT 5.6.1**: `git add Source/FC/Characters/Convoy/FCOverworldConvoy.h Source/FC/Components/FCCameraManager.cpp && git commit -m "feat(convoy): Attach camera to convoy CameraAttachPoint in BlendToTopDown"`
 
 ---
 
 #### Step 5.6.2: Bind Camera Constraints to Convoy (Prototype Scope)
 
-- [ ] **Analysis**
+- [x] **Analysis**
 
-  - [ ] PROTOTYPE SCOPE: Basic attachment sufficient for Week 3
-  - [ ] FUTURE: Spring arm length and pan boundaries based on convoy size
-  - [ ] BACKLOG: Implement dynamic camera constraint system
+  - [x] PROTOTYPE SCOPE: Basic attachment sufficient for Week 3
+  - [x] FUTURE: Spring arm length and pan boundaries based on convoy size
+  - [x] BACKLOG: Implement dynamic camera constraint system
 
-- [ ] **Implementation (Week 3 Prototype)**
+- [x] **Implementation (Week 3 Prototype)**
 
-  - [ ] Verify camera attachment working
-  - [ ] Use fixed spring arm length (from Task 3)
-  - [ ] Pan constraints remain level-based (not convoy-based)
-  - [ ] Document limitation in backlog (see end of file)
+  - [x] Verified camera attachment working in Step 5.6.1
+  - [x] Using fixed spring arm length (from Task 3)
+  - [x] Pan constraints remain level-based (not convoy-based)
+  - [x] Limitation documented - future enhancement for dynamic constraints
 
-- [ ] **Testing After Step 5.6.2** ✅ CHECKPOINT
-  - [ ] Camera follows convoy with fixed constraints
-  - [ ] Pan and zoom work as expected
-  - [ ] Attachment stable during movement
+- [x] **Testing After Step 5.6.2** ✅ CHECKPOINT
+  - [x] Camera follows convoy with fixed constraints
+  - [x] Pan and zoom work as expected via WASD and mouse wheel
+  - [x] Attachment stable during movement
+
+**PROTOTYPE SCOPE NOTE**: Dynamic camera constraints based on convoy size/position deferred to future tasks. Current implementation uses fixed spring arm and level-based pan boundaries, which is sufficient for Week 3 prototype.
 
 **COMMIT POINT 5.6.2**: N/A (prototype scope documented, no code changes)
 
@@ -981,7 +976,7 @@ IMC_FC_TopDown`
 - [ ] BP_FC_OverworldConvoy parent actor created with 3 child convoy members (leader + 2 followers)
 - [ ] Convoy members spawn and attach correctly via Construction Script
 - [ ] POI overlap aggregation implemented in BP_FC_OverworldConvoy
-- [ ] AFCOverworldPlayerController implements click-to-move for convoy leader
+- [ ] AFCPlayerController implements click-to-move for convoy leader
 - [ ] BP_OverworldCamera attached to convoy's CameraAttachPoint
 - [ ] Camera follows convoy smoothly during movement
 - [ ] Convoy placed in L_Overworld at PlayerStart
@@ -1193,7 +1188,7 @@ IMC_FC_TopDown`
 
 ### Step 6.4: Implement POI Right-Click Interaction Handler
 
-#### Step 6.4.1: Add POI Interaction Handler to AFCOverworldPlayerController
+#### Step 6.4.1: Add POI Interaction Handler to AFCPlayerController
 
 - [ ] **Analysis**
 
@@ -1201,9 +1196,9 @@ IMC_FC_TopDown`
   - [ ] On right-click: Raycast from mouse position, check if hit actor implements interface
   - [ ] If valid POI: Call OnPOIInteract() interface method
 
-- [ ] **Implementation (FCOverworldPlayerController.h)**
+- [ ] **Implementation (FCPlayerController.h)**
 
-  - [ ] Open `Source/FC/Core/FCOverworldPlayerController.h`
+  - [ ] Open `Source/FC/Core/FCPlayerController.h`
   - [ ] Add private members:
 
     ```cpp
@@ -1218,12 +1213,12 @@ IMC_FC_TopDown`
 
   - [ ] Save file
 
-- [ ] **Implementation (FCOverworldPlayerController.cpp)**
+- [ ] **Implementation (FCPlayerController.cpp)**
 
   - [ ] Update SetupInputComponent():
 
     ```cpp
-    void AFCOverworldPlayerController::SetupInputComponent()
+    void AFCPlayerController::SetupInputComponent()
     {
         Super::SetupInputComponent();
 
@@ -1232,7 +1227,7 @@ IMC_FC_TopDown`
         / Bind POI interaction action
         if (EnhancedInput && InteractPOIAction)
         {
-            EnhancedInput->BindAction(InteractPOIAction, ETriggerEvent::Started, this, &AFCOverworldPlayerController::HandleInteractPOI);
+            EnhancedInput->BindAction(InteractPOIAction, ETriggerEvent::Started, this, &AFCPlayerController::HandleInteractPOI);
             UE_LOG(LogFCOverworldController, Log, TEXT("SetupInputComponent: Bound InteractPOIAction"));
         }
     }
@@ -1241,7 +1236,7 @@ IMC_FC_TopDown`
   - [ ] Implement HandleInteractPOI():
 
     ```cpp
-    void AFCOverworldPlayerController::HandleInteractPOI()
+    void AFCPlayerController::HandleInteractPOI()
     {
         / Get mouse cursor hit result
         FHitResult HitResult;
@@ -1291,7 +1286,7 @@ IMC_FC_TopDown`
   - [ ] Interface call syntax correct
   - [ ] Can open Unreal Editor
 
-**COMMIT POINT 6.4.1**: `git add Source/FC/Core/FCOverworldPlayerController.h Source/FC/Core/FCOverworldPlayerController.cpp && git commit -m "feat(overworld): Implement POI right-click interaction handler"`
+**COMMIT POINT 6.4.1**: `git add Source/FC/Core/FCPlayerController.h Source/FC/Core/FCPlayerController.cpp && git commit -m "feat(overworld): Implement POI right-click interaction handler"`
 
 ---
 
@@ -1400,7 +1395,7 @@ IMC_FC_TopDown`
 - [ ] BPI_InteractablePOI interface created with OnPOIInteract() and GetPOIName() methods
 - [ ] BP_OverworldPOI implements BPI_InteractablePOI interface
 - [ ] OnPOIInteract() displays Print String stub message
-- [ ] AFCOverworldPlayerController implements HandleInteractPOI() with raycast and interface check
+- [ ] AFCPlayerController implements HandleInteractPOI() with raycast and interface check
 - [ ] InteractPOIAction assigned to IA_InteractPOI in BP_FC_PlayerController
 - [ ] 3-5 POI instances placed in L_Overworld with unique names
 - [ ] Right-click on POI shows on-screen message and logs interaction

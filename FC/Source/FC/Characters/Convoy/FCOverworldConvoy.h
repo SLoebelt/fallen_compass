@@ -70,6 +70,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "FC|Convoy")
 	AFCConvoyMember* GetLeaderMember() const { return LeaderMember; }
 
+	/** Get camera attachment point for camera following */
+	UFUNCTION(BlueprintCallable, Category = "FC|Convoy")
+	USceneComponent* GetCameraAttachPoint() const { return CameraAttachPoint; }
+
 	/** Called by convoy members when they overlap a POI */
 	UFUNCTION(BlueprintCallable, Category = "FC|Convoy")
 	void NotifyPOIOverlap(AActor* POIActor);

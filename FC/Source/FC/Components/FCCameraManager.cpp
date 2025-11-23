@@ -256,6 +256,55 @@ void UFCCameraManager::BlendToTopDown(float BlendTime)
 		return;
 	}
 
+	// Attach camera to convoy's CameraAttachPoint (Task 5.6.1)
+	TArray<AActor*> FoundConvoys;
+	UGameplayStatics::GetAllActorsOfClass(World, AActor::StaticClass(), FoundConvoys);
+	
+	AActor* Convoy = nullptr;
+	for (AActor* Actor : FoundConvoys)
+	{
+		if (Actor->GetClass()->GetName().Contains(TEXT("OverworldConvoy")))
+		{
+			Convoy = Actor;
+			break;
+		}
+	}
+
+	if (Convoy)
+	{
+		// Find CameraAttachPoint component via reflection
+		UFunction* GetAttachPointFunc = Convoy->FindFunction(FName("GetCameraAttachPoint"));
+		if (GetAttachPointFunc)
+		{
+			struct FGetCameraAttachPointParams
+			{
+				USceneComponent* ReturnValue;
+			};
+			FGetCameraAttachPointParams Params;
+			Params.ReturnValue = nullptr;
+			Convoy->ProcessEvent(GetAttachPointFunc, &Params);
+			
+			if (Params.ReturnValue)
+			{
+				// Attach camera to CameraAttachPoint
+				OverworldCamera->AttachToComponent(Params.ReturnValue, FAttachmentTransformRules::SnapToTargetNotIncludingScale);
+				UE_LOG(LogFCCameraManager, Log, TEXT("BlendToTopDown: Attached camera to convoy's CameraAttachPoint"));
+			}
+			else
+			{
+				UE_LOG(LogFCCameraManager, Warning, TEXT("BlendToTopDown: GetCameraAttachPoint returned null"));
+			}
+		}
+		else
+		{
+			UE_LOG(LogFCCameraManager, Warning, TEXT("BlendToTopDown: Convoy has no GetCameraAttachPoint method"));
+		}
+	}
+	else
+	{
+		UE_LOG(LogFCCameraManager, Log, TEXT("BlendToTopDown: No convoy found in level (expected in Office)"));
+	}
+
 	// Set PlayerPawn reference on camera for distance limiting
 	APlayerController* PC = GetPlayerController();
 	if (PC && PC->GetPawn())

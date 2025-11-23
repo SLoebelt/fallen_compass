@@ -6938,13 +6938,14 @@ void AFCPlayerController::BeginPlay()
     if (FoundConvoys.Num() > 0)
     {
         PossessedConvoy = Cast<AFCOverworldConvoy>(FoundConvoys[0]);
-        UE_LOG(LogFCPlayerController, Log, TEXT("Found convoy: %s"), 
+        UE_LOG(LogFCPlayerController, Log, TEXT("Found convoy: %s"),
             PossessedConvoy ? *PossessedConvoy->GetName() : TEXT("null"));
     }
 }
 ```
 
 **Implementation Notes**:
+
 - Automatically finds convoy placed in level
 - No manual references needed - uses `GetAllActorsOfClass`
 - Caches convoy reference for click handling
@@ -6972,6 +6973,7 @@ void AFCPlayerController::HandleClick()
 ```
 
 **Design Notes**:
+
 - Reuses existing `ClickAction` input binding (no separate `ClickMoveAction` needed)
 - Routes TopDown clicks to convoy navigation
 - TableView/FirstPerson clicks route to object interaction
@@ -7041,6 +7043,7 @@ void AFCPlayerController::HandleOverworldClickMove()
 ```
 
 **Implementation Details**:
+
 - **Raycast**: Uses `GetHitResultUnderCursor` to get world location under mouse
 - **NavMesh Projection**: Projects click location to nearest walkable NavMesh point (500 unit search radius)
 - **AI Command**: Calls `AAIController::MoveToLocation()` with projected target
@@ -7048,6 +7051,7 @@ void AFCPlayerController::HandleOverworldClickMove()
 - **Error Handling**: Logs warnings if convoy/leader/AI controller missing or NavMesh projection fails
 
 **Testing Results**:
+
 - ✅ Left-click on ground moves leader to target location
 - ✅ NavMesh projection validates paths (rejects invalid targets like walls)
 - ✅ Visual feedback confirms movement commands
@@ -7067,13 +7071,14 @@ flowchart TD
     H --> I[Project to NavMesh]
     I --> J[MoveToLocation]
     E --> K[Raycast Object Interaction]
-    
+
     style D fill:#e91e63
     style F fill:#50c878
     style J fill:#3498db
 ```
 
 **Design Rationale**:
+
 - Single `ClickAction` binding simplifies input system
 - Camera mode determines click behavior (navigation vs interaction)
 - No redundant input actions or Blueprint properties needed
