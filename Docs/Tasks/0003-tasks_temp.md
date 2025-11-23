@@ -642,24 +642,24 @@ IMC_FC_TopDown`
 
 #### Step 5.4.3: Verify POI Overlap Aggregation (Already in C++)
 
-- [ ] **Analysis**
+- [x] **Analysis**
 
-  - [ ] POI overlap aggregation already implemented in C++ AOverworldConvoy
-  - [ ] NotifyPOIOverlap() method callable from AConvoyMember
-  - [ ] OnConvoyPOIOverlap event dispatcher already exposed to Blueprint
-  - [ ] This step verifies functionality only
+  - [x] POI overlap aggregation already implemented in C++ AOverworldConvoy
+  - [x] NotifyPOIOverlap() method callable from AConvoyMember
+  - [x] OnConvoyPOIOverlap event dispatcher already exposed to Blueprint
+  - [x] This step verifies functionality only
 
-- [ ] **Verification (Unreal Editor)**
+- [x] **Verification (Unreal Editor)**
 
-  - [ ] Open BP_FC_OverworldConvoy
-  - [ ] Verify NotifyPOIOverlap method visible in Blueprint (inherited from C++)
-  - [ ] Verify OnConvoyPOIOverlap event dispatcher in Event Graph (My Blueprint panel)
-  - [ ] No additional implementation needed
+  - [x] Open BP_FC_OverworldConvoy
+  - [x] Verify NotifyPOIOverlap method visible in Blueprint (inherited from C++)
+  - [x] Verify OnConvoyPOIOverlap event dispatcher in Event Graph (My Blueprint panel)
+  - [x] No additional implementation needed
 
-- [ ] **Testing After Step 5.4.3** ✅ CHECKPOINT
-  - [ ] NotifyPOIOverlap method visible in Blueprint
-  - [ ] OnConvoyPOIOverlap event dispatcher accessible
-  - [ ] Blueprint compiles without errors
+- [x] **Testing After Step 5.4.3** ✅ CHECKPOINT
+  - [x] NotifyPOIOverlap method visible in Blueprint
+  - [x] OnConvoyPOIOverlap event dispatcher accessible
+  - [x] Blueprint compiles without errors
 
 **COMMIT POINT 5.4.3**: N/A (functionality already in C++ base class)
 
@@ -667,175 +667,84 @@ IMC_FC_TopDown`
 
 ### Step 5.5: Implement Click-to-Move for Convoy Leader
 
-#### Step 5.5.1: Add Click-to-Move Handler to AFCOverworldPlayerController
+#### Step 5.5.1: Add Click-to-Move Handler to AFCPlayerController
 
-- [ ] **Analysis**
+- [x] **Analysis**
 
-  - [ ] Player controller detects left-click on terrain
-  - [ ] Raycasts from mouse position to world
-  - [ ] Sends move command to convoy leader's AI controller
-  - [ ] Uses UFCInputManager for TopDown context
+  - [x] Player controller detects left-click on terrain
+  - [x] Raycasts from mouse position to world
+  - [x] Sends move command to convoy leader's AI controller
+  - [x] Uses existing HandleClick routing for TopDown mode
 
-- [ ] **Implementation (FCOverworldPlayerController.h)**
+- [x] **Implementation (FCPlayerController.h)**
 
-  - [ ] Open `Source/FC/Core/FCOverworldPlayerController.h`
-  - [ ] Add forward declarations:
-    ```cpp
-    class UInputAction;
-    class AOverworldConvoy;
-    class AConvoyMember;
-    ```
-  - [ ] Add private members:
+  - [x] Open `Source/FC/Core/FCPlayerController.h`
+  - [x] Add forward declarations for AFCOverworldConvoy and AFCConvoyMember
+  - [x] Add PossessedConvoy property (AFCOverworldConvoy\*)
+  - [x] Add HandleOverworldClickMove() method declaration
+  - [x] Save file
 
-    ```cpp
-    private:
-        /** Input action for click-to-move */
-        UPROPERTY(EditDefaultsOnly, Category = "FC|Input|Actions")
-        TObjectPtr<UInputAction> ClickMoveAction;
+- [x] **Implementation (FCPlayerController.cpp)**
 
-        /** Reference to possessed convoy */
-        UPROPERTY()
-        TObjectPtr<AOverworldConvoy> PossessedConvoy;
-
-        /** Handle click-to-move input */
-        void HandleClickMove();
-    ```
-
-  - [ ] Save file
-
-- [ ] **Implementation (FCOverworldPlayerController.cpp)**
-
-  - [ ] Open `Source/FC/Core/FCOverworldPlayerController.cpp`
-  - [ ] Add includes:
-    ```cpp
-    #include "InputAction.h"
-    #include "NavigationSystem.h"
-    #include "AIController.h"
-    #include "GameFramework/Character.h"
-    #include "World/FCOverworldConvoy.h"
-    #include "Characters/Convoy/ConvoyMember.h"
-    ```
-  - [ ] Update BeginPlay to find convoy in level:
+  - [x] Open `Source/FC/Core/FCPlayerController.cpp`
+  - [x] Add include for FCConvoyMember.h
+  - [x] Update BeginPlay to find convoy in level:
 
     ```cpp
-    void AFCOverworldPlayerController::BeginPlay()
+    // Find convoy in level if we're in Overworld
+    TArray<AActor*> FoundConvoys;
+    UGameplayStatics::GetAllActorsOfClass(GetWorld(), AFCOverworldConvoy::StaticClass(), FoundConvoys);
+
+    if (FoundConvoys.Num() > 0)
     {
-        Super::BeginPlay();
-
-        / Existing InputManager setup...
-
-        / Find AOverworldConvoy in level
-        TArray<AActor*> FoundConvoys;
-        UGameplayStatics::GetAllActorsOfClass(GetWorld(), AOverworldConvoy::StaticClass(), FoundConvoys);
-
-        if (FoundConvoys.Num() > 0)
-        {
-            PossessedConvoy = Cast<AOverworldConvoy>(FoundConvoys[0]);
-            UE_LOG(LogFCOverworldController, Log, TEXT("BeginPlay: Found convoy: %s"), *PossessedConvoy->GetName());
-        }
-        else
-        {
-            UE_LOG(LogFCOverworldController, Warning, TEXT("BeginPlay: No convoy found in level!"));
-        }
+        PossessedConvoy = Cast<AFCOverworldConvoy>(FoundConvoys[0]);
+        UE_LOG(LogFallenCompassPlayerController, Log, TEXT("BeginPlay: Found convoy: %s"), *PossessedConvoy->GetName());
     }
     ```
 
-  - [ ] Update SetupInputComponent:
-
+  - [x] Update HandleClick to route TopDown clicks:
     ```cpp
-    void AFCOverworldPlayerController::SetupInputComponent()
+    if (CurrentMode == EFCPlayerCameraMode::TopDown)
     {
-        Super::SetupInputComponent();
-
-        UEnhancedInputComponent* EnhancedInput = Cast<UEnhancedInputComponent>(InputComponent);
-        if (EnhancedInput && ClickMoveAction)
-        {
-            EnhancedInput->BindAction(ClickMoveAction, ETriggerEvent::Started, this, &AFCOverworldPlayerController::HandleClickMove);
-            UE_LOG(LogFCOverworldController, Log, TEXT("SetupInputComponent: Bound ClickMoveAction"));
-        }
+        HandleOverworldClickMove();
     }
     ```
+  - [x] Implement HandleOverworldClickMove:
+    - [x] Raycast from cursor using GetHitResultUnderCursor
+    - [x] Get convoy leader via PossessedConvoy->GetLeaderMember()
+    - [x] Get leader's AI controller
+    - [x] Project hit location to NavMesh
+    - [x] Call AIController->MoveToLocation()
+    - [x] Add logging and visual feedback
+  - [x] Save file
 
-  - [ ] Implement HandleClickMove:
+- [x] **Compilation**
 
-    ```cpp
-    void AFCOverworldPlayerController::HandleClickMove()
-    {
-        / Get mouse cursor hit result
-        FHitResult HitResult;
-        bool bHit = GetHitResultUnderCursor(ECC_Visibility, false, HitResult);
+  - [x] Build solution in Visual Studio
+  - [x] Verify no compilation errors
+  - [x] Check includes and forward declarations
 
-        if (!bHit)
-        {
-            UE_LOG(LogFCOverworldController, Warning, TEXT("HandleClickMove: No hit under cursor"));
-            return;
-        }
+- [x] **Testing After Step 5.5.1** ✅ CHECKPOINT
+  - [x] Compilation succeeds
+  - [x] HandleOverworldClickMove method implemented
+  - [x] Can open Unreal Editor
+  - [x] PIE tested with convoy in Overworld level
+  - [x] Left-click on ground moves leader to clicked location
+  - [x] NavMesh projection works (only accepts valid paths)
+  - [x] Visual feedback displays target location on screen (green text, 2s)
+  - [x] Output log confirms: "HandleOverworldClickMove: Moving convoy to [location]"
+  - [x] Camera follows leader smoothly during movement
+  - [x] AI controller navigation working perfectly
 
-        / Get convoy leader
-        if (!PossessedConvoy)
-        {
-            UE_LOG(LogFCOverworldController, Warning, TEXT("HandleClickMove: No convoy reference"));
-            return;
-        }
+**IMPLEMENTATION NOTES:**
 
-        / Get leader member from convoy (C++ method)
-        AConvoyMember* LeaderMember = PossessedConvoy->GetLeaderMember();
-        AActor* LeaderActor = Cast<AActor>(LeaderMember);
-        if (!LeaderActor)
-        {
-            UE_LOG(LogFCOverworldController, Warning, TEXT("HandleClickMove: No leader member found"));
-            return;
-        }
+- Used existing HandleClick routing instead of separate ClickMoveAction
+- Convoy finding happens in BeginPlay (logs warning if not found - expected in Office)
+- NavMesh projection ensures valid pathfinding destinations
+- Visual feedback shows target location on screen for 2 seconds
+- Leader movement fully functional with AIController->MoveToLocation()
 
-        / Get leader's AI controller (AConvoyMember inherits from ACharacter)
-        if (!LeaderMember)
-        {
-            UE_LOG(LogFCOverworldController, Warning, TEXT("HandleClickMove: Leader member is null"));
-            return;
-        }
-
-        AAIController* AIController = Cast<AAIController>(LeaderMember->GetController());
-        if (!AIController)
-        {
-            UE_LOG(LogFCOverworldController, Warning, TEXT("HandleClickMove: Leader has no AI controller"));
-            return;
-        }
-
-        / Project hit location to NavMesh
-        UNavigationSystemV1* NavSys = FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld());
-        if (NavSys)
-        {
-            FNavLocation NavLocation;
-            bool bFoundPath = NavSys->ProjectPointToNavigation(HitResult.Location, NavLocation);
-
-            if (bFoundPath)
-            {
-                / Send move command to AI controller
-                AIController->MoveTo(NavLocation.Location);
-                UE_LOG(LogFCOverworldController, Log, TEXT("HandleClickMove: Moving convoy to %s"), *NavLocation.Location.ToString());
-            }
-            else
-            {
-                UE_LOG(LogFCOverworldController, Warning, TEXT("HandleClickMove: Failed to project to NavMesh"));
-            }
-        }
-    }
-    ```
-
-  - [ ] Save file
-
-- [ ] **Compilation**
-
-  - [ ] Build solution in Visual Studio
-  - [ ] Verify no compilation errors
-  - [ ] Check includes and forward declarations
-
-- [ ] **Testing After Step 5.5.1** ✅ CHECKPOINT
-  - [ ] Compilation succeeds
-  - [ ] HandleClickMove method implemented
-  - [ ] Can open Unreal Editor
-
-**COMMIT POINT 5.5.1**: `git add Source/FC/Core/FCOverworldPlayerController.h Source/FC/Core/FCOverworldPlayerController.cpp && git commit -m "feat(convoy): Implement click-to-move for convoy leader in player controller"`
+**COMMIT POINT 5.5.1**: `git add Source/FC/Core/FCPlayerController.h Source/FC/Core/FCPlayerController.cpp && git commit -m "feat(convoy): Implement click-to-move for convoy leader in player controller"`
 
 ---
 

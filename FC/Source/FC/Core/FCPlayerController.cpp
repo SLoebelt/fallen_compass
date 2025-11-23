@@ -27,6 +27,7 @@
 #include "Components/FCCameraManager.h"
 #include "World/FCOverworldCamera.h"
 #include "Characters/Convoy/FCOverworldConvoy.h"
+#include "Characters/Convoy/FCConvoyMember.h"
 #include "AIController.h"
 #include "NavigationSystem.h"
 
@@ -176,6 +177,20 @@ void AFCPlayerController::BeginPlay()
 	else
 	{
 		UE_LOG(LogFallenCompassPlayerController, Error, TEXT("BeginPlay: Failed to get GameInstance"));
+	}
+
+	// Find convoy in level if we're in Overworld
+	TArray<AActor*> FoundConvoys;
+	UGameplayStatics::GetAllActorsOfClass(GetWorld(), AFCOverworldConvoy::StaticClass(), FoundConvoys);
+	
+	if (FoundConvoys.Num() > 0)
+	{
+		PossessedConvoy = Cast<AFCOverworldConvoy>(FoundConvoys[0]);
+		UE_LOG(LogFallenCompassPlayerController, Log, TEXT("BeginPlay: Found convoy: %s"), *PossessedConvoy->GetName());
+	}
+	else
+	{
+		UE_LOG(LogFallenCompassPlayerController, Log, TEXT("BeginPlay: No convoy found in level (expected in Office)"));
 	}
 
 	// Note: MenuCamera reference will be set in Blueprint (BP_FC_PlayerController)
@@ -970,7 +985,7 @@ void AFCPlayerController::HandleClick(const FInputActionValue& Value)
 	// TopDown mode: Click-to-move convoy
 	if (CurrentMode == EFCPlayerCameraMode::TopDown)
 	{
-		//HandleOverworldClickMove();
+		HandleOverworldClickMove();
 	}
 	// TableView/FirstPerson mode: Interact with table objects
 	else if (CurrentMode == EFCPlayerCameraMode::TableView || CurrentMode == EFCPlayerCameraMode::FirstPerson)
@@ -1090,4 +1105,77 @@ void AFCPlayerController::CloseTableWidget()
 		}
 	}
 	// Note: If no widget is open, ESC is handled by HandlePausePressed() which returns to FirstPerson
+}
+
+void AFCPlayerController::HandleOverworldClickMove()
+{
+	// Get mouse cursor hit result
+	FHitResult HitResult;
+	bool bHit = GetHitResultUnderCursor(ECC_Visibility, false, HitResult);
+
+	if (!bHit)
+	{
+		UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("HandleOverworldClickMove: No hit under cursor"));
+		return;
+	}
+
+	// Get convoy reference
+	if (!PossessedConvoy)
+	{
+		UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("HandleOverworldClickMove: No convoy reference"));
+		return;
+	}
+
+	// Get leader member from convoy
+	AFCConvoyMember* LeaderMember = PossessedConvoy->GetLeaderMember();
+	if (!LeaderMember)
+	{
+		UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("HandleOverworldClickMove: No leader member found"));
+		return;
+	}
+
+	// Get leader's AI controller
+	AAIController* AIController = Cast<AAIController>(LeaderMember->GetController());
+	if (!AIController)
+	{
+		UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("HandleOverworldClickMove: Leader has no AI controller"));
+		return;
+	}
+
+	// Project hit location to NavMesh
+	UNavigationSystemV1* NavSys = FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld());
+	if (NavSys)
+	{
+		FNavLocation NavLocation;
+		bool bFoundPath = NavSys->ProjectPointToNavigation(HitResult.Location, NavLocation);
+
+		if (bFoundPath)
+		{
+			// Send move command to AI controller
+			AIController->MoveToLocation(NavLocation.Location);
+			UE_LOG(LogFallenCompassPlayerController, Log, TEXT("HandleOverworldClickMove: Moving convoy to %s"), 
+				*NavLocation.Location.ToString());
+
+			// Visual feedback
+			if (GEngine)
+			{
+				GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Green, 
+					FString::Printf(TEXT("Moving to: %s"), *NavLocation.Location.ToString()));
+			}
+		}
+		else
+		{
+			UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("HandleOverworldClickMove: Failed to project to NavMesh"));
+			
+			if (GEngine)
+			{
+				GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Yellow, 
+					TEXT("Cannot move there - no valid path"));
+			}
+		}
+	}
+	else
+	{
+		UE_LOG(LogFallenCompassPlayerController, Error, TEXT("HandleOverworldClickMove: NavigationSystem not found"));
+	}
 }

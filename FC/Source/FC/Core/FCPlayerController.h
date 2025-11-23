@@ -13,6 +13,8 @@ class ACameraActor;
 class UUserWidget;
 class UFCCameraManager;
 class UFCInputManager;
+class AFCOverworldConvoy;
+class AFCConvoyMember;
 struct FInputActionValue;
 
 DECLARE_LOG_CATEGORY_EXTERN(LogFallenCompassPlayerController, Log, All);
@@ -132,6 +134,10 @@ protected:
 	UPROPERTY(BlueprintReadOnly, Category = "State")
 	bool bIsInTableView = false;
 
+	/** Reference to possessed convoy in Overworld */
+	UPROPERTY()
+	AFCOverworldConvoy* PossessedConvoy;
+
 	/** Current game state (MainMenu, Gameplay, etc.) */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "State")
 	EFCGameState CurrentGameState;
@@ -179,6 +185,7 @@ protected:
 	void HandleOverworldPan(const FInputActionValue& Value);
 	void HandleOverworldZoom(const FInputActionValue& Value);
 	void HandleClick(const FInputActionValue& Value);
+	void HandleOverworldClickMove();
 
 	/** Handle game state changes (bind to GameStateManager.OnStateChanged) */
 	UFUNCTION()
