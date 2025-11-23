@@ -91,6 +91,10 @@ class FC_API UFCGameInstance : public UGameInstance
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "UI")
     TSubclassOf<UUserWidget> PauseMenuWidgetClass;
 
+    /** Action selection widget class for POI interactions (configured in Blueprint, used by UIManager) */
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "UI")
+    TSubclassOf<UUserWidget> ActionSelectionWidgetClass;
+
     /** Table widget registry: Maps table object classes to their widget classes */
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "UI")
     TMap<TSubclassOf<AActor>, TSubclassOf<UUserWidget>> TableWidgetMap;

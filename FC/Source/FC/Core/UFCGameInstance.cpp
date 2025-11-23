@@ -42,6 +42,7 @@ void UFCGameInstance::Init()
         UIManager->MainMenuWidgetClass = MainMenuWidgetClass;
         UIManager->SaveSlotSelectorWidgetClass = SaveSlotSelectorWidgetClass;
         UIManager->PauseMenuWidgetClass = PauseMenuWidgetClass;
+        UIManager->ActionSelectionWidgetClass = ActionSelectionWidgetClass;
         UIManager->TableWidgetMap = TableWidgetMap;
         UE_LOG(LogTemp, Log, TEXT("UFCGameInstance: UIManager configured with widget classes"));
     }

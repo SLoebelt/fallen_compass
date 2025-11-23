@@ -8092,7 +8092,7 @@ void AFCOverworldConvoy::NotifyPOIOverlap(AActor* POIActor)
 
     FString POIName = POIActor->GetName();
     UE_LOG(LogFCOverworldConvoy, Log, TEXT("Convoy %s detected POI: %s"), *GetName(), *POIName);
-    
+
     // Broadcast event (legacy behavior)
     OnConvoyPOIOverlap.Broadcast(POIActor);
 }

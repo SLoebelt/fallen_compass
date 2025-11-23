@@ -1811,23 +1811,40 @@ IMC_FC_TopDown`
 
 #### Step 6.4.5: Configure Widget Class in Game Instance
 
-- [ ] **Analysis**
+- [x] **Analysis**
 
-  - [ ] POIActionSelectionWidgetClass now configured in UFCGameInstance (via UIManager subsystem)
-  - [ ] Set WBP_ActionSelection as widget class
+  - [x] ActionSelectionWidgetClass exposed in UFCGameInstance for Blueprint configuration
+  - [x] GameInstance delegates widget class to UFCUIManager on Init()
+  - [x] Set WBP_ActionSelection as widget class in BP_FC_GameInstance
+
+- [x] **Implementation (C++)**
+
+  - [x] **Update UFCGameInstance.h**:
+    - [x] Add ActionSelectionWidgetClass property (EditDefaultsOnly, BlueprintReadOnly, Category = "UI")
+  - [x] **Update UFCGameInstance.cpp**:
+    - [x] Add UIManager->ActionSelectionWidgetClass = ActionSelectionWidgetClass in Init()
+  - [x] **Update FCUIManager.h**:
+    - [x] Rename POIActionSelectionWidgetClass to ActionSelectionWidgetClass
+    - [x] Remove EditDefaultsOnly specifier (configured via GameInstance)
+  - [x] **Update FCUIManager.cpp**:
+    - [x] Replace all POIActionSelectionWidgetClass references with ActionSelectionWidgetClass
+  - [x] Save files
+  - [x] Compile C++ code
 
 - [ ] **Implementation (Unreal Editor)**
 
   - [ ] Open BP_FC_GameInstance
-  - [ ] Class Defaults → FC | UI Manager:
-    - [ ] POI Action Selection Widget Class: Select WBP_ActionSelection
+  - [ ] Class Defaults → UI:
+    - [ ] Action Selection Widget Class: Select WBP_ActionSelection
   - [ ] Compile and save
 
 - [ ] **Testing After Step 6.4.5** ✅ CHECKPOINT
-  - [ ] Widget class reference set
+  - [x] C++ code compiles without errors
+  - [x] ActionSelectionWidgetClass property visible in BP_FC_GameInstance under UI category
+  - [ ] Widget class reference set in Blueprint
   - [ ] Blueprint compiles
 
-**COMMIT POINT 6.4.5**: `git add Content/FC/Core/Blueprints/BP_FC_GameInstance.uasset && git commit -m "feat(overworld): Configure POI action widget in game instance"`
+**COMMIT POINT 6.4.5**: `git add Source/FC/Core/UFCGameInstance.h Source/FC/Core/UFCGameInstance.cpp Source/FC/Core/FCUIManager.h Source/FC/Core/FCUIManager.cpp Content/FC/Core/Blueprints/BP_FC_GameInstance.uasset && git commit -m "feat(overworld): Expose ActionSelectionWidgetClass in GameInstance and delegate to UIManager"`
 
 ---
 

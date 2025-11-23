@@ -347,9 +347,9 @@ void UFCUIManager::CloseTableWidget()
 
 UUserWidget* UFCUIManager::ShowPOIActionSelection(const TArray<FFCPOIActionData>& Actions, UFCInteractionComponent* InteractionComponent)
 {
-	if (!POIActionSelectionWidgetClass)
+	if (!ActionSelectionWidgetClass)
 	{
-		UE_LOG(LogFCUIManager, Error, TEXT("ShowPOIActionSelection: POIActionSelectionWidgetClass not configured!"));
+		UE_LOG(LogFCUIManager, Error, TEXT("ShowPOIActionSelection: ActionSelectionWidgetClass not configured!"));
 		return nullptr;
 	}
 
@@ -373,10 +373,10 @@ UUserWidget* UFCUIManager::ShowPOIActionSelection(const TArray<FFCPOIActionData>
 	}
 
 	// Create new POI action selection widget
-	CurrentPOIActionSelectionWidget = CreateWidget<UUserWidget>(GetGameInstance(), POIActionSelectionWidgetClass);
+	CurrentPOIActionSelectionWidget = CreateWidget<UUserWidget>(GetGameInstance(), ActionSelectionWidgetClass);
 	if (!CurrentPOIActionSelectionWidget)
 	{
-		UE_LOG(LogFCUIManager, Error, TEXT("ShowPOIActionSelection: Failed to create widget from class %s"), *POIActionSelectionWidgetClass->GetName());
+		UE_LOG(LogFCUIManager, Error, TEXT("ShowPOIActionSelection: Failed to create widget from class %s"), *ActionSelectionWidgetClass->GetName());
 		return nullptr;
 	}
 

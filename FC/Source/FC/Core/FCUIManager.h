@@ -37,9 +37,9 @@ public:
 	UPROPERTY()
 	TMap<TSubclassOf<AActor>, TSubclassOf<UUserWidget>> TableWidgetMap;
 
-	// POI action selection widget class (configured by GameInstance)
+	/** Action selection widget class for POI interactions (configured from GameInstance) */
 	UPROPERTY()
-	TSubclassOf<UUserWidget> POIActionSelectionWidgetClass;
+	TSubclassOf<UUserWidget> ActionSelectionWidgetClass;
 
 	// Cached widget instances
 	UPROPERTY()
