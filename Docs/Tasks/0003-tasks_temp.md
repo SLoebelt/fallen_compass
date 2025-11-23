@@ -748,50 +748,57 @@ IMC_FC_TopDown`
 
 ---
 
-#### Step 5.5.2: Verify GetLeaderMember Method (Already in C++)
+#### Step 5.5.2: Verify GetLeaderMember Method (Already in C++) - OBSOLETE
 
-- [ ] **Analysis**
+- [x] **Analysis**
 
-  - [ ] GetLeaderMember() method already implemented in C++ AOverworldConvoy
-  - [ ] Marked as BlueprintCallable, accessible from both C++ and Blueprint
-  - [ ] Returns AConvoyMember\* (leader member reference)
-  - [ ] This step verifies functionality only
+  - [x] GetLeaderMember() method already implemented in C++ AFCOverworldConvoy
+  - [x] Marked as BlueprintCallable, accessible from both C++ and Blueprint
+  - [x] Returns AFCConvoyMember\* (leader member reference)
+  - [x] Used successfully in Step 5.5.1 implementation
 
-- [ ] **Verification (Unreal Editor)**
+- [x] **Verification (Unreal Editor)**
 
-  - [ ] Open BP_FC_OverworldConvoy
-  - [ ] Verify GetLeaderMember method visible in Blueprint (inherited from C++)
-  - [ ] Test in Event Graph: Call GetLeaderMember → Print String with result
-  - [ ] Remove test code after verification
+  - [x] GetLeaderMember method called in HandleOverworldClickMove()
+  - [x] Returns valid AFCConvoyMember reference
+  - [x] C++ implementation working correctly
 
-- [ ] **Testing After Step 5.5.2** ✅ CHECKPOINT
-  - [ ] GetLeaderMember method visible and callable in Blueprint
-  - [ ] Returns valid AConvoyMember reference
-  - [ ] Blueprint compiles without errors
+- [x] **Testing After Step 5.5.2** ✅ CHECKPOINT
+  - [x] GetLeaderMember method functional in C++ PlayerController
+  - [x] Returns valid AFCConvoyMember reference
+  - [x] No Blueprint verification needed
 
-**COMMIT POINT 5.5.2**: N/A (functionality already in C++ base class)
+**OBSOLETE NOTE**: This step was marked as "verification only" and GetLeaderMember() was successfully used in Step 5.5.1 C++ implementation. No additional Blueprint testing required.
+
+**COMMIT POINT 5.5.2**: N/A (functionality already in C++ base class, verified in 5.5.1)
 
 ---
 
-#### Step 5.5.3: Configure ClickMoveAction in BP_FCOverworldPlayerController
+#### Step 5.5.3: Configure ClickMoveAction in BP_FC_PlayerController - OBSOLETE
 
-- [ ] **Analysis**
+- [x] **Analysis**
 
-  - [ ] ClickMoveAction property needs IA_Interact assigned in Blueprint
-  - [ ] Follow same pattern as other input actions
+  - [x] Original plan: Create separate ClickMoveAction property
+  - [x] Actual implementation: Reused existing ClickAction and HandleClick routing
+  - [x] HandleClick now routes TopDown clicks to HandleOverworldClickMove()
+  - [x] Simpler architecture, fewer input actions to manage
 
-- [ ] **Implementation (Unreal Editor)**
+- [x] **Implementation (C++ - Completed in 5.5.1)**
 
-  - [ ] Open BP_FCOverworldPlayerController
-  - [ ] Class Defaults → FC | Input | Actions: - [ ] Set ClickMoveAction: `/Game/FC/Input/Actions
-/Game/FC/Input/IA_Interact`
-  - [ ] Compile and save
+  - [x] No Blueprint configuration needed
+  - [x] Existing ClickAction already bound to IA_Interact in IMC_FC_TopDown
+  - [x] HandleClick checks camera mode and routes to appropriate handler
+  - [x] TopDown mode → HandleOverworldClickMove()
+  - [x] TableView/FirstPerson mode → HandleTableObjectClick()
 
-- [ ] **Testing After Step 5.5.3** ✅ CHECKPOINT
-  - [ ] ClickMoveAction assigned to IA_Interact
-  - [ ] Blueprint compiles without errors
+- [x] **Testing After Step 5.5.3** ✅ CHECKPOINT
+  - [x] Click routing working in PIE
+  - [x] No separate ClickMoveAction property needed
+  - [x] Existing input bindings sufficient
 
-**COMMIT POINT 5.5.3**: `git add Content/FC/Core/BP_FCOverworldPlayerController.uasset && git commit -m "feat(convoy): Assign IA_Interact to ClickMoveAction in BP_FCOverworldPlayerController"`
+**OBSOLETE NOTE**: This step is no longer needed. Step 5.5.1 implementation reused the existing ClickAction and HandleClick routing instead of creating a separate ClickMoveAction property. This simplifies the input system and reduces redundancy.
+
+**COMMIT POINT 5.5.3**: N/A (obsolete - functionality implemented in 5.5.1)
 
 ---
 
@@ -1288,7 +1295,7 @@ IMC_FC_TopDown`
 
 ---
 
-#### Step 6.4.2: Configure InteractPOIAction in BP_FCOverworldPlayerController
+#### Step 6.4.2: Configure InteractPOIAction in BP_FC_PlayerController
 
 - [ ] **Analysis**
 
@@ -1296,7 +1303,7 @@ IMC_FC_TopDown`
 
 - [ ] **Implementation (Unreal Editor)**
 
-  - [ ] Open BP_FCOverworldPlayerController
+  - [ ] Open BP_FC_PlayerController
   - [ ] Class Defaults → FC | Input | Actions: - [ ] Set InteractPOIAction: `/Game/FC/Input/Actions
 /Game/FC/Input/IA_InteractPOI`
   - [ ] Compile and save
@@ -1305,7 +1312,7 @@ IMC_FC_TopDown`
   - [ ] InteractPOIAction assigned to IA_InteractPOI
   - [ ] Blueprint compiles without errors
 
-**COMMIT POINT 6.4.2**: `git add Content/FC/Core/BP_FCOverworldPlayerController.uasset && git commit -m "feat(overworld): Assign IA_InteractPOI to InteractPOIAction"`
+**COMMIT POINT 6.4.2**: `git add Content/FC/Core/BP_FC_PlayerController.uasset && git commit -m "feat(overworld): Assign IA_InteractPOI to InteractPOIAction"`
 
 ---
 
@@ -1394,7 +1401,7 @@ IMC_FC_TopDown`
 - [ ] BP_OverworldPOI implements BPI_InteractablePOI interface
 - [ ] OnPOIInteract() displays Print String stub message
 - [ ] AFCOverworldPlayerController implements HandleInteractPOI() with raycast and interface check
-- [ ] InteractPOIAction assigned to IA_InteractPOI in BP_FCOverworldPlayerController
+- [ ] InteractPOIAction assigned to IA_InteractPOI in BP_FC_PlayerController
 - [ ] 3-5 POI instances placed in L_Overworld with unique names
 - [ ] Right-click on POI shows on-screen message and logs interaction
 - [ ] Convoy overlap with POI shows on-screen message and logs detection

@@ -6897,7 +6897,7 @@ MoveToLocation (Vector input: Target Location)
 #### Input System
 
 - **TopDown Input Context**: `IMC_FC_TopDown` includes left mouse button binding to `IA_Interact`
-- **Player Controller**: Handles click-to-move in TopDown camera mode (implementation in Task 5.5)
+- **Player Controller**: `AFCPlayerController::HandleOverworldClickMove()` implements click-to-move navigation for convoy leader
 
 #### Camera System
 
@@ -6908,6 +6908,176 @@ MoveToLocation (Vector input: Target Location)
 
 - **Overworld_Travel State**: Triggers TopDown input mode and convoy camera in `AFCPlayerController::OnGameStateChanged()`
 - **State Transitions**: Office_Exploration → Overworld_Travel (player clicks map in office)
+
+### Click-to-Move Navigation (Task 5.5)
+
+#### AFCPlayerController Integration
+
+- **Files**: `Source/FC/Core/FCPlayerController.h/.cpp`
+- **Purpose**: Handle left-click navigation commands for convoy leader in TopDown camera mode
+
+##### Key Properties
+
+```cpp
+/** Reference to player's convoy */
+UPROPERTY()
+AFCOverworldConvoy* PossessedConvoy;
+```
+
+##### BeginPlay: Find Convoy
+
+```cpp
+void AFCPlayerController::BeginPlay()
+{
+    Super::BeginPlay();
+
+    // Find convoy in level
+    TArray<AActor*> FoundConvoys;
+    UGameplayStatics::GetAllActorsOfClass(GetWorld(), AFCOverworldConvoy::StaticClass(), FoundConvoys);
+
+    if (FoundConvoys.Num() > 0)
+    {
+        PossessedConvoy = Cast<AFCOverworldConvoy>(FoundConvoys[0]);
+        UE_LOG(LogFCPlayerController, Log, TEXT("Found convoy: %s"), 
+            PossessedConvoy ? *PossessedConvoy->GetName() : TEXT("null"));
+    }
+}
+```
+
+**Implementation Notes**:
+- Automatically finds convoy placed in level
+- No manual references needed - uses `GetAllActorsOfClass`
+- Caches convoy reference for click handling
+
+##### HandleClick: Route to Click-to-Move
+
+```cpp
+void AFCPlayerController::HandleClick()
+{
+    if (!CameraManager || !CameraManager->GetActiveCamera())
+    {
+        return;
+    }
+
+    // Route click to appropriate handler based on camera mode
+    if (CameraManager->GetCameraMode() == EFCCameraMode::TopDown)
+    {
+        HandleOverworldClickMove();
+    }
+    else
+    {
+        HandleTableObjectClick();
+    }
+}
+```
+
+**Design Notes**:
+- Reuses existing `ClickAction` input binding (no separate `ClickMoveAction` needed)
+- Routes TopDown clicks to convoy navigation
+- TableView/FirstPerson clicks route to object interaction
+- Simplifies input system by consolidating click handlers
+
+##### HandleOverworldClickMove: NavMesh Pathfinding
+
+```cpp
+void AFCPlayerController::HandleOverworldClickMove()
+{
+    if (!PossessedConvoy)
+    {
+        UE_LOG(LogFCPlayerController, Warning, TEXT("No convoy possessed for click-to-move"));
+        return;
+    }
+
+    // Get convoy leader
+    AFCConvoyMember* Leader = PossessedConvoy->GetLeaderMember();
+    if (!Leader)
+    {
+        UE_LOG(LogFCPlayerController, Warning, TEXT("Convoy has no leader member"));
+        return;
+    }
+
+    // Get leader's AI controller
+    AAIController* AIController = Cast<AAIController>(Leader->GetController());
+    if (!AIController)
+    {
+        UE_LOG(LogFCPlayerController, Warning, TEXT("Leader has no AI controller"));
+        return;
+    }
+
+    // Raycast from cursor to world
+    FHitResult HitResult;
+    if (GetHitResultUnderCursor(ECC_Visibility, false, HitResult))
+    {
+        FVector TargetLocation = HitResult.Location;
+
+        // Project target to NavMesh for valid pathfinding
+        UNavigationSystemV1* NavSys = FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld());
+        if (NavSys)
+        {
+            FNavLocation NavLoc;
+            if (NavSys->ProjectPointToNavigation(TargetLocation, NavLoc, FVector(500.0f, 500.0f, 500.0f)))
+            {
+                TargetLocation = NavLoc.Location;
+
+                // Command AI controller to move
+                AIController->MoveToLocation(TargetLocation);
+
+                // Visual feedback
+                if (GEngine)
+                {
+                    GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Green,
+                        FString::Printf(TEXT("Moving convoy to: %s"), *TargetLocation.ToString()));
+                }
+
+                UE_LOG(LogFCPlayerController, Log, TEXT("Convoy leader moving to: %s"), *TargetLocation.ToString());
+            }
+            else
+            {
+                UE_LOG(LogFCPlayerController, Warning, TEXT("Failed to project click location to NavMesh"));
+            }
+        }
+    }
+}
+```
+
+**Implementation Details**:
+- **Raycast**: Uses `GetHitResultUnderCursor` to get world location under mouse
+- **NavMesh Projection**: Projects click location to nearest walkable NavMesh point (500 unit search radius)
+- **AI Command**: Calls `AAIController::MoveToLocation()` with projected target
+- **Visual Feedback**: Shows green on-screen message for 2 seconds with target coordinates
+- **Error Handling**: Logs warnings if convoy/leader/AI controller missing or NavMesh projection fails
+
+**Testing Results**:
+- ✅ Left-click on ground moves leader to target location
+- ✅ NavMesh projection validates paths (rejects invalid targets like walls)
+- ✅ Visual feedback confirms movement commands
+- ✅ Camera follows leader smoothly during movement
+
+#### Input Routing Architecture
+
+```mermaid
+flowchart TD
+    A[IA_Interact Triggered] --> B[HandleClick]
+    B --> C{Camera Mode?}
+    C -->|TopDown| D[HandleOverworldClickMove]
+    C -->|TableView/FirstPerson| E[HandleTableObjectClick]
+    D --> F[Get Leader from PossessedConvoy]
+    F --> G[Get AI Controller from Leader]
+    G --> H[Raycast Cursor to World]
+    H --> I[Project to NavMesh]
+    I --> J[MoveToLocation]
+    E --> K[Raycast Object Interaction]
+    
+    style D fill:#e91e63
+    style F fill:#50c878
+    style J fill:#3498db
+```
+
+**Design Rationale**:
+- Single `ClickAction` binding simplifies input system
+- Camera mode determines click behavior (navigation vs interaction)
+- No redundant input actions or Blueprint properties needed
+- Follows existing `HandleClick` routing pattern established in Task 3
 
 ### Logging
 
@@ -6939,14 +7109,14 @@ LogFCOverworldConvoy: Convoy BP_FC_OverworldConvoy_C_0 detected POI: BP_POI_Vill
 - **OnConstruction spawns disappear at PIE**: Expected behavior - spawning moved to `BeginPlay()` for runtime persistence
 - **6 members in Outliner but only 3 spawn**: Editor construction actors are destroyed at PIE start; runtime BeginPlay spawns the actual 3 members
 
-### Future Enhancements (Task 5.5+)
+### Future Enhancements (Task 5.6+)
 
-- Click-to-move leader navigation via player controller
-- Follower breadcrumb trail system
-- POI interaction UI prompts
-- Camera constraints for convoy bounds
-- Save/load convoy state
+- ~~Click-to-move leader navigation via player controller~~ ✅ **Implemented in Task 5.5.1**
+- Follower breadcrumb trail system (Task 5.8)
+- POI interaction UI prompts (Task 5.7+)
+- Camera constraints for convoy bounds (Task 5.6)
+- Save/load convoy state (Future task)
 
 ---
 
-_Last updated: November 22, 2025 (Week 3 in progress: Convoy system foundation implemented with C++ base classes, Blueprint children, and runtime spawning architecture)_
+_Last updated: November 23, 2025 (Week 3 Task 5.5 complete: Click-to-move navigation implemented with NavMesh pathfinding, convoy reference caching, and input routing through existing HandleClick architecture)_
