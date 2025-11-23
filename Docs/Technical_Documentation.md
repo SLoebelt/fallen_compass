@@ -23,9 +23,10 @@
 8. [Game State Management (Week 2)](#game-state-management-week-2)
 9. [Level Management & Transitions (Week 2)](#level-management--transitions-week-2)
 10. [Office ↔ Overworld Level Transitions (Task 7)](#office--overworld-level-transitions-task-7)
-11. [Expedition System (Week 2)](#expedition-system-week-2)
-12. [Logging & Debugging](#logging--debugging)
-13. [Build & Configuration](#build--configuration)
+11. [Conditional Pause System (Task 8)](#conditional-pause-system-task-8)
+12. [Expedition System (Week 2)](#expedition-system-week-2)
+13. [Logging & Debugging](#logging--debugging)
+14. [Build & Configuration](#build--configuration)
 
 ---
 
@@ -6274,6 +6275,292 @@ LoadLevel("L_Overworld")         // Then load level
 
 - `Content/TopDown/Maps/L_Office.umap`: Office level (InitializeMainMenu issue - Issue #1)
 - `Content/TopDown/Maps/L_Overworld.umap`: Overworld level (top-down travel)
+
+---
+
+## Conditional Pause System (Task 8)
+
+### Overview
+
+Task 8 implements conditional engine pause behavior that differs between Office and Overworld levels. In the Office, the pause menu opens without stopping player movement (preserving Enhanced Input), while in the Overworld, engine pause is enabled to stop convoy AI and physics.
+
+### Architecture
+
+```mermaid
+flowchart TB
+    subgraph PlayerInput["Player Input"]
+        ESC[ESC Key Press]
+    end
+
+    subgraph PlayerController["AFCPlayerController"]
+        HandlePause[HandlePausePressed]
+        CheckState{Check Current State}
+    end
+
+    subgraph GameState["UFCGameStateManager"]
+        PushState[PushState Paused]
+        PopState[PopState]
+        StateStack[State Stack]
+    end
+
+    subgraph UIManager["UFCUIManager"]
+        ShowMenu[ShowPauseMenu]
+        HideMenu[HidePauseMenu]
+        CheckLevel{Check Level Name}
+        SetEnginePause[SetPause true/false]
+    end
+
+    subgraph Levels["Current Level"]
+        Office[L_Office]
+        Overworld[L_Overworld]
+    end
+
+    ESC --> HandlePause
+    HandlePause --> CheckState
+    CheckState -->|Pausable State| PushState
+    CheckState -->|Already Paused| PopState
+    PushState --> ShowMenu
+    PopState --> HideMenu
+
+    ShowMenu --> CheckLevel
+    CheckLevel -->|L_Office| Office
+    CheckLevel -->|L_Overworld| SetEnginePause
+    SetEnginePause --> Overworld
+
+    HideMenu --> CheckLevel
+
+    style Office fill:#3498db
+    style Overworld fill:#e74c3c
+    style SetEnginePause fill:#f39c12
+    style CheckLevel fill:#9b59b6
+```
+
+### Implementation Details
+
+#### UFCUIManager::ShowPauseMenu()
+
+**Purpose**: Opens pause menu widget and conditionally enables engine pause based on current level.
+
+**Source**: `Source/FC/Core/UFCUIManager.cpp` lines ~86-145
+
+**Logic Flow**:
+
+1. **Create/Display Widget**:
+   - Creates `PauseMenuWidget` if not cached
+   - Adds to viewport with Z-order 100
+2. **Check Current Level**:
+   - Gets level name via `World->GetMapName()`
+   - Strips PIE prefix if present (e.g., `UEDPIE_0_L_Overworld` → `L_Overworld`)
+3. **Conditional Engine Pause**:
+   - If level name contains `"L_Overworld"`: Calls `PC->SetPause(true)` to enable engine pause
+   - If level is `L_Office`: Skips engine pause to preserve Enhanced Input
+4. **Input Mode**:
+   - Sets `FInputModeGameAndUI` to allow UI interaction
+   - Shows mouse cursor
+   - ESC key continues to work in Office (no engine pause)
+   - ESC key blocked in Overworld when paused (Known Issue #4)
+
+**Code Example**:
+
+```cpp
+void UFCUIManager::ShowPauseMenu()
+{
+    // ... widget creation ...
+
+    // Check current level to determine if engine pause should be used
+    UWorld* World = GetWorld();
+    bool bShouldUseEnginePause = false;
+
+    if (World)
+    {
+        FString CurrentLevelName = World->GetMapName();
+        CurrentLevelName.RemoveFromStart(World->StreamingLevelsPrefix);
+
+        // Enable engine pause only for Overworld level
+        bShouldUseEnginePause = CurrentLevelName.Contains(TEXT("L_Overworld"));
+
+        UE_LOG(LogFCUIManager, Log, TEXT("ShowPauseMenu: Current level is %s, engine pause %s"),
+            *CurrentLevelName,
+            bShouldUseEnginePause ? TEXT("ENABLED") : TEXT("DISABLED"));
+    }
+
+    // Set input mode and conditionally pause engine
+    APlayerController* PC = World->GetFirstPlayerController();
+    if (PC)
+    {
+        // ... input mode setup ...
+
+        if (bShouldUseEnginePause)
+        {
+            PC->SetPause(true); // Stops physics, AI, timers
+            UE_LOG(LogFCUIManager, Log, TEXT("ShowPauseMenu: Engine paused (L_Overworld level)"));
+        }
+    }
+}
+```
+
+#### UFCUIManager::HidePauseMenu()
+
+**Purpose**: Closes pause menu widget and conditionally disables engine pause.
+
+**Source**: `Source/FC/Core/UFCUIManager.cpp` lines ~147-180
+
+**Logic Flow**:
+
+1. **Remove Widget**: Removes `PauseMenuWidget` from viewport
+2. **Check Current Level**: Gets level name and checks if Overworld
+3. **Conditional Engine Unpause**:
+   - If level is `L_Overworld`: Calls `PC->SetPause(false)` to resume gameplay
+   - If level is `L_Office`: Skips unpause (was never paused)
+4. **Restore Input**: Sets `FInputModeGameOnly`, hides mouse cursor
+
+**Code Example**:
+
+```cpp
+void UFCUIManager::HidePauseMenu()
+{
+    PauseMenuWidget->RemoveFromParent();
+
+    // Check if engine pause was used
+    UWorld* World = GetWorld();
+    bool bWasUsingEnginePause = false;
+
+    if (World)
+    {
+        FString CurrentLevelName = World->GetMapName();
+        CurrentLevelName.RemoveFromStart(World->StreamingLevelsPrefix);
+        bWasUsingEnginePause = CurrentLevelName.Contains(TEXT("L_Overworld"));
+    }
+
+    APlayerController* PC = World->GetFirstPlayerController();
+    if (PC)
+    {
+        if (bWasUsingEnginePause)
+        {
+            PC->SetPause(false); // Resume physics, AI, timers
+            UE_LOG(LogFCUIManager, Log, TEXT("HidePauseMenu: Engine unpaused"));
+        }
+
+        PC->SetInputMode(FInputModeGameOnly());
+        PC->bShowMouseCursor = false;
+    }
+}
+```
+
+#### AFCPlayerController::HandlePausePressed()
+
+**Purpose**: Handles ESC key input and manages pause state via GameStateManager.
+
+**Source**: `Source/FC/Core/FCPlayerController.cpp` lines ~353-423
+
+**Logic Flow**:
+
+1. **Check Current State**:
+   - If state is `Paused`: Call `PopState()` to resume (triggers `HidePauseMenu()`)
+   - If state is pausable: Call `PushState(Paused)` (triggers `ShowPauseMenu()`)
+2. **Pausable States**:
+   - `Office_Exploration`
+   - `Office_TableView`
+   - `Overworld_Travel`
+3. **State Stack**: Uses `UFCGameStateManager` state stack for pause/resume
+
+**Code Example**:
+
+```cpp
+void AFCPlayerController::HandlePausePressed()
+{
+    UFCGameStateManager* StateMgr = GetGameInstance()->GetSubsystem<UFCGameStateManager>();
+    UFCUIManager* UIManager = GetGameInstance()->GetSubsystem<UFCUIManager>();
+
+    // Check if already paused
+    if (StateMgr->GetCurrentState() == EFCGameStateID::Paused)
+    {
+        // Resume: Pop Paused state from stack
+        if (StateMgr->PopState())
+        {
+            UIManager->HidePauseMenu();
+        }
+        return;
+    }
+
+    // Check if in pausable state
+    EFCGameStateID CurrentState = StateMgr->GetCurrentState();
+    if (CurrentState == EFCGameStateID::Office_Exploration ||
+        CurrentState == EFCGameStateID::Office_TableView ||
+        CurrentState == EFCGameStateID::Overworld_Travel)
+    {
+        // Pause: Push Paused state onto stack
+        if (StateMgr->PushState(EFCGameStateID::Paused))
+        {
+            UIManager->ShowPauseMenu();
+        }
+    }
+}
+```
+
+### Behavior Comparison
+
+| Feature             | L_Office                        | L_Overworld               |
+| ------------------- | ------------------------------- | ------------------------- |
+| **ESC Opens Menu**  | ✅ Yes                          | ✅ Yes                    |
+| **Engine Pause**    | ❌ No (Enhanced Input works)    | ✅ Yes (convoy stops)     |
+| **Player Movement** | ✅ Continues (WASD, mouse look) | ❌ Stops (physics paused) |
+| **Resume Button**   | ✅ Closes menu                  | ✅ Closes menu, unpauses  |
+| **ESC Closes Menu** | ✅ Yes (input active)           | ❌ No (Known Issue #4)    |
+| **Input Mode**      | GameAndUI                       | GameAndUI                 |
+
+### Known Limitations
+
+#### Issue #4: ESC Doesn't Close Menu in Overworld
+
+**Problem**: When engine pause is active (`SetPause(true)`), Enhanced Input actions are blocked. Pressing ESC while paused doesn't trigger `HandlePausePressed()` to close the menu.
+
+**Workaround**: Use Resume button instead of ESC key.
+
+**Proposed Solutions**:
+
+1. **Widget-Driven**: WBP_PauseMenu captures ESC via UMG `OnKeyDown` event
+2. **Input Mode**: Use `FInputModeUIOnly` + manual convoy disable instead of engine pause
+3. **Controller Flag**: Set `bShouldPerformFullTickWhenPaused = true` on PlayerController
+
+**Status**: Tracked as Known Issue #4 in backlog, scheduled for Week 4/5.
+
+### Testing Checklist
+
+**Office Pause Behavior**:
+
+- ✅ ESC opens pause menu
+- ✅ Player can still move (WASD) while menu open
+- ✅ Mouse look continues to work
+- ✅ ESC closes pause menu (toggles correctly)
+- ✅ Resume button closes menu
+
+**Overworld Pause Behavior**:
+
+- ✅ ESC opens pause menu
+- ✅ Convoy movement stops immediately
+- ✅ Physics simulation pauses
+- ✅ Resume button closes menu and resumes gameplay
+- ⚠️ ESC doesn't close menu (Known Issue #4)
+- ✅ Return to Main Menu button works
+- ✅ Abort Expedition button works
+
+### Related Code Files
+
+**C++ Classes**:
+
+- `Source/FC/Core/UFCUIManager.h/.cpp`: ShowPauseMenu(), HidePauseMenu() conditional pause logic
+- `Source/FC/Core/FCPlayerController.h/.cpp`: HandlePausePressed() state management
+- `Source/FC/Core/FCGameStateManager.h/.cpp`: PushState(), PopState() for pause/resume
+
+**Widgets**:
+
+- `Content/FC/UI/Menus/WBP_PauseMenu.uasset`: Pause menu with Resume and Abort buttons
+
+**Levels**:
+
+- `Content/TopDown/Maps/L_Office.umap`: Office level (no engine pause)
+- `Content/TopDown/Maps/L_Overworld.umap`: Overworld level (engine pause enabled)
 
 ---
 

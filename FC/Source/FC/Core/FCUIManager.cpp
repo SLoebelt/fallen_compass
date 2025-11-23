@@ -109,11 +109,27 @@ void UFCUIManager::ShowPauseMenu()
 		PauseMenuWidget->AddToViewport(100);
 		UE_LOG(LogFCUIManager, Log, TEXT("ShowPauseMenu: Widget added to viewport"));
 
-		// Set input mode to allow both UI interaction and game input (ESC key)
-		// NOTE: We do NOT call SetPause(true) because that prevents Enhanced Input actions from firing
-		// The game state system (EFCGameStateID::Paused) provides the logical pause state
-		// For gameplay that needs engine pause (e.g., Overworld 3D map), use CustomTimeDilation instead
+		// Conditionally enable engine pause based on current level
+		// Office level (L_Office): NO engine pause (Enhanced Input needs to work)
+		// Overworld level (L_Overworld): YES engine pause (stops convoy movement and physics)
 		UWorld* World = GetWorld();
+		bool bShouldUseEnginePause = false;
+		
+		if (World)
+		{
+			FString CurrentLevelName = World->GetMapName();
+			// Remove PIE prefix if present (e.g., "UEDPIE_0_L_Overworld" -> "L_Overworld")
+			CurrentLevelName.RemoveFromStart(World->StreamingLevelsPrefix);
+			
+			// Enable engine pause only for Overworld level
+			bShouldUseEnginePause = CurrentLevelName.Contains(TEXT("L_Overworld"));
+			
+			UE_LOG(LogFCUIManager, Log, TEXT("ShowPauseMenu: Current level is %s, engine pause %s"),
+				*CurrentLevelName,
+				bShouldUseEnginePause ? TEXT("ENABLED") : TEXT("DISABLED"));
+		}
+
+		// Set input mode and optionally pause engine
 		if (World)
 		{
 			APlayerController* PC = World->GetFirstPlayerController();
@@ -124,6 +140,13 @@ void UFCUIManager::ShowPauseMenu()
 				InputMode.SetHideCursorDuringCapture(false);
 				PC->SetInputMode(InputMode);
 				PC->bShowMouseCursor = true;
+				
+				// Conditionally pause engine based on level
+				if (bShouldUseEnginePause)
+				{
+					PC->SetPause(true);
+					UE_LOG(LogFCUIManager, Log, TEXT("ShowPauseMenu: Engine paused (L_Overworld level)"));
+				}
 				
 				UE_LOG(LogFCUIManager, Log, TEXT("ShowPauseMenu: Input mode set to GameAndUI, pause menu displayed"));
 			}
@@ -144,13 +167,38 @@ void UFCUIManager::HidePauseMenu()
 		PauseMenuWidget->RemoveFromParent();
 		UE_LOG(LogFCUIManager, Log, TEXT("HidePauseMenu: Widget removed from viewport"));
 
-		// Restore input mode
+		// Conditionally disable engine pause if it was enabled
+		// Check current level to determine if engine pause was used
 		UWorld* World = GetWorld();
+		bool bWasUsingEnginePause = false;
+		
+		if (World)
+		{
+			FString CurrentLevelName = World->GetMapName();
+			// Remove PIE prefix if present
+			CurrentLevelName.RemoveFromStart(World->StreamingLevelsPrefix);
+			
+			// Engine pause was used if we're in Overworld level
+			bWasUsingEnginePause = CurrentLevelName.Contains(TEXT("L_Overworld"));
+			
+			UE_LOG(LogFCUIManager, Log, TEXT("HidePauseMenu: Current level is %s, engine pause %s"),
+				*CurrentLevelName,
+				bWasUsingEnginePause ? TEXT("was ENABLED, unpausing") : TEXT("was DISABLED"));
+		}
+
+		// Restore input mode and optionally unpause engine
 		if (World)
 		{
 			APlayerController* PC = World->GetFirstPlayerController();
 			if (PC)
 			{
+				// Conditionally unpause engine if it was paused
+				if (bWasUsingEnginePause)
+				{
+					PC->SetPause(false);
+					UE_LOG(LogFCUIManager, Log, TEXT("HidePauseMenu: Engine unpaused (L_Overworld level)"));
+				}
+				
 				PC->SetInputMode(FInputModeGameOnly());
 				PC->bShowMouseCursor = false;
 				UE_LOG(LogFCUIManager, Log, TEXT("HidePauseMenu: Input mode restored to game only, pause menu hidden"));
