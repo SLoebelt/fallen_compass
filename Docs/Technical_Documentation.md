@@ -7213,12 +7213,19 @@ LogFCOverworldConvoy: Convoy BP_FC_OverworldConvoy_C_0 detected POI: BP_POI_Vill
   - `BP_OverworldCamera` - TopDown camera with spring arm
   - `NavMeshBoundsVolume` - For AI pathfinding (press `P` in PIE to visualize)
   - `PlayerStart` - Reference point for convoy placement
+  - `BP_FC_OverworldPOI` - Points of Interest for convoy interaction (Task 6.2)
 
 **Convoy Placement**:
 
 - Position: Near PlayerStart (e.g., X=0, Y=0, Z=100)
 - Details Panel: Set `Convoy Member Class` to `BP_FC_ConvoyMember`
 - No manual camera attachment needed - handled by `UFCCameraManager::BlendToTopDown()`
+
+**POI Placement** (Task 6.2):
+
+- Position: Various locations around map
+- Details Panel: Set `POI Name` to identify specific POI (e.g., "Village", "Ruins")
+- Convoy automatically detects overlap via capsule collision
 
 **Testing Checklist**:
 
@@ -7227,17 +7234,241 @@ LogFCOverworldConvoy: Convoy BP_FC_OverworldConvoy_C_0 detected POI: BP_POI_Vill
 - ✅ Left-click moves leader via NavMesh
 - ✅ Camera follows convoy during movement
 - ✅ Pan (WASD) and zoom (mouse wheel) work while moving
+- ✅ POI actors spawn and convoy detects overlap
+
+---
+
+## POI System (Week 3 - Task 6.2)
+
+### Overview
+
+The POI (Point of Interest) system provides interactive locations in the overworld that the convoy can encounter. The system uses a C++ base class (`AFCOverworldPOI`) with Blueprint children for visual configuration, following the same architecture pattern as the convoy system.
+
+### Architecture
+
+```mermaid
+classDiagram
+    class AActor {
+        <<Unreal>>
+        +BeginPlay()
+    }
+
+    class AFCOverworldPOI {
+        -USceneComponent* POIRoot
+        -UStaticMeshComponent* POIMesh
+        -UBoxComponent* InteractionBox
+        -FString POIName
+        +GetPOIName() FString
+        +OnPOIInteract() virtual
+    }
+
+    class BP_FC_OverworldPOI {
+        <<Blueprint>>
+        +Mesh Configuration
+        +Material Setup
+        +POI Name Instance
+    }
+
+    class AFCConvoyMember {
+        <<Convoy System>>
+        +OnCapsuleBeginOverlap()
+    }
+
+    AActor <|-- AFCOverworldPOI
+    AFCOverworldPOI <|-- BP_FC_OverworldPOI : inherits
+    AFCConvoyMember --> AFCOverworldPOI : detects overlap
+
+    style AFCOverworldPOI fill:#ff6b6b
+    style BP_FC_OverworldPOI fill:#4ecdc4
+    style AFCConvoyMember fill:#50c878
+```
+
+### AFCOverworldPOI
+
+- **Files**: `Source/FC/World/FCOverworldPOI.h/.cpp`
+- **Inheritance**: `AActor`
+- **Purpose**: Base C++ class for overworld Points of Interest with collision for mouse raycast and convoy overlap detection
+
+#### Key Properties
+
+```cpp
+/** Root component for POI hierarchy */
+UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "FC|POI")
+USceneComponent* POIRoot;
+
+/** Static mesh for visual representation */
+UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "FC|POI")
+UStaticMeshComponent* POIMesh;
+
+/** Collision box for mouse raycast and convoy overlap detection */
+UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "FC|POI")
+UBoxComponent* InteractionBox;
+
+/** Display name for this Point of Interest */
+UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "FC|POI")
+FString POIName;
+```
+
+#### Key Methods
+
+##### Constructor
+
+```cpp
+AFCOverworldPOI::AFCOverworldPOI()
+{
+    PrimaryActorTick.bCanEverTick = false;
+
+    // Create component hierarchy
+    POIRoot = CreateDefaultSubobject<USceneComponent>(TEXT("POIRoot"));
+    SetRootComponent(POIRoot);
+
+    // Create static mesh component
+    POIMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("POIMesh"));
+    POIMesh->SetupAttachment(POIRoot);
+    POIMesh->SetRelativeScale3D(FVector(2.0f, 2.0f, 2.0f));
+    POIMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+
+    // Create interaction box for raycast and overlap
+    InteractionBox = CreateDefaultSubobject<UBoxComponent>(TEXT("InteractionBox"));
+    InteractionBox->SetupAttachment(POIRoot);
+    InteractionBox->SetBoxExtent(FVector(150.0f, 150.0f, 100.0f));
+    InteractionBox->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+    InteractionBox->SetCollisionObjectType(ECollisionChannel::ECC_WorldDynamic);
+    InteractionBox->SetCollisionResponseToAllChannels(ECollisionResponse::ECR_Overlap);
+    InteractionBox->SetCollisionResponseToChannel(ECC_Visibility, ECollisionResponse::ECR_Block);
+    InteractionBox->SetGenerateOverlapEvents(true);
+
+    // Default POI name
+    POIName = TEXT("Unnamed POI");
+}
+```
+
+**Implementation Notes**:
+
+- POIMesh scaled 2x for visibility from top-down camera
+- POIMesh has no collision (visual only)
+- InteractionBox: 150x150x100 extent (larger than mesh for easier interaction)
+- InteractionBox blocks Visibility channel (for mouse raycast detection)
+- InteractionBox overlaps all channels (for convoy capsule overlap)
+- QueryOnly collision (no physics simulation)
+
+##### BeginPlay
+
+```cpp
+void AFCOverworldPOI::BeginPlay()
+{
+    Super::BeginPlay();
+
+    UE_LOG(LogFCOverworldPOI, Log, TEXT("POI '%s' spawned at %s"), 
+        *POIName, *GetActorLocation().ToString());
+}
+```
+
+##### GetPOIName & OnPOIInteract
+
+```cpp
+UFUNCTION(BlueprintCallable, Category = "FC|POI")
+FString GetPOIName() const { return POIName; }
+
+void AFCOverworldPOI::OnPOIInteract_Implementation()
+{
+    // Stub implementation - logs to console
+    UE_LOG(LogFCOverworldPOI, Log, TEXT("POI Interaction: %s"), *POIName);
+
+    if (GEngine)
+    {
+        GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Yellow,
+            FString::Printf(TEXT("POI Interaction Stub: %s"), *POIName));
+    }
+}
+```
+
+**Design Notes**:
+
+- `OnPOIInteract()` is BlueprintNativeEvent (can be overridden in Blueprint)
+- Current implementation is stub for Task 6 (logs to console and shows on-screen message)
+- Future tasks will implement full interaction UI and game logic
+
+#### Blueprint Child Class: BP_FC_OverworldPOI
+
+- **Location**: `/Game/FC/World/Blueprints/Actors/POI/BP_FC_OverworldPOI`
+- **Parent**: `AFCOverworldPOI`
+- **Purpose**: Configure visual mesh, materials, and POI-specific names
+
+**Configuration**:
+
+- **POIMesh Component**: Static mesh (cone, sphere, or custom marker mesh)
+- **Materials**: Distinctive color for visibility (yellow/orange recommended)
+- **POI Name**: Editable per-instance in Details panel (e.g., "Village", "Ruins", "Encounter")
+
+**Placement in L_Overworld**:
+
+- Drag BP_FC_OverworldPOI from Content Browser into level
+- Set POI Name in Details panel for each instance
+- InteractionBox automatically handles convoy overlap detection
+
+### Convoy Integration
+
+#### Overlap Detection
+
+POI detection uses the existing convoy overlap system from Task 5:
+
+- `AFCConvoyMember::OnCapsuleBeginOverlap()` detects POI via class name pattern matching
+- Class name check: `Actor->GetClass()->GetName().Contains(TEXT("POI"))`
+- Convoy member notifies parent: `ParentConvoy->NotifyPOIOverlap(POIActor)`
+- Parent convoy broadcasts event and logs detection
+
+**Example Log Output**:
+
+```
+LogFCOverworldPOI: POI 'Village' spawned at X=1000.000 Y=500.000 Z=100.000
+LogFCConvoyMember: ConvoyMember BP_FC_ConvoyMember_C_0: Detected overlap with potential POI BP_FC_OverworldPOI_C_0
+LogFCConvoyMember: ConvoyMember BP_FC_ConvoyMember_C_0: Notifying parent convoy of POI overlap
+LogFCOverworldConvoy: Convoy BP_FC_OverworldConvoy_C_0 detected POI: BP_FC_OverworldPOI_C_0
+```
+
+#### Right-Click Interaction (Task 6.4 - Planned)
+
+Future implementation will add:
+
+- Right-click raycast detection to POI InteractionBox
+- Call `OnPOIInteract()` on clicked POI
+- Display interaction UI (defer to later tasks)
+
+### Logging
+
+POI system uses dedicated log category:
+
+```cpp
+DEFINE_LOG_CATEGORY_STATIC(LogFCOverworldPOI, Log, All);
+```
+
+### Common Issues
+
+- **POI not detected by convoy**: Ensure InteractionBox has Generate Overlap Events enabled and overlaps Pawn channel
+- **Can't click POI**: Verify InteractionBox blocks Visibility channel for mouse raycast
+- **POI name not showing in logs**: Check POI Name property is set in Details panel for placed instance
+
+### Future Enhancements (Task 6.3+)
+
+- ~~POI base class and Blueprint child~~ ✅ **Implemented in Task 6.2**
+- BPI_InteractablePOI interface implementation (Task 6.3)
+- Right-click interaction handler in AFCPlayerController (Task 6.4)
+- POI interaction UI and game logic (Task 6.5+)
+- Different POI types (villages, ruins, encounters, merchants)
 
 ### Future Enhancements (Task 5.8+)
 
 - ~~Click-to-move leader navigation via player controller~~ ✅ **Implemented in Task 5.5.1**
 - ~~Camera attachment to convoy CameraAttachPoint~~ ✅ **Implemented in Task 5.6.1**
 - ~~Convoy placement in L_Overworld level~~ ✅ **Implemented in Task 5.7.1**
+- ~~POI base class for overworld interaction~~ ✅ **Implemented in Task 6.2**
 - Follower breadcrumb trail system (Task 5.8)
-- POI interaction UI prompts (Task 5.8+)
+- POI right-click interaction handler (Task 6.4)
+- POI interaction UI prompts (Task 6.5+)
 - Dynamic camera constraints based on convoy bounds (Week 6+ - Backlog Item 2)
 - Save/load convoy state (Future task)
 
 ---
 
-_Last updated: November 23, 2025 (Week 3 Task 5.7 complete: Camera attachment implemented in UFCCameraManager::BlendToTopDown(), convoy placed in L_Overworld, full click-to-move and camera following tested in PIE)_
+_Last updated: November 23, 2025 (Week 3 Task 6.2 complete: AFCOverworldPOI C++ base class created, BP_FC_OverworldPOI configured and placed in L_Overworld, convoy overlap detection verified)_

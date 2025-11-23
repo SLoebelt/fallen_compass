@@ -1008,129 +1008,255 @@ IMC_FC_TopDown`
 
 ---
 
-### Step 6.1: Create Input Action for POI Interaction
+### Step 6.1: Verify Input Action for POI Interaction
 
-#### Step 6.1.1: Create IA_InteractPOI Input Action
+#### Step 6.1.1: Verify IA_Interact Input Action (OBSOLETE - Already Exists)
 
-- [ ] **Analysis**
+- [x] **Analysis**
 
-  - [ ] POI interaction uses right-click (separate from left-click move)
-  - [ ] Boolean trigger (press detection)
-  - [ ] Will be bound to Right Mouse Button in IMC_FC_TopDown
+  - [x] POI interaction uses right-click via existing IA_Interact action
+  - [x] IA_Interact already exists at `/Game/FC/Input/IA_Interact`
+  - [x] Currently not used for any other functionality in TopDown mode
+  - [x] Will reuse instead of creating separate IA_InteractPOI
 
-- [ ] **Implementation (Unreal Editor)**
+- [x] **Verification**
 
-  - [ ] Content Browser → `/Game/FC/Input/Actions
-/Game/FC/Input/`
-  - [ ] Right-click → Input → Input Action
-  - [ ] Name: `IA_InteractPOI`
-  - [ ] Open IA_InteractPOI
-  - [ ] Set Value Type: Digital (bool)
-  - [ ] Save asset
+  - [x] IA_Interact exists and is Digital (bool) type
+  - [x] Available for POI interaction binding
 
-- [ ] **Testing After Step 6.1.1** ✅ CHECKPOINT
-  - [ ] Asset created at correct path
-  - [ ] Value Type set to Digital (bool)
-  - [ ] Asset saves without errors
+- [x] **Testing After Step 6.1.1** ✅ CHECKPOINT
+  - [x] IA_Interact confirmed to exist
+  - [x] No conflicts with other TopDown functionality
 
-**COMMIT POINT 6.1.1**: `git add Content/FC/Input/Actions/IA_InteractPOI.uasset && git commit -m "feat(overworld): Create IA_InteractPOI input action"`
+**OBSOLETE NOTE**: Step originally planned to create IA_InteractPOI, but we're reusing existing IA_Interact instead to simplify input system.
+
+**COMMIT POINT 6.1.1**: N/A (using existing asset)
 
 ---
 
-#### Step 6.1.2: Add Right Mouse Button Binding to IMC_FC_TopDown
+#### Step 6.1.2: Verify Right Mouse Button Binding in IMC_FC_TopDown (OBSOLETE - Already Bound)
 
-- [ ] **Analysis**
+- [x] **Analysis**
 
-  - [ ] Right Mouse Button key name in Enhanced Input: "RightMouseButton"
-  - [ ] No modifiers needed
+  - [x] Right Mouse Button already bound to IA_Interact in IMC_FC_TopDown
+  - [x] No additional binding needed
 
-- [ ] **Implementation (Unreal Editor)**
+- [x] **Verification**
 
-  - [ ] Open `/Game/FC/Input/Contexts/IMC_FC_TopDown`
-  - [ ] Add Mapping: IA_InteractPOI
-  - [ ] Add Key: **Right Mouse Button**
-    - [ ] No modifiers needed
-  - [ ] Save IMC_FC_TopDown
+  - [x] IMC_FC_TopDown already has IA_Interact mapped to Right Mouse Button
+  - [x] Binding ready for POI interaction implementation
 
-- [ ] **Testing After Step 6.1.2** ✅ CHECKPOINT
-  - [ ] Right Mouse Button bound to IA_InteractPOI
-  - [ ] IMC_FC_TopDown now has 4 mappings (Pan, Zoom, Interact/ClickMove, InteractPOI)
-  - [ ] Asset saves without errors
+- [x] **Testing After Step 6.1.2** ✅ CHECKPOINT
+  - [x] Right Mouse Button bound to IA_Interact in TopDown context
+  - [x] IMC_FC_TopDown has required mappings (Pan, Zoom, ClickMove, Interact)
+  - [x] No changes needed
 
-**COMMIT POINT 6.1.2**: `git add Content/FC/Input/IMC_FC_TopDown.uasset && git commit -m "feat(overworld): Add right mouse button binding for POI interaction in IMC_FC_TopDown"`
+**OBSOLETE NOTE**: Right Mouse Button already bound to IA_Interact in IMC_FC_TopDown mapping context. No additional configuration needed.
 
----
-
-### Step 6.2: Create BP_OverworldPOI Actor Blueprint
-
-#### Step 6.2.1: Create Actor Blueprint with Mesh and Collision
-
-- [ ] **Analysis**
-
-  - [ ] POI needs collision for mouse raycast detection AND convoy overlap
-  - [ ] Static mesh for visual representation
-  - [ ] Box or sphere collision component
-  - [ ] Implements BPI_InteractablePOI interface (for convoy overlap detection)
-
-- [ ] **Implementation (Unreal Editor)**
-
-  - [ ] Content Browser → `/Game/FC/World/Blueprints/Actors/`
-  - [ ] Right-click → Blueprint Class → Actor
-  - [ ] Name: `BP_OverworldPOI`
-  - [ ] Open BP_OverworldPOI
-  - [ ] Components Panel:
-    - [ ] Root: Scene Component (rename to "POIRoot")
-    - [ ] Add Child: Static Mesh Component (rename to "POIMesh")
-      - [ ] Set Static Mesh: Choose placeholder (Cone, Sphere, or starter content mesh)
-      - [ ] Set Scale: X=2, Y=2, Z=2 (visible from camera)
-      - [ ] Set Material: Distinctive color (e.g., yellow/orange for POI)
-    - [ ] Add Child: Box Component (rename to "InteractionBox")
-      - [ ] Set Box Extent: X=150, Y=150, Z=100 (larger than mesh for easier clicking)
-      - [ ] Enable **Generate Overlap Events**: True
-      - [ ] Set Collision Preset: **Custom**
-        - [ ] Collision Enabled: Query Only (No Physics Collision)
-        - [ ] Object Type: WorldDynamic
-        - [ ] Collision Responses: Overlap All (for convoy overlap detection)
-        - [ ] Visibility Channel: **Block** (for mouse raycast)
-  - [ ] Compile and save
-
-- [ ] **Testing After Step 6.2.1** ✅ CHECKPOINT
-  - [ ] Blueprint compiles without errors
-  - [ ] Components hierarchy correct
-  - [ ] InteractionBox set to Block Visibility and Overlap Pawn
-  - [ ] Can place in level viewport (test, then remove)
-
-**COMMIT POINT 6.2.1**: `git add Content/FC/World/Blueprints/Actors/BP_OverworldPOI.uasset && git commit -m "feat(overworld): Create BP_OverworldPOI actor with mesh and interaction collision"`
+**COMMIT POINT 6.1.2**: N/A (binding already exists)
 
 ---
 
-#### Step 6.2.2: Add Custom POI Name Property
+### Step 6.2: Create AFCOverworldPOI C++ Base Class
 
-- [ ] **Analysis**
+#### Step 6.2.1: Create AFCOverworldPOI C++ Class
 
-  - [ ] Each POI should have a name for identification in logs and future UI
-  - [ ] Editable per-instance property
-  - [ ] String type
+- [x] **Analysis**
 
-- [ ] **Implementation (BP_OverworldPOI Event Graph)**
+  - [x] C++ base class for all overworld POI actors (matches convoy architecture)
+  - [x] Root component, static mesh, and collision box for raycast/overlap
+  - [x] POI name property (FString, EditAnywhere, Instance Editable)
+  - [x] Virtual OnPOIInteract() method for Blueprint extensibility
+  - [x] Overlap detection setup in constructor
+  - [x] Blueprint children configure mesh/materials per POI type
 
-  - [ ] Open BP_OverworldPOI
-  - [ ] Variables Panel → Add Variable:
-    - [ ] Name: `POIName`
-    - [ ] Type: String
-    - [ ] Instance Editable: ✅ Checked
-    - [ ] Category: "FC|POI"
-    - [ ] Default Value: "Unnamed POI"
-    - [ ] Tooltip: "Display name for this Point of Interest"
-  - [ ] Compile and save
+- [x] **Implementation (C++)**
 
-- [ ] **Testing After Step 6.2.2** ✅ CHECKPOINT
-  - [ ] POIName variable created
-  - [ ] Instance Editable enabled
-  - [ ] Default value set
-  - [ ] Blueprint compiles without errors
+  - [x] **Created Header File**: `Source/FC/World/FCOverworldPOI.h`
 
-**COMMIT POINT 6.2.2**: `git add Content/FC/World/Blueprints/Actors/BP_OverworldPOI.uasset && git commit -m "feat(overworld): Add POIName property to BP_OverworldPOI"`
+    - [x] Component properties: POIRoot, POIMesh, InteractionBox
+    - [x] POIName property (EditAnywhere, BlueprintReadWrite)
+    - [x] GetPOIName() accessor (BlueprintCallable)
+    - [x] OnPOIInteract() virtual method (BlueprintNativeEvent)
+
+  - [x] **Created Source File**: `Source/FC/World/FCOverworldPOI.cpp`
+
+    - [x] Constructor creates component hierarchy
+    - [x] POIMesh scaled 2x, no collision
+    - [x] InteractionBox: 150x150x100 extent, QueryOnly, blocks Visibility, overlaps all
+    - [x] Default POI name: "Unnamed POI"
+    - [x] BeginPlay logs POI spawn with name and location
+    - [x] OnPOIInteract_Implementation() shows yellow stub message (5s)
+
+  - [x] Compiled successfully via Live Coding
+
+- [x] **Testing After Step 6.2.1** ✅ CHECKPOINT
+  - [x] C++ code compiled without errors
+  - [x] AFCOverworldPOI visible in Unreal Editor Content Browser
+  - [x] Can create Blueprint child class from AFCOverworldPOI
+
+**COMMIT POINT 6.2.1**: `git add Source/FC/World/FCOverworldPOI.h Source/FC/World/FCOverworldPOI.cpp && git commit -m "feat(overworld): Create AFCOverworldPOI C++ base class"`
+
+    ```cpp
+    #pragma once
+
+    #include "CoreMinimal.h"
+    #include "GameFramework/Actor.h"
+    #include "FCOverworldPOI.generated.h"
+
+    class USceneComponent;
+    class UStaticMeshComponent;
+    class UBoxComponent;
+
+    DECLARE_LOG_CATEGORY_EXTERN(LogFCOverworldPOI, Log, All);
+
+    /**
+     * AFCOverworldPOI - Base class for overworld Points of Interest
+     *
+     * Provides collision for mouse raycast detection and convoy overlap.
+     * Blueprint children configure specific mesh, materials, and POI names.
+     */
+    UCLASS()
+    class FC_API AFCOverworldPOI : public AActor
+    {
+        GENERATED_BODY()
+
+    public:
+        AFCOverworldPOI();
+
+    protected:
+        virtual void BeginPlay() override;
+
+    private:
+        /** Root component for POI hierarchy */
+        UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "FC|POI", meta = (AllowPrivateAccess = "true"))
+        USceneComponent* POIRoot;
+
+        /** Static mesh for visual representation */
+        UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "FC|POI", meta = (AllowPrivateAccess = "true"))
+        UStaticMeshComponent* POIMesh;
+
+        /** Collision box for mouse raycast and convoy overlap detection */
+        UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "FC|POI", meta = (AllowPrivateAccess = "true"))
+        UBoxComponent* InteractionBox;
+
+        /** Display name for this Point of Interest */
+        UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "FC|POI", meta = (AllowPrivateAccess = "true"))
+        FString POIName;
+
+    public:
+        /** Get POI display name */
+        UFUNCTION(BlueprintCallable, Category = "FC|POI")
+        FString GetPOIName() const { return POIName; }
+
+        /** Handle POI interaction (stub for Task 6 - will log to console) */
+        UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "FC|POI")
+        void OnPOIInteract();
+    };
+    ```
+
+- [ ] **Create Source File**: `Source/FC/World/FCOverworldPOI.cpp`
+
+  ```cpp
+  #include "World/FCOverworldPOI.h"
+  #include "Components/SceneComponent.h"
+  #include "Components/StaticMeshComponent.h"
+  #include "Components/BoxComponent.h"
+
+  DEFINE_LOG_CATEGORY(LogFCOverworldPOI);
+
+  AFCOverworldPOI::AFCOverworldPOI()
+  {
+      PrimaryActorTick.bCanEverTick = false;
+
+      // Create component hierarchy
+      POIRoot = CreateDefaultSubobject<USceneComponent>(TEXT("POIRoot"));
+      SetRootComponent(POIRoot);
+
+      // Create static mesh component
+      POIMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("POIMesh"));
+      POIMesh->SetupAttachment(POIRoot);
+      POIMesh->SetRelativeScale3D(FVector(2.0f, 2.0f, 2.0f));
+      POIMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+
+      // Create interaction box for raycast and overlap
+      InteractionBox = CreateDefaultSubobject<UBoxComponent>(TEXT("InteractionBox"));
+      InteractionBox->SetupAttachment(POIRoot);
+      InteractionBox->SetBoxExtent(FVector(150.0f, 150.0f, 100.0f));
+      InteractionBox->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+      InteractionBox->SetCollisionObjectType(ECollisionChannel::ECC_WorldDynamic);
+      InteractionBox->SetCollisionResponseToAllChannels(ECollisionResponse::ECR_Overlap);
+      InteractionBox->SetCollisionResponseToChannel(ECC_Visibility, ECollisionResponse::ECR_Block);
+      InteractionBox->SetGenerateOverlapEvents(true);
+
+      // Default POI name
+      POIName = TEXT("Unnamed POI");
+  }
+
+  void AFCOverworldPOI::BeginPlay()
+  {
+      Super::BeginPlay();
+
+      UE_LOG(LogFCOverworldPOI, Log, TEXT("POI '%s' spawned at %s"),
+          *POIName, *GetActorLocation().ToString());
+  }
+
+  void AFCOverworldPOI::OnPOIInteract_Implementation()
+  {
+      // Stub implementation - logs to console
+      UE_LOG(LogFCOverworldPOI, Log, TEXT("POI Interaction: %s"), *POIName);
+
+      if (GEngine)
+      {
+          GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Yellow,
+              FString::Printf(TEXT("POI Interaction Stub: %s"), *POIName));
+      }
+  }
+  ```
+
+- [x] Save files
+- [x] Compile C++ code (Live Coding or full build)
+
+- [x] **Testing After Step 6.2.1** ✅ CHECKPOINT
+  - [x] C++ code compiles without errors
+  - [x] AFCOverworldPOI visible in Unreal Editor Content Browser
+  - [x] Can create Blueprint child class from AFCOverworldPOI
+
+**COMMIT POINT 6.2.1**: `git add Source/FC/World/FCOverworldPOI.h Source/FC/World/FCOverworldPOI.cpp && git commit -m "feat(overworld): Create AFCOverworldPOI C++ base class"`
+
+---
+
+#### Step 6.2.2: Create BP_FC_OverworldPOI Blueprint Child Class
+
+- [x] **Analysis**
+
+  - [x] Blueprint child of AFCOverworldPOI for visual configuration
+  - [x] Configure mesh, materials, and default POI name
+  - [x] Can be placed in level and name edited per-instance
+
+- [x] **Implementation (Unreal Editor)**
+
+  - [x] Created Blueprint at `/Game/FC/World/Blueprints/Actors/POI/BP_FC_OverworldPOI`
+  - [x] Parent class: AFCOverworldPOI
+  - [x] Components Panel:
+    - [x] POIMesh component configured with static mesh
+    - [x] Material assigned (visible from top-down camera)
+    - [x] Component hierarchy inherited from C++ base class
+  - [x] Class Defaults:
+    - [x] POI Name configured (instance editable in Details panel)
+  - [x] Compiled and saved
+
+- [x] **Testing After Step 6.2.2** ✅ CHECKPOINT
+  - [x] Blueprint compiles without errors
+  - [x] Components hierarchy inherited from C++ base class
+  - [x] POIMesh has mesh and material assigned
+  - [x] Placed in L_Overworld level successfully
+  - [x] POI Name editable per-instance in Details panel
+  - [x] Convoy detects POI overlap (logs "Convoy detected POI: [name]")
+
+**IMPLEMENTATION NOTE**: Convoy overlap detection already working via AFCConvoyMember capsule overlap with InteractionBox. Class name pattern matching successfully detects POI actors.
+
+**COMMIT POINT 6.2.2**: `git add Content/FC/World/Blueprints/Actors/POI/BP_FC_OverworldPOI.uasset && git commit -m "feat(overworld): Create BP_FC_OverworldPOI Blueprint child with mesh config and test in L_Overworld"`
 
 ---
 
