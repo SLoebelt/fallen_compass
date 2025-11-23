@@ -1550,41 +1550,41 @@ IMC_FC_TopDown`
 
 #### Step 6.3.3: Configure Actions in BP_FC_OverworldPOI
 
-- [ ] **Analysis**
+- [x] **Analysis**
 
-  - [ ] Configure available actions in Blueprint for testing
-  - [ ] Create test POI with single action (auto-execute on overlap)
-  - [ ] Create test POI with multiple actions (show selection dialog)
+  - [x] Configure available actions in Blueprint for testing
+  - [x] Create test POI with single action (auto-execute on overlap)
+  - [x] Create test POI with multiple actions (show selection dialog)
 
-- [ ] **Implementation (Unreal Editor)**
+- [x] **Implementation (Unreal Editor)**
 
-  - [ ] Open BP_FC_OverworldPOI
-  - [ ] Class Defaults → FC | POI | Actions:
-    - [ ] Available Actions: Add 2 elements for testing
-      - [ ] Element 0:
-        - [ ] Action Type: Talk
-        - [ ] Action Text: "Talk to Merchant"
-      - [ ] Element 1:
-        - [ ] Action Type: Trade
-        - [ ] Action Text: "Open Trade Menu"
-  - [ ] Compile and save
-  - [ ] Create variant BP_FC_OverworldPOI_Village:
-    - [ ] Duplicate BP_FC_OverworldPOI
-    - [ ] Rename to BP_FC_OverworldPOI_Village
-    - [ ] POI Name: "Village"
-    - [ ] Available Actions: Keep 2 actions (Talk, Trade)
-  - [ ] Create variant BP_FC_OverworldPOI_Enemy:
-    - [ ] Duplicate BP_FC_OverworldPOI
-    - [ ] Rename to BP_FC_OverworldPOI_Enemy
-    - [ ] POI Name: "Enemy Camp"
-    - [ ] Available Actions: 1 action only
-      - [ ] Action Type: Ambush
-      - [ ] Action Text: "Ambush!"
+  - [x] Open BP_FC_OverworldPOI
+  - [x] Class Defaults → FC | POI | Actions:
+    - [x] Available Actions: Add 2 elements for testing
+      - [x] Element 0:
+        - [x] Action Type: Talk
+        - [x] Action Text: "Talk to Merchant"
+      - [x] Element 1:
+        - [x] Action Type: Trade
+        - [x] Action Text: "Open Trade Menu"
+  - [x] Compile and save
+  - [x] Create variant BP_FC_OverworldPOI_Village:
+    - [x] Duplicate BP_FC_OverworldPOI
+    - [x] Rename to BP_FC_OverworldPOI_Village
+    - [x] POI Name: "Village"
+    - [x] Available Actions: Keep 2 actions (Talk, Trade)
+  - [x] Create variant BP_FC_OverworldPOI_Enemy:
+    - [x] Duplicate BP_FC_OverworldPOI
+    - [x] Rename to BP_FC_OverworldPOI_Enemy
+    - [x] POI Name: "Enemy Camp"
+    - [x] Available Actions: 1 action only
+      - [x] Action Type: Ambush
+      - [x] Action Text: "Ambush!"
 
-- [ ] **Testing After Step 6.3.3** ✅ CHECKPOINT
-  - [ ] BP_FC_OverworldPOI has 2 actions configured
-  - [ ] Variant Blueprints created with different action sets
-  - [ ] All Blueprints compile without errors
+- [x] **Testing After Step 6.3.3** ✅ CHECKPOINT
+  - [x] BP_FC_OverworldPOI has 2 actions configured
+  - [x] Variant Blueprints created with different action sets
+  - [x] All Blueprints compile without errors
 
 **COMMIT POINT 6.3.3**: `git add Content/FC/World/Blueprints/Actors/POI/BP_FC_OverworldPOI*.uasset && git commit -m "feat(overworld): Configure POI actions in Blueprint variants"`
 
@@ -1597,61 +1597,61 @@ IMC_FC_TopDown`
 - [ ] **Analysis**
 
   - [ ] Widget displays available actions when POI has multiple options
-  - [ ] User clicks action button → stores selection → initiates convoy movement
-  - [ ] Widget shows when right-clicking multi-action POI or on unintentional overlap
-  - [ ] Blueprint implementation for UI flexibility
+  - [x] User clicks action button → stores selection → initiates convoy movement
+  - [x] Widget shows when right-clicking multi-action POI or on unintentional overlap
+  - [x] Blueprint implementation for UI flexibility
 
-- [ ] **Implementation (Unreal Editor - UMG Widget)**
+- [x] **Implementation (Unreal Editor - UMG Widget)**
 
-  - [ ] Content Browser → `/Game/FC/UI/Widgets/`
-  - [ ] Right-click → User Interface → Widget Blueprint
-  - [ ] Name: `WBP_POIActionSelection`
-  - [ ] Open WBP_POIActionSelection
-  - [ ] **Widget Hierarchy**:
-    - [ ] Canvas Panel (root)
-      - [ ] Overlay (center screen with auto-size)
-        - [ ] Border (background panel)
-          - [ ] Vertical Box
-            - [ ] Text Block (header: "Select Action")
-            - [ ] Scroll Box (action list container)
-  - [ ] **Widget Variables**:
-    - [ ] `AvailableActions` (TArray<FFCPOIActionData>, Instance Editable)
-    - [ ] `SelectedAction` (EFCPOIAction)
-    - [ ] `TargetPOI` (AActor, instance ref)
-    - [ ] `OnActionSelected` (Event Dispatcher with EFCPOIAction parameter)
-  - [ ] **Graph: PopulateActions()**
-    - [ ] Input: AvailableActions array
-    - [ ] ForEach loop through actions:
-      - [ ] Create WBP_POIActionButton widget
-      - [ ] Set button text to ActionData.ActionText
-      - [ ] Bind button click to OnActionButtonClicked(ActionType)
-      - [ ] Add button to Scroll Box
-  - [ ] **Graph: OnActionButtonClicked(EFCPOIAction Action)**
-    - [ ] Set SelectedAction = Action
-    - [ ] Call OnActionSelected dispatcher
-    - [ ] Remove widget from viewport
-  - [ ] Compile and save
+  - [x] Content Browser → `/Game/FC/UI/Menus/ActionMenu`
+  - [x] Right-click → User Interface → Widget Blueprint
+  - [x] Name: `WBP_ActionSelection`
+  - [x] Open WBP_ActionSelection
+  - [x] **Widget Hierarchy**:
+    - [x] Canvas Panel (root)
+      - [x] Overlay (center screen with auto-size)
+        - [x] Border (background panel)
+          - [x] Vertical Box
+            - [x] Text Block (header: "Select Action")
+            - [x] Scroll Box (action list container)
+  - [x] **Widget Variables**:
+    - [x] `AvailableActions` (TArray<FFCPOIActionData>, Instance Editable)
+    - [x] `SelectedAction` (EFCPOIAction)
+    - [x] `TargetPOI` (AActor, instance ref)
+    - [x] `OnActionSelected` (Event Dispatcher with EFCPOIAction parameter)
+  - [x] **Graph: PopulateActions()**
+    - [x] Input: AvailableActions array
+    - [x] ForEach loop through actions:
+      - [x] Create WBP_POIActionButton widget
+      - [x] Set button text to ActionData.ActionText
+      - [x] Bind button click to OnActionButtonClicked(ActionType)
+      - [x] Add button to Scroll Box
+  - [x] **Graph: OnActionButtonClicked(EFCPOIAction Action)**
+    - [x] Set SelectedAction = Action
+    - [x] Call OnActionSelected dispatcher
+    - [x] Remove widget from viewport
+  - [x] Compile and save
 
-- [ ] **Implementation (WBP_POIActionButton child widget)**
+- [x] **Implementation (WBP_POIActionButton child widget)**
 
-  - [ ] Create Widget Blueprint: `WBP_POIActionButton`
-  - [ ] Hierarchy:
-    - [ ] Button (root)
-      - [ ] Text Block (action text)
-  - [ ] Variables:
-    - [ ] `ActionType` (EFCPOIAction)
-    - [ ] `ActionText` (Text)
-    - [ ] `OnClicked` (Event Dispatcher with EFCPOIAction parameter)
-  - [ ] Event OnClicked (button):
-    - [ ] Call OnClicked dispatcher with ActionType
-  - [ ] Compile and save
+  - [x] Create Widget Blueprint: `WBP_POIActionButton`
+  - [x] Hierarchy:
+    - [x] Button (root)
+      - [x] Text Block (action text)
+  - [x] Variables:
+    - [x] `ActionType` (EFCPOIAction)
+    - [x] `ActionText` (Text)
+    - [x] `OnClicked` (Event Dispatcher with EFCPOIAction parameter)
+  - [x] Event OnClicked (button):
+    - [x] Call OnClicked dispatcher with ActionType
+  - [x] Compile and save
 
-- [ ] **Testing After Step 6.4.1** ✅ CHECKPOINT
-  - [ ] Widgets created without errors
-  - [ ] Action selection widget compiles
-  - [ ] Event dispatchers configured correctly
+- [x] **Testing After Step 6.4.1** ✅ CHECKPOINT
+  - [x] Widgets created without errors
+  - [x] Action selection widget compiles
+  - [x] Event dispatchers configured correctly
 
-**COMMIT POINT 6.4.1**: `git add Content/FC/UI/Widgets/WBP_POIActionSelection.uasset Content/FC/UI/Widgets/WBP_POIActionButton.uasset && git commit -m "feat(overworld): Create POI action selection widget"`
+**COMMIT POINT 6.4.1**: `git add Content/FC/UI/Widgets/WBP_ActionSelection.uasset Content/FC/UI/Widgets/WBP_POIActionButton.uasset && git commit -m "feat(overworld): Create POI action selection widget"`
 
 ---
 
@@ -1695,11 +1695,11 @@ IMC_FC_TopDown`
 
         /** Widget class for POI action selection */
         UPROPERTY(EditDefaultsOnly, Category = "FC|UI", meta = (AllowPrivateAccess = "true"))
-        TSubclassOf<UUserWidget> POIActionSelectionWidgetClass;
+        TSubclassOf<UUserWidget> ActionSelectionWidgetClass;
 
         /** Current action selection widget instance */
         UPROPERTY()
-        UUserWidget* POIActionSelectionWidget;
+        UUserWidget* ActionSelectionWidget;
 
         /** Pending POI interaction data */
         UPROPERTY()
@@ -1769,13 +1769,13 @@ IMC_FC_TopDown`
 
 - [ ] **Analysis**
 
-  - [ ] Set POIActionSelectionWidgetClass in Blueprint
+  - [ ] Set ActionSelectionWidgetClass in Blueprint
 
 - [ ] **Implementation (Unreal Editor)**
 
   - [ ] Open BP_FC_PlayerController
   - [ ] Class Defaults → FC | UI:
-    - [ ] POI Action Selection Widget Class: Select WBP_POIActionSelection
+    - [ ] POI Action Selection Widget Class: Select WBP_ActionSelection
   - [ ] Compile and save
 
 - [ ] **Testing After Step 6.4.4** ✅ CHECKPOINT
@@ -1792,7 +1792,7 @@ IMC_FC_TopDown`
 
   - [ ] Widget's OnActionSelected dispatcher calls controller's OnPOIActionSelected()
 
-- [ ] **Implementation (WBP_POIActionSelection)**
+- [ ] **Implementation (WBP_ActionSelection)**
 
   - [ ] Event Construct: Get Player Controller → Cast to AFCPlayerController → Save as variable
   - [ ] Bind OnActionSelected → Call Controller→OnPOIActionSelected(SelectedAction)
@@ -1802,7 +1802,7 @@ IMC_FC_TopDown`
   - [ ] Widget binds to controller
   - [ ] OnActionSelected fires callback
 
-**COMMIT POINT 6.4.5**: `git add Content/FC/UI/Widgets/WBP_POIActionSelection.uasset && git commit -m "feat(overworld): Wire action widget to controller callback"`
+**COMMIT POINT 6.4.5**: `git add Content/FC/UI/Widgets/WBP_ActionSelection.uasset && git commit -m "feat(overworld): Wire action widget to controller callback"`
 
 ---
 
