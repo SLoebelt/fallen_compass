@@ -400,10 +400,11 @@ void AFCPlayerController::HandlePausePressed()
 		return;
 	}
 
-	// Check if we're in a pausable state (Office_Exploration or Office_TableView)
+	// Check if we're in a pausable state (Office_Exploration, Office_TableView, or Overworld_Travel)
 	EFCGameStateID CurrentState = StateMgr->GetCurrentState();
 	if (CurrentState == EFCGameStateID::Office_Exploration || 
-	    CurrentState == EFCGameStateID::Office_TableView)
+	    CurrentState == EFCGameStateID::Office_TableView ||
+	    CurrentState == EFCGameStateID::Overworld_Travel)
 	{
 		// Pause: Push current state onto stack and transition to Paused
 		if (StateMgr->PushState(EFCGameStateID::Paused))

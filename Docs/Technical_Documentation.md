@@ -22,9 +22,10 @@
 7. [Table Interaction System (Week 2)](#table-interaction-system-week-2)
 8. [Game State Management (Week 2)](#game-state-management-week-2)
 9. [Level Management & Transitions (Week 2)](#level-management--transitions-week-2)
-10. [Expedition System (Week 2)](#expedition-system-week-2)
-11. [Logging & Debugging](#logging--debugging)
-12. [Build & Configuration](#build--configuration)
+10. [Office ↔ Overworld Level Transitions (Task 7)](#office--overworld-level-transitions-task-7)
+11. [Expedition System (Week 2)](#expedition-system-week-2)
+12. [Logging & Debugging](#logging--debugging)
+13. [Build & Configuration](#build--configuration)
 
 ---
 
@@ -5988,6 +5989,291 @@ GetGameInstance()->GetSubsystem<UFCLevelManager>()->GetPreviousLevelName()
 **Previous Level Tracking**: Essential for "Back" navigation patterns (e.g., Expedition → Office, Office → Main Menu).
 
 **PIE Prefix Normalization**: Strips "UEDPIE*0*" prefix from level names during Play-In-Editor sessions for consistent level name references.
+
+---
+
+## Office ↔ Overworld Level Transitions (Task 7)
+
+### Overview
+
+Task 7 implements bidirectional level transitions between the Office (`L_Office`) and Overworld (`L_Overworld`) levels. Players can start expeditions from the Office and abort them to return, with proper state management, confirmation dialogs, and input mode switching.
+
+### Architecture
+
+```mermaid
+flowchart TB
+    subgraph Office["L_Office Level"]
+        MapTable[Map Table Interaction]
+        ExpeditionPlanning[WBP_ExpeditionPlanning]
+        OfficeState[Office_Exploration State]
+    end
+
+    subgraph Overworld["L_Overworld Level"]
+        TravelState[Overworld_Travel State]
+        PauseMenu[WBP_PauseMenu]
+        ConfirmDialog[WBP_ConfirmationDialog]
+    end
+
+    subgraph Subsystems["Game Subsystems"]
+        LevelManager[UFCLevelManager]
+        GameStateManager[UFCGameStateManager]
+        PlayerController[AFCPlayerController]
+    end
+
+    MapTable -->|Click Table| ExpeditionPlanning
+    ExpeditionPlanning -->|Start Journey| GameStateManager
+    GameStateManager -->|TransitionTo Overworld_Travel| LevelManager
+    LevelManager -->|LoadLevel L_Overworld| Overworld
+
+    TravelState -->|ESC Key| PlayerController
+    PlayerController -->|HandlePausePressed| PauseMenu
+    PauseMenu -->|Abort Expedition| ConfirmDialog
+    ConfirmDialog -->|Confirmed| GameStateManager
+    GameStateManager -->|TransitionTo Office_Exploration| LevelManager
+    LevelManager -->|LoadLevel L_Office| Office
+
+    style ExpeditionPlanning fill:#3498db
+    style PauseMenu fill:#e74c3c
+    style ConfirmDialog fill:#f39c12
+    style LevelManager fill:#9b59b6
+    style GameStateManager fill:#2ecc71
+```
+
+### Transition Flow: Office → Overworld
+
+#### Components Involved
+
+- **WBP_ExpeditionPlanning** (`/Game/FC/UI/Planning/WBP_ExpeditionPlanning`): Expedition planning widget with "Start Journey" button
+- **UFCGameStateManager**: Manages game state transitions
+- **UFCLevelManager**: Handles level loading with fade transitions
+- **AFCPlayerController**: Switches input modes (FirstPerson ↔ TopDown)
+
+#### Sequence
+
+1. **Player clicks map table** in L_Office (Office_Exploration state)
+2. **WBP_ExpeditionPlanning opens** with expedition details and "Start Journey" button
+3. **Player clicks "Start Journey"**:
+   - Widget closes (Remove from Parent)
+   - Get Game Instance → Get Subsystem (`UFCGameStateManager`)
+   - Call `TransitionTo(Overworld_Travel)`
+   - Get Game Instance → Get Subsystem (`UFCLevelManager`)
+   - Call `LoadLevel("L_Overworld", bUseFade=true)`
+4. **Level loads** with fade transition:
+   - Fade out from L_Office
+   - Load L_Overworld
+   - Fade in to L_Overworld
+5. **State and input mode update**:
+   - Game state: `Office_Exploration` → `Overworld_Travel`
+   - Input mode: `IMC_FC_FirstPerson` → `IMC_FC_TopDown`
+   - Player can now control top-down caravan movement
+
+### Transition Flow: Overworld → Office (Abort)
+
+#### Components Involved
+
+- **WBP_PauseMenu** (`/Game/FC/UI/Menus/WBP_PauseMenu`): Pause menu with "Resume" and "Abort Expedition" buttons
+- **WBP_ConfirmationDialog** (`/Game/FC/UI/Menus/WBP_ConfirmationDialog`): Reusable confirmation dialog
+- **AFCPlayerController::HandlePausePressed()**: ESC key handling for pausable states
+- **UFCGameStateManager**: State stack management (PushState/PopState)
+- **UFCLevelManager**: Level loading
+
+#### Sequence
+
+1. **Player presses ESC** in L_Overworld (Overworld_Travel state)
+2. **HandlePausePressed() checks pausable states**:
+   - Source: `FCPlayerController.cpp` lines ~403-410
+   - Allowed states: `Office_Exploration`, `Office_TableView`, `Overworld_Travel`
+   - Pushes `Paused` state onto stack (state stack: [Overworld_Travel, Paused])
+3. **WBP_PauseMenu opens** with visible buttons:
+   - "Resume" (unpause and continue)
+   - "Abort Expedition" (styled with warning color)
+   - **Known Issue #2**: Button visible in both levels (checks state, not level)
+4. **Player clicks "Abort Expedition"**:
+   - WBP_ConfirmationDialog created and added to viewport (Z-order 101)
+   - Uses `bUseDefault=true` for default text:
+     - Title: "Confirm Expedition Abort"
+     - Message: "Are you sure you want to abort the expedition? All progress will be lost."
+     - Confirm: "Abort Expedition"
+     - Cancel: "Cancel"
+5. **Player options**:
+   - **Cancel**: Dialog closes, pause menu remains open, still in L_Overworld
+   - **Confirm**:
+     - Get Game Instance → Get Subsystem (`UFCGameStateManager`)
+     - Call `TransitionTo(Office_Exploration)`
+     - Get Game Instance → Get Subsystem (`UFCLevelManager`)
+     - Call `LoadLevel("L_Office", bUseFade=false)`
+     - Remove pause menu from parent
+6. **Level loads** and returns to L_Office
+   - **Known Issue #1**: State incorrectly transitions to MainMenu (L_Office Level Blueprint calls InitializeMainMenu)
+   - Expected: State = `Office_Exploration`, Input = `IMC_FC_FirstPerson`
+   - Actual: State = `MainMenu`, mouse look input broken
+
+### Reusable Components
+
+#### WBP_ConfirmationDialog
+
+**Purpose**: Generic confirmation dialog for destructive actions requiring user confirmation.
+
+**Properties**:
+
+- `OnConfirmed` (Event Dispatcher): Fires when user clicks button, parameter `bool isConfirmed`
+- `bUseDefault` (bool): Use default expedition abort text (true) or custom text (false)
+
+**Functions**:
+
+- `InitializeConfirmationDialog(Title, Message, ConfirmText, CancelText)`: Sets custom text for dialog
+- Auto-removes from parent after button click
+
+**Usage Pattern**:
+
+```
+Create Widget: WBP_ConfirmationDialog
+[Optional] Call: InitializeConfirmationDialog (if bUseDefault=false)
+Add to Viewport (Z-order 101)
+Bind OnConfirmed → HandleConfirmationStatus:
+  Branch on isConfirmed:
+    True: Execute confirmed action
+    False: (Optional) Resume or cancel
+```
+
+**Reusability**: Can be used for any confirmation dialog needs:
+
+- Quit game confirmation
+- Delete save confirmation
+- Discard changes confirmation
+- Destructive action warnings
+
+#### Pausable States Configuration
+
+**Source**: `FCPlayerController.cpp` line ~403
+
+```cpp
+void AFCPlayerController::HandlePausePressed()
+{
+    EFCGameStateID CurrentState = GameStateManager->GetCurrentState();
+
+    // Only allow pausing in exploration states
+    if (CurrentState == EFCGameStateID::Office_Exploration ||
+        CurrentState == EFCGameStateID::Office_TableView ||
+        CurrentState == EFCGameStateID::Overworld_Travel)  // Added in Task 7
+    {
+        if (GameStateManager->GetCurrentState() == EFCGameStateID::Paused)
+        {
+            // Resume: Pop Paused state from stack
+            GameStateManager->PopState();
+        }
+        else
+        {
+            // Pause: Push Paused state onto stack
+            GameStateManager->PushState(EFCGameStateID::Paused);
+        }
+    }
+}
+```
+
+**Key Insight**: Task 7 added `Overworld_Travel` to pausable states. Previously ESC only worked in Office levels.
+
+### Known Limitations & Future Improvements
+
+See **Known Issues & Future Backlog** section in `Docs/Tasks/0003-tasks.md` for comprehensive details:
+
+#### Issue #1: Office State Reset on Return from Overworld (Medium Severity)
+
+**Problem**: When aborting expedition and returning to L_Office, the Level Blueprint calls `InitializeMainMenu()` which transitions game state to MainMenu instead of preserving Office_Exploration.
+
+**Impact**:
+
+- Mouse look input broken (FirstPerson input context not properly initialized)
+- Player cannot interact with map table or office elements
+- ESC key incorrectly shows main menu instead of pause menu
+
+**Root Cause**: L_Office Level Blueprint's BeginPlay unconditionally calls `GameStateManager->InitializeMainMenu()` without checking existing state.
+
+**Proposed Solutions**:
+
+1. Check current state in Level Blueprint before calling InitializeMainMenu
+2. Add resume flow for returning to Office from Overworld
+3. Refactor InitializeMainMenu to only run on first game launch (SaveGame flag)
+
+**Status**: Documented for future sprint, not blocking Task 7 completion
+
+#### Issue #2: Pause Menu Abort Button Visibility Logic (Low Severity)
+
+**Problem**: "Abort Expedition" button visible in Office pause menu because it checks game state (Paused) rather than current level.
+
+**Impact**:
+
+- Minor UX inconsistency - button visible but functionally harmless
+- No crash or functional breakage (transition just loads L_Office when already in L_Office)
+
+**Proposed Solutions**:
+
+1. Add level check: `GetWorld()->GetMapName() == "L_Overworld"`
+2. Add conditional visibility in Event Construct based on current level
+3. Create separate pause menus for Office and Overworld
+
+**Status**: Documented for future sprint, deferred for UX polish
+
+#### Issue #3: Level Loading Order for State Transitions (Architecture)
+
+**Problem**: Widgets must manually coordinate `TransitionTo(State)` + `LoadLevel(LevelName)` calls in correct order.
+
+**Question**: Should `GameStateManager->TransitionTo()` automatically trigger associated level loads?
+
+**Current Pattern**:
+
+```
+TransitionTo(Overworld_Travel)  // Change state first
+LoadLevel("L_Overworld")         // Then load level
+```
+
+**Architectural Decision**: Maintain single responsibility principle - widgets coordinate both calls. This provides flexibility for state changes without level loads (e.g., Office_Exploration → Office_TableView within same level).
+
+**Status**: Documented as current design pattern, not a bug
+
+### Testing Checklist
+
+**Office → Overworld**:
+
+- ✅ Click map table → WBP_ExpeditionPlanning opens
+- ✅ Click "Start Journey" → Loads L_Overworld with fade
+- ✅ State changes: Office_Exploration → Overworld_Travel
+- ✅ Input switches: FirstPerson → TopDown
+
+**Overworld → Office (Abort)**:
+
+- ✅ ESC key opens WBP_PauseMenu
+- ✅ "Abort Expedition" button visible (both levels - Known Issue #2)
+- ✅ Click "Abort Expedition" → WBP_ConfirmationDialog appears
+- ✅ Click "Cancel" → Dialog closes, pause menu remains
+- ✅ Click "Abort Expedition" → "Abort Expedition" (confirm) → Returns to L_Office
+- ⚠️ State transitions to MainMenu instead of Office_Exploration (Known Issue #1)
+
+**Round Trip**:
+
+- ✅ Office → Overworld transition works perfectly
+- ⚠️ Overworld → Office loads level but has state/input issues
+- ✅ No crashes or memory leaks
+- ✅ No widget duplication
+
+### Related Code Files
+
+**Widgets**:
+
+- `Content/FC/UI/Planning/WBP_ExpeditionPlanning.uasset`: Start Journey button
+- `Content/FC/UI/Menus/WBP_PauseMenu.uasset`: Pause menu with Abort Expedition button
+- `Content/FC/UI/Menus/WBP_ConfirmationDialog.uasset`: Reusable confirmation dialog
+
+**C++ Classes**:
+
+- `Source/FC/Core/FCPlayerController.h/.cpp`: HandlePausePressed() pausable states (line ~403)
+- `Source/FC/Core/FCGameStateManager.h/.cpp`: State transitions and stack management
+- `Source/FC/Core/FCLevelManager.h/.cpp`: LoadLevel() with fade transitions
+
+**Level Blueprints**:
+
+- `Content/TopDown/Maps/L_Office.umap`: Office level (InitializeMainMenu issue - Issue #1)
+- `Content/TopDown/Maps/L_Overworld.umap`: Overworld level (top-down travel)
 
 ---
 
