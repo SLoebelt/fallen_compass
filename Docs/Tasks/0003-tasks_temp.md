@@ -1655,154 +1655,193 @@ IMC_FC_TopDown`
 
 ---
 
-#### Step 6.4.2: Add POI Right-Click Handler in AFCPlayerController
+#### Step 6.4.2: Add POI Right-Click Handler with Component Architecture
 
-- [ ] **Analysis**
+- [x] **Analysis**
 
-  - [ ] Raycast on right-click to detect POI actors
-  - [ ] Query available actions via IFCInteractablePOI interface
-  - [ ] Action logic:
-    - [ ] 0 actions → ignore click (no interaction)
-    - [ ] 1 action → store action, move convoy to POI, execute on overlap
-    - [ ] 2+ actions → show action selection widget, wait for selection, move convoy, execute on overlap
-  - [ ] Store pending action and target POI for overlap execution
+  - [x] Raycast on right-click to detect POI actors
+  - [x] Query available actions via IFCInteractablePOI interface
+  - [x] Action logic:
+    - [x] 0 actions → ignore click (no interaction)
+    - [x] 1 action → auto-execute immediately
+    - [x] 2+ actions → show action selection widget via UIManager
+  - [x] Store pending action and target POI for overlap execution
+  - [x] **Architecture**: UFCInteractionComponent handles interaction logic, UFCUIManager manages widgets, PlayerController routes input
 
-- [ ] **Implementation (C++)**
+- [x] **Implementation (C++ - UFCInteractionComponent)**
 
-  - [ ] **Update FCPlayerController.h**:
+  - [x] **Update FCInteractionComponent.h**:
 
-    ```cpp
-    #pragma once
+    - [x] Add IFCInteractablePOI include
+    - [x] Add PendingInteractionPOI, PendingInteractionAction, bHasPendingPOIInteraction properties
+    - [x] Add HandlePOIClick(), OnPOIActionSelected(), NotifyPOIOverlap() method declarations
+    - [x] Methods marked BlueprintCallable for widget integration
 
-    #include "CoreMinimal.h"
-    #include "GameFramework/PlayerController.h"
-    #include "Interaction/IFCInteractablePOI.h"  // Add interface include
-    #include "FCPlayerController.generated.h"
+  - [x] **Update FCInteractionComponent.cpp**:
+    - [x] Add IFCInteractablePOI and UFCUIManager includes
+    - [x] Implement HandlePOIClick() with action count logic:
+      - [x] Query IFCInteractablePOI::GetAvailableActions()
+      - [x] 0 actions: ignore
+      - [x] 1 action: auto-select and store as pending
+      - [x] 2+ actions: request UIManager->ShowPOIActionSelection()
+    - [x] Implement OnPOIActionSelected() callback to store user selection
+    - [x] Implement NotifyPOIOverlap() with intentional/unintentional overlap handling:
+      - [x] Intentional overlap (pending action): execute stored action, close widget
+      - [x] Unintentional overlap: query actions, auto-execute if 1 action, show selection if 2+
 
-    // ... existing forward declarations ...
-    class UUserWidget;  // Add widget class declaration
+- [x] **Implementation (C++ - UFCUIManager)**
 
-    UCLASS()
-    class FC_API AFCPlayerController : public APlayerController
-    {
-        GENERATED_BODY()
+  - [x] **Update FCUIManager.h**:
 
-    public:
-        // ... existing declarations ...
+    - [x] Add IFCInteractablePOI include for FFCPOIActionData
+    - [x] Add POIActionSelectionWidgetClass property
+    - [x] Add CurrentPOIActionSelectionWidget instance property
+    - [x] Add ShowPOIActionSelection(), ClosePOIActionSelection() method declarations
+    - [x] Add getter methods: GetCurrentPOIActionSelectionWidget(), IsPOIActionSelectionOpen()
 
-    private:
-        // ... existing convoy and camera references ...
+  - [x] **Update FCUIManager.cpp**:
 
-        /** Widget class for POI action selection */
-        UPROPERTY(EditDefaultsOnly, Category = "FC|UI", meta = (AllowPrivateAccess = "true"))
-        TSubclassOf<UUserWidget> ActionSelectionWidgetClass;
+    - [x] Implement ShowPOIActionSelection(Actions, Component):
+      - [x] Validate POIActionSelectionWidgetClass configured
+      - [x] Close existing widget if open
+      - [x] Create widget instance, add to viewport
+      - [x] Returns widget instance for Blueprint to populate actions
+    - [x] Implement ClosePOIActionSelection() to remove widget and clear reference
 
-        /** Current action selection widget instance */
-        UPROPERTY()
-        UUserWidget* ActionSelectionWidget;
+  - [x] Save files
+  - [x] Compile C++ code
 
-        /** Pending POI interaction data */
-        UPROPERTY()
-        AActor* PendingInteractionPOI;
+- [x] **Testing After Step 6.4.2** ✅ CHECKPOINT
+  - [x] C++ code compiles without errors
+  - [x] UFCInteractionComponent has POI interaction methods
+  - [x] UFCUIManager has widget lifecycle methods
+  - [x] Architecture properly separates concerns (Component = logic, UIManager = widgets, Controller = routing)
 
-        EFCPOIAction PendingInteractionAction;
-        bool bHasPendingInteraction;
-
-        /** Handle right-click on POI actor (query actions, show widget if needed) */
-        void HandleInteractPOI(AActor* POIActor);
-
-        /** Callback when user selects action from widget */
-        UFUNCTION()
-        void OnPOIActionSelected(EFCPOIAction SelectedAction);
-
-        /** Move convoy to POI location (called after action selection) */
-        void MoveConvoyToPOI(AActor* POIActor);
-
-    public:
-        /** Called by convoy when overlapping POI (executes pending action) */
-        void NotifyPOIOverlap(AActor* POIActor);
-
-        /** Get pending interaction data */
-        FORCEINLINE bool HasPendingInteraction() const { return bHasPendingInteraction; }
-        FORCEINLINE AActor* GetPendingInteractionPOI() const { return PendingInteractionPOI; }
-        FORCEINLINE EFCPOIAction GetPendingInteractionAction() const { return PendingInteractionAction; }
-    };
-    ```
-
-  - [ ] **Update FCPlayerController.cpp** (see full implementation in task details)
-  - [ ] Save files
-  - [ ] Compile C++ code
-
-- [ ] **Testing After Step 6.4.2** ✅ CHECKPOINT
-  - [ ] C++ code compiles without errors
-  - [ ] HandleInteractPOI() method added
-  - [ ] NotifyPOIOverlap() method added
-
-**COMMIT POINT 6.4.2**: `git add Source/FC/Core/FCPlayerController.h Source/FC/Core/FCPlayerController.cpp && git commit -m "feat(overworld): Add POI right-click handler with multi-action support"`
+**COMMIT POINT 6.4.2**: `git add Source/FC/Interaction/FCInteractionComponent.h Source/FC/Interaction/FCInteractionComponent.cpp Source/FC/Core/FCUIManager.h Source/FC/Core/FCUIManager.cpp && git commit -m "feat(overworld): Implement POI interaction with component architecture"`
 
 ---
 
-#### Step 6.4.3: Connect Convoy Overlap to Controller Notification
+#### Step 6.4.3: Update PlayerController to Delegate POI Interactions
+
+- [x] **Analysis**
+
+  - [x] PlayerController routes right-click to UFCInteractionComponent
+  - [x] Remove bloated HandleInteractPOI implementation (196 lines)
+  - [x] Delegation pattern: Controller→Component→UIManager
+  - [x] Renamed MoveConvoyToPOI to MoveConvoyToLocation (takes FVector instead of AActor)
+
+- [x] **Implementation (C++)**
+
+  - [x] **Update FCPlayerController.h**:
+
+    - [x] Remove POIActionSelectionWidgetClass property (now in UIManager)
+    - [x] Remove POIActionSelectionWidget instance property
+    - [x] Remove PendingInteractionPOI, PendingInteractionAction, bHasPendingInteraction properties (now in Component)
+    - [x] Remove HandleInteractPOI(), OnPOIActionSelected() method declarations
+    - [x] Remove NotifyPOIOverlap() method and getter inline methods (now handled by Component)
+    - [x] Add MoveConvoyToLocation(FVector) declaration (convoy movement is controller responsibility)
+
+  - [x] **Update FCPlayerController.cpp**:
+
+    - [x] Update HandleClick() to call InteractionComponent->HandlePOIClick(HitActor) instead of HandleInteractPOI()
+    - [x] Remove HandleInteractPOI() implementation (60 lines)
+    - [x] Remove OnPOIActionSelected() implementation (22 lines)
+    - [x] Remove NotifyPOIOverlap() implementation (67 lines)
+    - [x] Remove POI interaction property initialization from constructor (4 lines)
+    - [x] Replace MoveConvoyToPOI(AActor) with MoveConvoyToLocation(FVector) - simple delegation method
+
+  - [x] Save files
+  - [x] Compile C++ code
+
+- [x] **Testing After Step 6.4.3** ✅ CHECKPOINT
+  - [x] C++ code compiles without errors
+  - [x] PlayerController reduced by ~180 lines (196 removed, 16 added for MoveConvoyToLocation)
+  - [x] HandleClick delegates to InteractionComponent
+  - [x] Architecture clean: Controller routes, Component handles logic
+
+**COMMIT POINT 6.4.3**: `git add Source/FC/Core/FCPlayerController.h Source/FC/Core/FCPlayerController.cpp && git commit -m "refactor(overworld): Clean up PlayerController, delegate POI interaction to component"`
+
+---
+
+#### Step 6.4.4: Connect Convoy Overlap to Interaction Component
 
 - [ ] **Analysis**
 
   - [ ] AFCConvoyMember already detects POI overlap (Step 6.2)
-  - [ ] Forward overlap event to controller for action execution
+  - [ ] Forward overlap event to InteractionComponent instead of PlayerController
+  - [ ] Convoy needs reference to InteractionComponent (get from PlayerController)
 
 - [ ] **Implementation (C++)**
 
   - [ ] **Update FCConvoyMember.cpp** OnCapsuleBeginOverlap():
-    - [ ] Add controller notification after parent convoy notification
-    - [ ] Call PC->NotifyPOIOverlap(OtherActor)
+    - [ ] Get PlayerController's InteractionComponent reference
+    - [ ] Call InteractionComponent->NotifyPOIOverlap(OtherActor)
+    - [ ] Remove old PlayerController->NotifyPOIOverlap() call if exists
   - [ ] Save file
   - [ ] Compile C++ code
 
-- [ ] **Testing After Step 6.4.3** ✅ CHECKPOINT
+- [ ] **Testing After Step 6.4.4** ✅ CHECKPOINT
   - [ ] C++ code compiles without errors
-  - [ ] Convoy overlap notifies controller
+  - [ ] Convoy overlap notifies InteractionComponent
 
-**COMMIT POINT 6.4.3**: `git add Source/FC/Characters/Convoy/FCConvoyMember.cpp && git commit -m "feat(overworld): Connect convoy POI overlap to controller"`
+**COMMIT POINT 6.4.4**: `git add Source/FC/Characters/Convoy/FCConvoyMember.cpp && git commit -m "feat(overworld): Connect convoy POI overlap to interaction component"`
 
 ---
 
-#### Step 6.4.4: Configure Widget Class in BP_FC_PlayerController
+#### Step 6.4.5: Configure Widget Class in Game Instance
 
 - [ ] **Analysis**
 
-  - [ ] Set ActionSelectionWidgetClass in Blueprint
+  - [ ] POIActionSelectionWidgetClass now configured in UFCGameInstance (via UIManager subsystem)
+  - [ ] Set WBP_ActionSelection as widget class
 
 - [ ] **Implementation (Unreal Editor)**
 
-  - [ ] Open BP_FC_PlayerController
-  - [ ] Class Defaults → FC | UI:
+  - [ ] Open BP_FC_GameInstance
+  - [ ] Class Defaults → FC | UI Manager:
     - [ ] POI Action Selection Widget Class: Select WBP_ActionSelection
   - [ ] Compile and save
 
-- [ ] **Testing After Step 6.4.4** ✅ CHECKPOINT
+- [ ] **Testing After Step 6.4.5** ✅ CHECKPOINT
   - [ ] Widget class reference set
   - [ ] Blueprint compiles
 
-**COMMIT POINT 6.4.4**: `git add Content/FC/Core/Blueprints/BP_FC_PlayerController.uasset && git commit -m "feat(overworld): Configure POI action widget in controller"`
+**COMMIT POINT 6.4.5**: `git add Content/FC/Core/Blueprints/BP_FC_GameInstance.uasset && git commit -m "feat(overworld): Configure POI action widget in game instance"`
 
 ---
 
-#### Step 6.4.5: Wire Widget OnActionSelected Event to Controller
+#### Step 6.4.6: Wire Widget to Interaction Component
 
 - [ ] **Analysis**
 
-  - [ ] Widget's OnActionSelected dispatcher calls controller's OnPOIActionSelected()
+  - [ ] WBP_ActionSelection receives actions array from UFCUIManager
+  - [ ] Widget populates action buttons dynamically
+  - [ ] Widget's OnActionSelected dispatcher calls UFCInteractionComponent->OnPOIActionSelected()
+  - [ ] Component reference passed from UFCUIManager::ShowPOIActionSelection()
 
-- [ ] **Implementation (WBP_ActionSelection)**
+- [ ] **Implementation (WBP_ActionSelection Blueprint)**
 
-  - [ ] Event Construct: Get Player Controller → Cast to AFCPlayerController → Save as variable
-  - [ ] Bind OnActionSelected → Call Controller→OnPOIActionSelected(SelectedAction)
+  - [ ] **Add Variables**:
+    - [ ] `InteractionComponent` (UFCInteractionComponent\*, Instance Editable)
+  - [ ] **Event Construct**:
+    - [ ] Call PopulateActions(AvailableActions) to create button widgets
+  - [ ] **Function: PopulateActions(Actions)**:
+    - [ ] ForEach loop through Actions array:
+      - [ ] Create WBP_POIActionButton instance
+      - [ ] Set button's ActionType and ActionText from array element
+      - [ ] Bind button's OnClicked → OnActionButtonClicked(ActionType)
+      - [ ] Add button to Scroll Box
+  - [ ] **Function: OnActionButtonClicked(EFCPOIAction Action)**:
+    - [ ] Call InteractionComponent->OnPOIActionSelected(Action)
+    - [ ] Remove widget from viewport
   - [ ] Compile and save
 
-- [ ] **Testing After Step 6.4.5** ✅ CHECKPOINT
-  - [ ] Widget binds to controller
-  - [ ] OnActionSelected fires callback
+- [ ] **Testing After Step 6.4.6** ✅ CHECKPOINT
+  - [ ] Widget binds to InteractionComponent
+  - [ ] Action buttons call component method
+  - [ ] Widget closes after selection
 
-**COMMIT POINT 6.4.5**: `git add Content/FC/UI/Widgets/WBP_ActionSelection.uasset && git commit -m "feat(overworld): Wire action widget to controller callback"`
+**COMMIT POINT 6.4.6**: `git add Content/FC/UI/Widgets/WBP_ActionSelection.uasset && git commit -m "feat(overworld): Wire action widget to interaction component"`
 
 ---
 

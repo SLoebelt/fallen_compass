@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "Subsystems/GameInstanceSubsystem.h"
 #include "Blueprint/UserWidget.h"
+#include "Interaction/IFCInteractablePOI.h"
 #include "FCUIManager.generated.h"
 
 DECLARE_LOG_CATEGORY_EXTERN(LogFCUIManager, Log, All);
@@ -36,6 +37,10 @@ public:
 	UPROPERTY()
 	TMap<TSubclassOf<AActor>, TSubclassOf<UUserWidget>> TableWidgetMap;
 
+	// POI action selection widget class (configured by GameInstance)
+	UPROPERTY()
+	TSubclassOf<UUserWidget> POIActionSelectionWidgetClass;
+
 	// Cached widget instances
 	UPROPERTY()
 	TObjectPtr<UUserWidget> MainMenuWidget;
@@ -49,6 +54,10 @@ public:
 	// Currently displayed table widget
 	UPROPERTY()
 	TObjectPtr<UUserWidget> CurrentTableWidget;
+
+	// Currently displayed POI action selection widget
+	UPROPERTY()
+	TObjectPtr<UUserWidget> CurrentPOIActionSelectionWidget;
 
 	// Widget lifecycle methods
 	UFUNCTION(BlueprintCallable, Category = "UI")
@@ -82,6 +91,20 @@ public:
 	
 	UFUNCTION(BlueprintPure, Category = "UI|Table")
 	bool IsTableWidgetOpen() const { return CurrentTableWidget != nullptr; }
+
+	// POI action selection widget lifecycle methods
+	UFUNCTION(BlueprintCallable, Category = "UI|POI")
+	UUserWidget* ShowPOIActionSelection(const TArray<FFCPOIActionData>& Actions, class UFCInteractionComponent* InteractionComponent);
+
+	UFUNCTION(BlueprintCallable, Category = "UI|POI")
+	void ClosePOIActionSelection();
+
+	// POI widget queries
+	UFUNCTION(BlueprintPure, Category = "UI|POI")
+	UUserWidget* GetCurrentPOIActionSelectionWidget() const { return CurrentPOIActionSelectionWidget; }
+
+	UFUNCTION(BlueprintPure, Category = "UI|POI")
+	bool IsPOIActionSelectionOpen() const { return CurrentPOIActionSelectionWidget != nullptr; }
 
 	// Button callback methods (called from Blueprint widgets)
 	UFUNCTION(BlueprintCallable, Category = "UI")

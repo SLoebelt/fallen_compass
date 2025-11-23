@@ -982,9 +982,39 @@ void AFCPlayerController::HandleClick(const FInputActionValue& Value)
 
 	EFCPlayerCameraMode CurrentMode = CameraManager->GetCameraMode();
 
-	// TopDown mode: Click-to-move convoy
+	// TopDown mode: Check for POI interaction or click-to-move convoy
 	if (CurrentMode == EFCPlayerCameraMode::TopDown)
 	{
+		// Raycast to detect what was clicked
+		FHitResult HitResult;
+		bool bHit = GetHitResultUnderCursor(ECC_Visibility, false, HitResult);
+
+		if (bHit && HitResult.GetActor())
+		{
+			AActor* HitActor = HitResult.GetActor();
+
+			// Check if hit actor implements IFCInteractablePOI
+			if (HitActor->GetClass()->ImplementsInterface(UIFCInteractablePOI::StaticClass()))
+			{
+				// Delegate to InteractionComponent (get from FirstPersonCharacter)
+				AFCFirstPersonCharacter* FPCharacter = Cast<AFCFirstPersonCharacter>(GetPawn());
+				if (FPCharacter)
+				{
+					UFCInteractionComponent* InteractionComp = FPCharacter->GetInteractionComponent();
+					if (InteractionComp)
+					{
+						InteractionComp->HandlePOIClick(HitActor);
+					}
+					else
+					{
+						UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("HandleClick: No InteractionComponent on character"));
+					}
+				}
+				return;
+			}
+		}
+
+		// If not POI, handle click-to-move
 		HandleOverworldClickMove();
 	}
 	// TableView/FirstPerson mode: Interact with table objects
@@ -1179,3 +1209,48 @@ void AFCPlayerController::HandleOverworldClickMove()
 		UE_LOG(LogFallenCompassPlayerController, Error, TEXT("HandleOverworldClickMove: NavigationSystem not found"));
 	}
 }
+
+void AFCPlayerController::MoveConvoyToLocation(const FVector& TargetLocation)
+{
+	if (!PossessedConvoy)
+	{
+		UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("MoveConvoyToLocation: No convoy possessed"));
+		return;
+	}
+
+	// Get convoy leader
+	AFCConvoyMember* LeaderMember = PossessedConvoy->GetLeaderMember();
+	if (!LeaderMember)
+	{
+		UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("MoveConvoyToLocation: No leader member found"));
+		return;
+	}
+
+	// Get AI controller
+	AAIController* AIController = Cast<AAIController>(LeaderMember->GetController());
+	if (!AIController)
+	{
+		UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("MoveConvoyToLocation: Leader has no AI controller"));
+		return;
+	}
+
+	// Project to NavMesh and move
+	UNavigationSystemV1* NavSys = FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld());
+	if (NavSys)
+	{
+		FNavLocation NavLocation;
+		bool bFoundPath = NavSys->ProjectPointToNavigation(TargetLocation, NavLocation);
+
+		if (bFoundPath)
+		{
+			AIController->MoveToLocation(NavLocation.Location);
+			UE_LOG(LogFallenCompassPlayerController, Log, TEXT("MoveConvoyToLocation: Moving to %s"), 
+				*NavLocation.Location.ToString());
+		}
+		else
+		{
+			UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("MoveConvoyToLocation: Failed to project to NavMesh"));
+		}
+	}
+}
+

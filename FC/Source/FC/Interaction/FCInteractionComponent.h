@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
+#include "IFCInteractablePOI.h"
 #include "FCInteractionComponent.generated.h"
 
 class IIFCInteractable;
@@ -40,6 +41,26 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Interaction")
 	bool HasInteractable() const { return CurrentInteractable.IsValid(); }
 
+	/** Handle POI click interaction (queries actions, shows selection widget if needed) */
+	UFUNCTION(BlueprintCallable, Category = "Interaction|POI")
+	void HandlePOIClick(AActor* POIActor);
+
+	/** Called when convoy overlaps with POI (executes pending action or shows selection) */
+	UFUNCTION(BlueprintCallable, Category = "Interaction|POI")
+	void NotifyPOIOverlap(AActor* POIActor);
+
+	/** Called when user selects an action from the selection widget */
+	UFUNCTION()
+	void OnPOIActionSelected(EFCPOIAction SelectedAction);
+
+	/** Returns pending interaction POI */
+	UFUNCTION(BlueprintPure, Category = "Interaction|POI")
+	AActor* GetPendingInteractionPOI() const { return PendingInteractionPOI; }
+
+	/** Returns true if there's a pending POI interaction */
+	UFUNCTION(BlueprintPure, Category = "Interaction|POI")
+	bool HasPendingPOIInteraction() const { return bHasPendingPOIInteraction; }
+
 protected:
 	/** Performs a line trace to detect interactables */
 	void DetectInteractables();
@@ -74,4 +95,11 @@ private:
 
 	/** Timer for interaction checks */
 	float InteractionCheckTimer = 0.0f;
+
+	/** Pending POI interaction data */
+	UPROPERTY()
+	TObjectPtr<AActor> PendingInteractionPOI;
+
+	EFCPOIAction PendingInteractionAction;
+	bool bHasPendingPOIInteraction = false;
 };

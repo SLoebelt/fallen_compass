@@ -2,12 +2,15 @@
 
 #include "FCInteractionComponent.h"
 #include "IFCInteractable.h"
+#include "IFCInteractablePOI.h"
 #include "GameFramework/Actor.h"
 #include "GameFramework/PlayerController.h"
 #include "Camera/CameraComponent.h"
 #include "Blueprint/UserWidget.h"
 #include "Engine/World.h"
 #include "DrawDebugHelpers.h"
+#include "Core/UFCGameInstance.h"
+#include "Core/FCUIManager.h"
 
 DEFINE_LOG_CATEGORY(LogFCInteraction);
 
@@ -221,3 +224,161 @@ void UFCInteractionComponent::Interact()
 	UE_LOG(LogFCInteraction, Log, TEXT("Interacting with: %s"), *InteractableActor->GetName());
 	IIFCInteractable::Execute_OnInteract(InteractableActor, GetOwner());
 }
+
+void UFCInteractionComponent::HandlePOIClick(AActor* POIActor)
+{
+	if (!POIActor) return;
+
+	// Query available actions via interface
+	IIFCInteractablePOI* POIInterface = Cast<IIFCInteractablePOI>(POIActor);
+	if (!POIInterface) return;
+
+	TArray<FFCPOIActionData> AvailableActions = POIInterface->Execute_GetAvailableActions(POIActor);
+	FString POIName = POIInterface->Execute_GetPOIName(POIActor);
+
+	UE_LOG(LogFCInteraction, Log, TEXT("POI click on '%s', %d actions available"), *POIName, AvailableActions.Num());
+
+	// Handle based on action count
+	if (AvailableActions.Num() == 0)
+	{
+		// No actions available - ignore click
+		UE_LOG(LogFCInteraction, Warning, TEXT("POI '%s' has no available actions"), *POIName);
+		return;
+	}
+	else if (AvailableActions.Num() == 1)
+	{
+		// Single action - auto-select for later execution
+		PendingInteractionPOI = POIActor;
+		PendingInteractionAction = AvailableActions[0].ActionType;
+		bHasPendingPOIInteraction = true;
+
+		UE_LOG(LogFCInteraction, Log, TEXT("Auto-selected action '%s' for POI '%s'"), 
+			*UEnum::GetValueAsString(PendingInteractionAction), *POIName);
+
+		// Notify via broadcast that convoy should move to POI
+		// PlayerController will handle the movement command
+	}
+	else
+	{
+		// Multiple actions - delegate to UIManager for widget display
+		UE_LOG(LogFCInteraction, Log, TEXT("Requesting action selection for POI '%s'"), *POIName);
+
+		PendingInteractionPOI = POIActor;
+		bHasPendingPOIInteraction = false; // Wait for selection
+
+		// Get UIManager to show action selection widget
+		UFCGameInstance* GameInstance = Cast<UFCGameInstance>(GetWorld()->GetGameInstance());
+		if (GameInstance)
+		{
+			UFCUIManager* UIManager = GameInstance->GetSubsystem<UFCUIManager>();
+			if (UIManager)
+			{
+				UIManager->ShowPOIActionSelection(AvailableActions, this);
+				UE_LOG(LogFCInteraction, Log, TEXT("HandlePOIClick: Showing POI action selection widget"));
+			}
+			else
+			{
+				UE_LOG(LogFCInteraction, Error, TEXT("HandlePOIClick: Failed to get UIManager subsystem"));
+			}
+		}
+		else
+		{
+			UE_LOG(LogFCInteraction, Error, TEXT("HandlePOIClick: Failed to get game instance"));
+		}
+	}
+}
+
+void UFCInteractionComponent::OnPOIActionSelected(EFCPOIAction SelectedAction)
+{
+	if (!PendingInteractionPOI)
+	{
+		UE_LOG(LogFCInteraction, Warning, TEXT("OnPOIActionSelected: No pending POI"));
+		return;
+	}
+
+	// Store selected action
+	PendingInteractionAction = SelectedAction;
+	bHasPendingPOIInteraction = true;
+
+	IIFCInteractablePOI* POIInterface = Cast<IIFCInteractablePOI>(PendingInteractionPOI);
+	if (POIInterface)
+	{
+		FString POIName = POIInterface->Execute_GetPOIName(PendingInteractionPOI);
+		UE_LOG(LogFCInteraction, Log, TEXT("Selected action '%s' for POI '%s'"), 
+			*UEnum::GetValueAsString(SelectedAction), *POIName);
+	}
+
+	// Action selected, PlayerController should now move convoy to POI
+}
+
+void UFCInteractionComponent::NotifyPOIOverlap(AActor* POIActor)
+{
+	if (!POIActor) return;
+
+	IIFCInteractablePOI* POIInterface = Cast<IIFCInteractablePOI>(POIActor);
+	if (!POIInterface) return;
+
+	FString POIName = POIInterface->Execute_GetPOIName(POIActor);
+
+	// Check if this is the pending interaction POI
+	if (bHasPendingPOIInteraction && PendingInteractionPOI == POIActor)
+	{
+		// Execute pending action
+		UE_LOG(LogFCInteraction, Log, TEXT("Executing pending action '%s' on POI '%s'"), 
+			*UEnum::GetValueAsString(PendingInteractionAction), *POIName);
+
+		POIInterface->Execute_ExecuteAction(POIActor, PendingInteractionAction, GetOwner());
+
+		// Clear pending interaction
+		bHasPendingPOIInteraction = false;
+		PendingInteractionPOI = nullptr;
+	}
+	else
+	{
+		// Unintentional overlap (exploration, fleeing, enemy chase)
+		TArray<FFCPOIActionData> AvailableActions = POIInterface->Execute_GetAvailableActions(POIActor);
+
+		if (AvailableActions.Num() == 0)
+		{
+			// No actions - ignore overlap
+			UE_LOG(LogFCInteraction, Log, TEXT("Unintentional overlap with POI '%s' (no actions)"), *POIName);
+		}
+		else if (AvailableActions.Num() == 1)
+		{
+			// Single action - auto-execute
+			UE_LOG(LogFCInteraction, Log, TEXT("Unintentional overlap: auto-executing '%s' on POI '%s'"), 
+				*UEnum::GetValueAsString(AvailableActions[0].ActionType), *POIName);
+
+			POIInterface->Execute_ExecuteAction(POIActor, AvailableActions[0].ActionType, GetOwner());
+		}
+		else
+		{
+			// Multiple actions - show selection dialog
+			UE_LOG(LogFCInteraction, Log, TEXT("Unintentional overlap: showing action selection for POI '%s'"), *POIName);
+
+			PendingInteractionPOI = POIActor;
+			bHasPendingPOIInteraction = false; // Wait for selection
+
+			// Get UIManager to show action selection widget
+			UFCGameInstance* GameInstance = Cast<UFCGameInstance>(GetWorld()->GetGameInstance());
+			if (GameInstance)
+			{
+				UFCUIManager* UIManager = GameInstance->GetSubsystem<UFCUIManager>();
+				if (UIManager)
+				{
+					UIManager->ShowPOIActionSelection(AvailableActions, this);
+					UE_LOG(LogFCInteraction, Log, TEXT("NotifyPOIOverlap: Showing POI action selection widget"));
+				}
+				else
+				{
+					UE_LOG(LogFCInteraction, Error, TEXT("NotifyPOIOverlap: Failed to get UIManager subsystem"));
+				}
+			}
+			else
+			{
+				UE_LOG(LogFCInteraction, Error, TEXT("NotifyPOIOverlap: Failed to get game instance"));
+			}
+		}
+	}
+}
+

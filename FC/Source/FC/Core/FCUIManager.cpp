@@ -344,3 +344,65 @@ void UFCUIManager::CloseTableWidget()
 	// Clear reference
 	CurrentTableWidget = nullptr;
 }
+
+UUserWidget* UFCUIManager::ShowPOIActionSelection(const TArray<FFCPOIActionData>& Actions, UFCInteractionComponent* InteractionComponent)
+{
+	if (!POIActionSelectionWidgetClass)
+	{
+		UE_LOG(LogFCUIManager, Error, TEXT("ShowPOIActionSelection: POIActionSelectionWidgetClass not configured!"));
+		return nullptr;
+	}
+
+	if (!InteractionComponent)
+	{
+		UE_LOG(LogFCUIManager, Error, TEXT("ShowPOIActionSelection: InteractionComponent is null!"));
+		return nullptr;
+	}
+
+	if (Actions.Num() == 0)
+	{
+		UE_LOG(LogFCUIManager, Warning, TEXT("ShowPOIActionSelection: No actions provided!"));
+		return nullptr;
+	}
+
+	// Close any existing POI action selection widget first
+	if (CurrentPOIActionSelectionWidget)
+	{
+		UE_LOG(LogFCUIManager, Log, TEXT("ShowPOIActionSelection: Closing existing POI action selection widget"));
+		ClosePOIActionSelection();
+	}
+
+	// Create new POI action selection widget
+	CurrentPOIActionSelectionWidget = CreateWidget<UUserWidget>(GetGameInstance(), POIActionSelectionWidgetClass);
+	if (!CurrentPOIActionSelectionWidget)
+	{
+		UE_LOG(LogFCUIManager, Error, TEXT("ShowPOIActionSelection: Failed to create widget from class %s"), *POIActionSelectionWidgetClass->GetName());
+		return nullptr;
+	}
+
+	// TODO: Set actions array on widget (requires Blueprint-exposed property)
+	// Widget needs to populate action buttons from Actions array
+	// Widget needs to bind OnActionSelected event to InteractionComponent->OnPOIActionSelected
+
+	// Add to viewport
+	CurrentPOIActionSelectionWidget->AddToViewport();
+	UE_LOG(LogFCUIManager, Log, TEXT("ShowPOIActionSelection: Created and displayed POI action selection widget with %d actions"), Actions.Num());
+
+	return CurrentPOIActionSelectionWidget;
+}
+
+void UFCUIManager::ClosePOIActionSelection()
+{
+	if (!CurrentPOIActionSelectionWidget)
+	{
+		UE_LOG(LogFCUIManager, Warning, TEXT("ClosePOIActionSelection: No POI action selection widget currently open"));
+		return;
+	}
+
+	// Remove from viewport
+	CurrentPOIActionSelectionWidget->RemoveFromParent();
+	UE_LOG(LogFCUIManager, Log, TEXT("ClosePOIActionSelection: Removed POI action selection widget from viewport"));
+
+	// Clear reference
+	CurrentPOIActionSelectionWidget = nullptr;
+}

@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/PlayerController.h"
 #include "Components/FCInputManager.h"
+#include "Interaction/IFCInteractablePOI.h"
 #include "FCPlayerController.generated.h"
 
 class UInputAction;
@@ -186,6 +187,10 @@ protected:
 	void HandleOverworldZoom(const FInputActionValue& Value);
 	void HandleClick(const FInputActionValue& Value);
 	void HandleOverworldClickMove();
+
+	/** Move convoy to target location (called by InteractionComponent for POI navigation) */
+	UFUNCTION(BlueprintCallable, Category = "FC|Convoy")
+	void MoveConvoyToLocation(const FVector& TargetLocation);
 
 	/** Handle game state changes (bind to GameStateManager.OnStateChanged) */
 	UFUNCTION()

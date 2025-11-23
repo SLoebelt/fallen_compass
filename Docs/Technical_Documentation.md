@@ -7238,56 +7238,236 @@ LogFCOverworldConvoy: Convoy BP_FC_OverworldConvoy_C_0 detected POI: BP_POI_Vill
 
 ---
 
-## POI System (Week 3 - Task 6.2)
+## POI Interaction System (Week 3 - Task 6)
 
 ### Overview
 
-The POI (Point of Interest) system provides interactive locations in the overworld that the convoy can encounter. The system uses a C++ base class (`AFCOverworldPOI`) with Blueprint children for visual configuration, following the same architecture pattern as the convoy system.
+The POI (Point of Interest) interaction system provides click-to-interact and overlap-based encounters in the overworld. Week 3 implemented a component-based architecture where `UFCInteractionComponent` handles interaction logic, `UFCUIManager` manages widgets, and `AFCPlayerController` routes input—eliminating the 196-line PlayerController bloat from the initial prototype.
 
 ### Architecture
 
 ```mermaid
 classDiagram
-    class AActor {
-        <<Unreal>>
-        +BeginPlay()
+    class IFCInteractablePOI {
+        <<Interface>>
+        +GetAvailableActions() TArray~FFCPOIActionData~
+        +ExecuteAction(EFCPOIAction)
+        +GetPOIName() FText
+        +CanExecuteAction(EFCPOIAction) bool
+    }
+
+    class EFCPOIAction {
+        <<enumeration>>
+        None
+        Talk
+        Ambush
+        Enter
+        Trade
+        Harvest
+        Observe
+    }
+
+    class FFCPOIActionData {
+        +EFCPOIAction ActionType
+        +FText ActionText
+        +FText ActionDescription
     }
 
     class AFCOverworldPOI {
         -USceneComponent* POIRoot
         -UStaticMeshComponent* POIMesh
         -UBoxComponent* InteractionBox
-        -FString POIName
-        +GetPOIName() FString
-        +OnPOIInteract() virtual
+        -TArray~FFCPOIActionData~ AvailableActions
+        +GetAvailableActions_Implementation()
+        +ExecuteAction_Implementation()
+        +GetPOIName_Implementation()
     }
 
-    class BP_FC_OverworldPOI {
+    class UFCInteractionComponent {
+        -AActor* PendingInteractionPOI
+        -EFCPOIAction PendingInteractionAction
+        -bool bHasPendingPOIInteraction
+        +HandlePOIClick(AActor*)
+        +OnPOIActionSelected(EFCPOIAction)
+        +NotifyPOIOverlap(AActor*)
+    }
+
+    class UFCUIManager {
+        -TSubclassOf~UUserWidget~ POIActionSelectionWidgetClass
+        -UUserWidget* CurrentPOIActionSelectionWidget
+        +ShowPOIActionSelection(Actions, Component)
+        +ClosePOIActionSelection()
+    }
+
+    class AFCPlayerController {
+        +HandleClick()
+    }
+
+    class WBP_ActionSelection {
         <<Blueprint>>
-        +Mesh Configuration
-        +Material Setup
-        +POI Name Instance
+        +UFCInteractionComponent* InteractionComponent
+        +PopulateActions(Actions)
+        +OnActionButtonClicked(Action)
     }
 
-    class AFCConvoyMember {
-        <<Convoy System>>
-        +OnCapsuleBeginOverlap()
-    }
+    IFCInteractablePOI <|.. AFCOverworldPOI : implements
+    IFCInteractablePOI --> EFCPOIAction : uses
+    IFCInteractablePOI --> FFCPOIActionData : returns
+    AFCPlayerController --> UFCInteractionComponent : delegates
+    UFCInteractionComponent --> IFCInteractablePOI : queries
+    UFCInteractionComponent --> UFCUIManager : requests widget
+    UFCUIManager --> WBP_ActionSelection : creates
+    WBP_ActionSelection --> UFCInteractionComponent : callbacks
 
-    AActor <|-- AFCOverworldPOI
-    AFCOverworldPOI <|-- BP_FC_OverworldPOI : inherits
-    AFCConvoyMember --> AFCOverworldPOI : detects overlap
-
-    style AFCOverworldPOI fill:#ff6b6b
-    style BP_FC_OverworldPOI fill:#4ecdc4
-    style AFCConvoyMember fill:#50c878
+    style IFCInteractablePOI fill:#ff6b6b
+    style UFCInteractionComponent fill:#50c878
+    style UFCUIManager fill:#e91e63
+    style AFCPlayerController fill:#f39c12
 ```
+
+### Design Principles
+
+**Component-Based Architecture**:
+
+- **UFCInteractionComponent**: Handles interaction detection, action selection logic, pending action tracking
+- **UFCUIManager**: Manages widget lifecycle (create, show, close), centralized widget management
+- **AFCPlayerController**: Routes input to appropriate component, no direct interaction logic
+
+**Separation of Concerns**:
+
+- PlayerController: Input routing only (~20 lines vs 196-line bloated prototype)
+- InteractionComponent: Interaction detection and execution logic
+- UIManager: Widget creation and lifecycle management
+- POI Actors: Interface implementation, action definitions
+
+**Action-Based Interactions**:
+
+- POIs define available actions via `IFCInteractablePOI` interface
+- 1 action: Auto-execute immediately (no widget)
+- 2+ actions: Show selection widget via UIManager
+- Widget callbacks invoke component methods, not controller methods
+
+### IFCInteractablePOI Interface
+
+- **Files**: `Source/FC/Interaction/IFCInteractablePOI.h/.cpp`
+- **Type**: C++ interface with inline default implementations
+- **Purpose**: Define POI interaction contract with action-based system
+
+#### EFCPOIAction Enum
+
+```cpp
+UENUM(BlueprintType)
+enum class EFCPOIAction : uint8
+{
+    None        = 0 UMETA(DisplayName = "None"),
+    Talk        = 1 UMETA(DisplayName = "Talk"),
+    Ambush      = 2 UMETA(DisplayName = "Ambush"),
+    Enter       = 3 UMETA(DisplayName = "Enter"),
+    Trade       = 4 UMETA(DisplayName = "Trade"),
+    Harvest     = 5 UMETA(DisplayName = "Harvest"),
+    Observe     = 6 UMETA(DisplayName = "Observe")
+};
+```
+
+**Action Semantics**:
+
+- **Talk**: Dialogue/conversation with NPCs
+- **Ambush**: Initiate combat encounter
+- **Enter**: Enter building/location
+- **Trade**: Open merchant UI
+- **Harvest**: Gather resources
+- **Observe**: Scout/reconnaissance without commitment
+
+#### FFCPOIActionData Struct
+
+```cpp
+USTRUCT(BlueprintType)
+struct FFCPOIActionData
+{
+    GENERATED_BODY()
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite)
+    EFCPOIAction ActionType = EFCPOIAction::None;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite)
+    FText ActionText = FText::GetEmpty();
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite)
+    FText ActionDescription = FText::GetEmpty();
+};
+```
+
+**Purpose**: Package action type with display text for widget population.
+
+#### Interface Methods
+
+##### GetAvailableActions
+
+```cpp
+UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "FC|POI")
+TArray<FFCPOIActionData> GetAvailableActions();
+
+// Default inline implementation
+virtual TArray<FFCPOIActionData> GetAvailableActions_Implementation()
+{
+    return TArray<FFCPOIActionData>();
+}
+```
+
+**Design Notes**:
+
+- Returns empty array by default (0 actions = no interaction)
+- POI implementations populate with available actions
+- Called by `UFCInteractionComponent::HandlePOIClick()`
+
+##### ExecuteAction
+
+```cpp
+UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "FC|POI")
+void ExecuteAction(EFCPOIAction Action);
+
+// Default inline implementation
+virtual void ExecuteAction_Implementation(EFCPOIAction Action)
+{
+    UE_LOG(LogTemp, Warning, TEXT("IFCInteractablePOI::ExecuteAction_Implementation: Action %d not implemented"), (uint8)Action);
+}
+```
+
+**Design Notes**:
+
+- Called after user selects action or auto-execute for single action
+- Implementations trigger game logic (start dialogue, initiate combat, open trade UI, etc.)
+
+##### GetPOIName & CanExecuteAction
+
+```cpp
+UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "FC|POI")
+FText GetPOIName();
+
+virtual FText GetPOIName_Implementation()
+{
+    return FText::FromString(TEXT("Unknown POI"));
+}
+
+UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "FC|POI")
+bool CanExecuteAction(EFCPOIAction Action);
+
+virtual bool CanExecuteAction_Implementation(EFCPOIAction Action)
+{
+    return true;
+}
+```
+
+**Purpose**:
+
+- `GetPOIName()`: Display name for UI and logs
+- `CanExecuteAction()`: Validation for action availability (e.g., check supplies for Trade)
 
 ### AFCOverworldPOI
 
 - **Files**: `Source/FC/World/FCOverworldPOI.h/.cpp`
-- **Inheritance**: `AActor`
-- **Purpose**: Base C++ class for overworld Points of Interest with collision for mouse raycast and convoy overlap detection
+- **Inheritance**: `AActor`, `IIFCInteractablePOI`
+- **Purpose**: Base POI actor implementing interface with configurable action array
 
 #### Key Properties
 
@@ -7306,12 +7486,61 @@ UBoxComponent* InteractionBox;
 
 /** Display name for this Point of Interest */
 UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "FC|POI")
-FString POIName;
+FText POIName;
+
+/** Available actions for this POI (configured per-instance in Blueprint) */
+UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "FC|POI")
+TArray<FFCPOIActionData> AvailableActions;
 ```
 
-#### Key Methods
+#### Interface Implementation
 
-##### Constructor
+##### GetAvailableActions
+
+```cpp
+TArray<FFCPOIActionData> AFCOverworldPOI::GetAvailableActions_Implementation()
+{
+    return AvailableActions;
+}
+```
+
+**Usage**:
+
+- Blueprint instances configure `AvailableActions` array in Details panel
+- Example: Village POI has [Talk, Trade], Ruins POI has [Observe, Enter, Ambush]
+
+##### ExecuteAction
+
+```cpp
+void AFCOverworldPOI::ExecuteAction_Implementation(EFCPOIAction Action)
+{
+    UE_LOG(LogFCOverworldPOI, Log, TEXT("POI '%s': Executing action %d (stub implementation)"),
+        *POIName.ToString(), (uint8)Action);
+
+    if (GEngine)
+    {
+        FString ActionName = UEnum::GetValueAsString(Action);
+        GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Yellow,
+            FString::Printf(TEXT("POI '%s': Execute %s"), *POIName.ToString(), *ActionName));
+    }
+}
+```
+
+**Design Notes**:
+
+- Current implementation is stub (logs action, shows on-screen message)
+- Future tasks will implement full game logic (dialogue system, combat, trade UI, etc.)
+
+##### GetPOIName
+
+```cpp
+FText AFCOverworldPOI::GetPOIName_Implementation()
+{
+    return POIName;
+}
+```
+
+#### Constructor
 
 ```cpp
 AFCOverworldPOI::AFCOverworldPOI()
@@ -7339,136 +7568,597 @@ AFCOverworldPOI::AFCOverworldPOI()
     InteractionBox->SetGenerateOverlapEvents(true);
 
     // Default POI name
-    POIName = TEXT("Unnamed POI");
+    POIName = FText::FromString(TEXT("Unnamed POI"));
 }
 ```
 
 **Implementation Notes**:
 
+- InteractionBox blocks Visibility channel (for right-click raycast)
+- InteractionBox overlaps all channels (for convoy overlap detection)
 - POIMesh scaled 2x for visibility from top-down camera
-- POIMesh has no collision (visual only)
-- InteractionBox: 150x150x100 extent (larger than mesh for easier interaction)
-- InteractionBox blocks Visibility channel (for mouse raycast detection)
-- InteractionBox overlaps all channels (for convoy capsule overlap)
-- QueryOnly collision (no physics simulation)
 
-##### BeginPlay
+### UFCInteractionComponent (POI Methods)
+
+- **Files**: `Source/FC/Interaction/FCInteractionComponent.h/.cpp`
+- **Purpose**: Extended to handle POI click detection, action selection, and overlap events
+
+#### Key Properties
 
 ```cpp
-void AFCOverworldPOI::BeginPlay()
-{
-    Super::BeginPlay();
+/** POI with pending interaction (user selected action, waiting for convoy overlap) */
+UPROPERTY()
+AActor* PendingInteractionPOI;
 
-    UE_LOG(LogFCOverworldPOI, Log, TEXT("POI '%s' spawned at %s"),
-        *POIName, *GetActorLocation().ToString());
+/** Action selected by user (to execute on convoy overlap) */
+UPROPERTY()
+EFCPOIAction PendingInteractionAction;
+
+/** True if user selected action and convoy should execute on overlap */
+UPROPERTY()
+bool bHasPendingPOIInteraction;
+```
+
+**Design Notes**:
+
+- Tracks intentional vs unintentional POI overlap
+- Pending action stored when user right-clicks POI or selects action from widget
+- Executed when convoy overlaps POI
+
+#### HandlePOIClick
+
+```cpp
+void UFCInteractionComponent::HandlePOIClick(AActor* POIActor)
+{
+    if (!POIActor)
+    {
+        return;
+    }
+
+    // Query available actions via interface
+    IIFCInteractablePOI* POIInterface = Cast<IIFCInteractablePOI>(POIActor);
+    if (!POIInterface)
+    {
+        UE_LOG(LogFCInteraction, Warning, TEXT("HandlePOIClick: Actor does not implement IFCInteractablePOI"));
+        return;
+    }
+
+    TArray<FFCPOIActionData> AvailableActions = POIInterface->Execute_GetAvailableActions(POIActor);
+    FText POIName = POIInterface->Execute_GetPOIName(POIActor);
+
+    if (AvailableActions.Num() == 0)
+    {
+        // No actions - ignore click
+        UE_LOG(LogFCInteraction, Log, TEXT("HandlePOIClick: POI '%s' has no available actions"), *POIName.ToString());
+        return;
+    }
+    else if (AvailableActions.Num() == 1)
+    {
+        // Single action - auto-select and store as pending
+        EFCPOIAction Action = AvailableActions[0].ActionType;
+        PendingInteractionPOI = POIActor;
+        PendingInteractionAction = Action;
+        bHasPendingPOIInteraction = true;
+
+        UE_LOG(LogFCInteraction, Log, TEXT("HandlePOIClick: Auto-selected action '%s' for POI '%s'"),
+            *AvailableActions[0].ActionText.ToString(), *POIName.ToString());
+
+        // TODO: Move convoy to POI via PlayerController->MoveConvoyToPOI(POIActor)
+    }
+    else
+    {
+        // Multiple actions - show selection widget
+        UE_LOG(LogFCInteraction, Log, TEXT("HandlePOIClick: Multiple actions available for POI '%s', showing action selection widget"), *POIName.ToString());
+
+        // Get UIManager to show action selection widget
+        UFCGameInstance* GameInstance = Cast<UFCGameInstance>(GetWorld()->GetGameInstance());
+        if (GameInstance)
+        {
+            UFCUIManager* UIManager = GameInstance->GetSubsystem<UFCUIManager>();
+            if (UIManager)
+            {
+                UIManager->ShowPOIActionSelection(AvailableActions, this);
+                UE_LOG(LogFCInteraction, Log, TEXT("HandlePOIClick: Showing POI action selection widget"));
+            }
+            else
+            {
+                UE_LOG(LogFCInteraction, Error, TEXT("HandlePOIClick: Failed to get UIManager subsystem"));
+            }
+        }
+        else
+        {
+            UE_LOG(LogFCInteraction, Error, TEXT("HandlePOIClick: Failed to get game instance"));
+        }
+    }
 }
 ```
 
-##### GetPOIName & OnPOIInteract
+**Logic Flow**:
+
+1. Query `GetAvailableActions()` via interface
+2. 0 actions → ignore click (log and return)
+3. 1 action → auto-select, store as pending, move convoy (future: call PlayerController->MoveConvoyToPOI)
+4. 2+ actions → request UIManager to show action selection widget
+
+**Design Notes**:
+
+- No widget for single action (auto-execute, better UX)
+- Pending action stored before convoy movement (executed on overlap)
+- UIManager handles widget creation (component doesn't create widgets directly)
+
+#### OnPOIActionSelected
 
 ```cpp
-UFUNCTION(BlueprintCallable, Category = "FC|POI")
-FString GetPOIName() const { return POIName; }
-
-void AFCOverworldPOI::OnPOIInteract_Implementation()
+void UFCInteractionComponent::OnPOIActionSelected(EFCPOIAction SelectedAction)
 {
-    // Stub implementation - logs to console
-    UE_LOG(LogFCOverworldPOI, Log, TEXT("POI Interaction: %s"), *POIName);
-
-    if (GEngine)
+    if (!PendingInteractionPOI)
     {
-        GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Yellow,
-            FString::Printf(TEXT("POI Interaction Stub: %s"), *POIName));
+        UE_LOG(LogFCInteraction, Warning, TEXT("OnPOIActionSelected: No pending POI interaction"));
+        return;
     }
+
+    // Store selected action
+    PendingInteractionAction = SelectedAction;
+    bHasPendingPOIInteraction = true;
+
+    UE_LOG(LogFCInteraction, Log, TEXT("OnPOIActionSelected: Action %d selected for POI %s"),
+        (uint8)SelectedAction, *PendingInteractionPOI->GetName());
+
+    // TODO: Move convoy to POI via PlayerController->MoveConvoyToPOI(PendingInteractionPOI)
+}
+```
+
+**Purpose**:
+
+- Callback invoked by WBP_ActionSelection widget when user clicks action button
+- Stores selection and marks pending interaction flag
+- Future: Trigger convoy movement to POI
+
+#### NotifyPOIOverlap
+
+```cpp
+void UFCInteractionComponent::NotifyPOIOverlap(AActor* POIActor)
+{
+    if (!POIActor)
+    {
+        return;
+    }
+
+    IIFCInteractablePOI* POIInterface = Cast<IIFCInteractablePOI>(POIActor);
+    if (!POIInterface)
+    {
+        UE_LOG(LogFCInteraction, Warning, TEXT("NotifyPOIOverlap: Actor does not implement IFCInteractablePOI"));
+        return;
+    }
+
+    FText POIName = POIInterface->Execute_GetPOIName(POIActor);
+
+    if (bHasPendingPOIInteraction && PendingInteractionPOI == POIActor)
+    {
+        // Intentional overlap (user right-clicked POI or selected action)
+        UE_LOG(LogFCInteraction, Log, TEXT("Intentional overlap with POI '%s', executing action %d"),
+            *POIName.ToString(), (uint8)PendingInteractionAction);
+
+        // Execute stored action
+        POIInterface->Execute_ExecuteAction(POIActor, PendingInteractionAction);
+
+        // Close action selection widget if open
+        UFCGameInstance* GameInstance = Cast<UFCGameInstance>(GetWorld()->GetGameInstance());
+        if (GameInstance)
+        {
+            UFCUIManager* UIManager = GameInstance->GetSubsystem<UFCUIManager>();
+            if (UIManager && UIManager->IsPOIActionSelectionOpen())
+            {
+                UIManager->ClosePOIActionSelection();
+            }
+        }
+
+        // Clear pending interaction
+        PendingInteractionPOI = nullptr;
+        PendingInteractionAction = EFCPOIAction::None;
+        bHasPendingPOIInteraction = false;
+    }
+    else
+    {
+        // Unintentional overlap (convoy wandered into POI)
+        UE_LOG(LogFCInteraction, Log, TEXT("Unintentional overlap with POI '%s'"), *POIName.ToString());
+
+        TArray<FFCPOIActionData> AvailableActions = POIInterface->Execute_GetAvailableActions(POIActor);
+
+        if (AvailableActions.Num() == 1)
+        {
+            // Single action - auto-execute immediately
+            POIInterface->Execute_ExecuteAction(POIActor, AvailableActions[0].ActionType);
+        }
+        else if (AvailableActions.Num() > 1)
+        {
+            // Multiple actions - show selection dialog
+            UE_LOG(LogFCInteraction, Log, TEXT("Unintentional overlap: showing action selection for POI '%s'"), *POIName);
+
+            PendingInteractionPOI = POIActor;
+            bHasPendingPOIInteraction = false; // Wait for selection
+
+            // Get UIManager to show action selection widget
+            UFCGameInstance* GameInstance = Cast<UFCGameInstance>(GetWorld()->GetGameInstance());
+            if (GameInstance)
+            {
+                UFCUIManager* UIManager = GameInstance->GetSubsystem<UFCUIManager>();
+                if (UIManager)
+                {
+                    UIManager->ShowPOIActionSelection(AvailableActions, this);
+                    UE_LOG(LogFCInteraction, Log, TEXT("NotifyPOIOverlap: Showing POI action selection widget"));
+                }
+                else
+                {
+                    UE_LOG(LogFCInteraction, Error, TEXT("NotifyPOIOverlap: Failed to get UIManager subsystem"));
+                }
+            }
+            else
+            {
+                UE_LOG(LogFCInteraction, Error, TEXT("NotifyPOIOverlap: Failed to get game instance"));
+            }
+        }
+    }
+}
+```
+
+**Logic Flow**:
+
+1. **Intentional Overlap** (bHasPendingPOIInteraction == true):
+   - Execute stored action immediately
+   - Close action selection widget if open
+   - Clear pending interaction state
+2. **Unintentional Overlap** (bHasPendingPOIInteraction == false):
+   - Query available actions
+   - 1 action: Auto-execute immediately
+   - 2+ actions: Show selection widget, wait for user choice
+
+**Design Notes**:
+
+- Distinguishes intentional (right-click → convoy move) vs unintentional (convoy wander) overlap
+- Unintentional single-action POI auto-executes (e.g., auto-harvest resources)
+- Unintentional multi-action POI prompts user (prevents accidental ambush)
+
+### UFCUIManager (POI Widget Methods)
+
+- **Files**: `Source/FC/Core/FCUIManager.h/.cpp`
+- **Purpose**: Extended to manage POI action selection widget lifecycle
+
+#### Key Properties
+
+```cpp
+/** POI action selection widget class (configured by GameInstance) */
+UPROPERTY()
+TSubclassOf<UUserWidget> POIActionSelectionWidgetClass;
+
+/** Currently displayed POI action selection widget */
+UPROPERTY()
+TObjectPtr<UUserWidget> CurrentPOIActionSelectionWidget;
+```
+
+#### ShowPOIActionSelection
+
+```cpp
+UUserWidget* UFCUIManager::ShowPOIActionSelection(const TArray<FFCPOIActionData>& Actions, UFCInteractionComponent* InteractionComponent)
+{
+    if (!POIActionSelectionWidgetClass)
+    {
+        UE_LOG(LogFCUIManager, Error, TEXT("ShowPOIActionSelection: POIActionSelectionWidgetClass not configured!"));
+        return nullptr;
+    }
+
+    if (!InteractionComponent)
+    {
+        UE_LOG(LogFCUIManager, Error, TEXT("ShowPOIActionSelection: InteractionComponent is null!"));
+        return nullptr;
+    }
+
+    if (Actions.Num() == 0)
+    {
+        UE_LOG(LogFCUIManager, Warning, TEXT("ShowPOIActionSelection: No actions provided!"));
+        return nullptr;
+    }
+
+    // Close any existing POI action selection widget first
+    if (CurrentPOIActionSelectionWidget)
+    {
+        UE_LOG(LogFCUIManager, Log, TEXT("ShowPOIActionSelection: Closing existing POI action selection widget"));
+        ClosePOIActionSelection();
+    }
+
+    // Create new POI action selection widget
+    CurrentPOIActionSelectionWidget = CreateWidget<UUserWidget>(GetGameInstance(), POIActionSelectionWidgetClass);
+    if (!CurrentPOIActionSelectionWidget)
+    {
+        UE_LOG(LogFCUIManager, Error, TEXT("ShowPOIActionSelection: Failed to create widget from class %s"), *POIActionSelectionWidgetClass->GetName());
+        return nullptr;
+    }
+
+    // TODO: Set actions array on widget (requires Blueprint-exposed property)
+    // Widget needs to populate action buttons from Actions array
+    // Widget needs to bind OnActionSelected event to InteractionComponent->OnPOIActionSelected
+
+    // Add to viewport
+    CurrentPOIActionSelectionWidget->AddToViewport();
+    UE_LOG(LogFCUIManager, Log, TEXT("ShowPOIActionSelection: Created and displayed POI action selection widget with %d actions"), Actions.Num());
+
+    return CurrentPOIActionSelectionWidget;
 }
 ```
 
 **Design Notes**:
 
-- `OnPOIInteract()` is BlueprintNativeEvent (can be overridden in Blueprint)
-- Current implementation is stub for Task 6 (logs to console and shows on-screen message)
-- Future tasks will implement full interaction UI and game logic
+- Validates widget class configured in GameInstance
+- Closes existing widget before creating new one (prevents duplicate widgets)
+- Returns widget instance for Blueprint to receive actions array and component reference
+- TODO: Requires Blueprint implementation to populate action buttons (Step 6.4.6)
 
-#### Blueprint Child Class: BP_FC_OverworldPOI
+#### ClosePOIActionSelection
 
-- **Location**: `/Game/FC/World/Blueprints/Actors/POI/BP_FC_OverworldPOI`
-- **Parent**: `AFCOverworldPOI`
-- **Purpose**: Configure visual mesh, materials, and POI-specific names
+```cpp
+void UFCUIManager::ClosePOIActionSelection()
+{
+    if (!CurrentPOIActionSelectionWidget)
+    {
+        UE_LOG(LogFCUIManager, Warning, TEXT("ClosePOIActionSelection: No POI action selection widget currently open"));
+        return;
+    }
 
-**Configuration**:
+    // Remove from viewport
+    CurrentPOIActionSelectionWidget->RemoveFromParent();
+    UE_LOG(LogFCUIManager, Log, TEXT("ClosePOIActionSelection: Removed POI action selection widget from viewport"));
 
-- **POIMesh Component**: Static mesh (cone, sphere, or custom marker mesh)
-- **Materials**: Distinctive color for visibility (yellow/orange recommended)
-- **POI Name**: Editable per-instance in Details panel (e.g., "Village", "Ruins", "Encounter")
+    // Clear reference
+    CurrentPOIActionSelectionWidget = nullptr;
+}
+```
 
-**Placement in L_Overworld**:
+#### Query Methods
 
-- Drag BP_FC_OverworldPOI from Content Browser into level
-- Set POI Name in Details panel for each instance
-- InteractionBox automatically handles convoy overlap detection
+```cpp
+UFUNCTION(BlueprintPure, Category = "UI|POI")
+UUserWidget* GetCurrentPOIActionSelectionWidget() const { return CurrentPOIActionSelectionWidget; }
+
+UFUNCTION(BlueprintPure, Category = "UI|POI")
+bool IsPOIActionSelectionOpen() const { return CurrentPOIActionSelectionWidget != nullptr; }
+```
+
+### AFCPlayerController (POI Delegation)
+
+- **Files**: `Source/FC/Core/FCPlayerController.h/.cpp`
+- **Purpose**: Route right-click input to InteractionComponent (cleanup pending in Step 6.4.3)
+
+#### HandleClick (Pending Refactor)
+
+```cpp
+void AFCPlayerController::HandleClick()
+{
+    if (!CameraManager || !CameraManager->GetActiveCamera())
+    {
+        return;
+    }
+
+    // Route click to appropriate handler based on camera mode
+    if (CameraManager->GetCameraMode() == EFCCameraMode::TopDown)
+    {
+        // TODO: Check if clicking POI actor first
+        // If POI: Call InteractionComponent->HandlePOIClick(HitActor)
+        // Else: HandleOverworldClickMove() for convoy navigation
+        HandleOverworldClickMove();
+    }
+    else
+    {
+        HandleTableObjectClick();
+    }
+}
+```
+
+**Future Implementation (Step 6.4.3)**:
+
+- Raycast under cursor before click-to-move
+- If hit POI actor: Call `InteractionComponent->HandlePOIClick(HitActor)`
+- Else: Call `HandleOverworldClickMove()` for convoy navigation
+- Removes 196 lines of bloated POI logic from PlayerController
+
+### WBP_ActionSelection Widget
+
+- **Location**: `/Game/FC/UI/Menus/ActionMenu/WBP_ActionSelection`
+- **Parent**: `UUserWidget`
+- **Purpose**: Display available POI actions and callback to InteractionComponent
+
+#### Widget Hierarchy
+
+- Canvas Panel (root)
+  - Overlay (center screen with auto-size)
+    - Border (background panel)
+      - Vertical Box
+        - Text Block (header: "Select Action")
+        - Scroll Box (action list container)
+
+#### Widget Variables (Pending Step 6.4.6)
+
+```
+AvailableActions: TArray<FFCPOIActionData> (Instance Editable)
+InteractionComponent: UFCInteractionComponent* (Instance Editable)
+```
+
+#### Blueprint Graph (Pending Step 6.4.6)
+
+**Event Construct**:
+
+```
+Get InteractionComponent reference from UFCUIManager
+Populate action buttons from AvailableActions array
+Bind button clicks to OnActionButtonClicked(ActionType)
+```
+
+**Function: PopulateActions(Actions)**:
+
+```
+ForEach Actions:
+  Create WBP_POIActionButton instance
+  Set button's ActionType and ActionText from array element
+  Bind button OnClicked → OnActionButtonClicked(ActionType)
+  Add button to Scroll Box
+```
+
+**Function: OnActionButtonClicked(EFCPOIAction Action)**:
+
+```
+Call InteractionComponent->OnPOIActionSelected(Action)
+Remove widget from viewport
+```
+
+### WBP_POIActionButton Widget
+
+- **Location**: `/Game/FC/UI/Menus/ActionMenu/WBP_POIActionButton`
+- **Parent**: `UUserWidget`
+- **Purpose**: Individual action button in selection list
+
+#### Widget Hierarchy
+
+- Button (root)
+  - Text Block (action text)
+
+#### Widget Variables
+
+```
+ActionType: EFCPOIAction
+ActionText: FText
+OnClicked: Event Dispatcher (EFCPOIAction parameter)
+```
+
+#### Blueprint Graph
+
+**Event OnClicked (button)**:
+
+```
+Call OnClicked dispatcher with ActionType parameter
+```
 
 ### Convoy Integration
 
-#### Overlap Detection
+#### AFCConvoyMember Overlap Detection (Pending Step 6.4.4)
 
-POI detection uses the existing convoy overlap system from Task 5:
+Current implementation:
 
-- `AFCConvoyMember::OnCapsuleBeginOverlap()` detects POI via class name pattern matching
-- Class name check: `Actor->GetClass()->GetName().Contains(TEXT("POI"))`
-- Convoy member notifies parent: `ParentConvoy->NotifyPOIOverlap(POIActor)`
-- Parent convoy broadcasts event and logs detection
+```cpp
+void AFCConvoyMember::OnCapsuleBeginOverlap(...)
+{
+    // Check if actor class name contains "POI"
+    if (OtherActor->GetClass()->GetName().Contains(TEXT("POI")))
+    {
+        NotifyPOIOverlap(OtherActor);
+    }
+}
 
-**Example Log Output**:
-
+void AFCConvoyMember::NotifyPOIOverlap(AActor* POIActor)
+{
+    if (ParentConvoy)
+    {
+        ParentConvoy->NotifyPOIOverlap(POIActor);
+    }
+}
 ```
-LogFCOverworldPOI: POI 'Village' spawned at X=1000.000 Y=500.000 Z=100.000
-LogFCConvoyMember: ConvoyMember BP_FC_ConvoyMember_C_0: Detected overlap with potential POI BP_FC_OverworldPOI_C_0
-LogFCConvoyMember: ConvoyMember BP_FC_ConvoyMember_C_0: Notifying parent convoy of POI overlap
-LogFCOverworldConvoy: Convoy BP_FC_OverworldConvoy_C_0 detected POI: BP_FC_OverworldPOI_C_0
-```
 
-#### Right-Click Interaction (Task 6.4 - Planned)
+**Future Implementation (Step 6.4.4)**:
 
-Future implementation will add:
+- Get PlayerController's InteractionComponent reference
+- Call `InteractionComponent->NotifyPOIOverlap(POIActor)` directly
+- Remove `ParentConvoy->NotifyPOIOverlap()` delegation
 
-- Right-click raycast detection to POI InteractionBox
-- Call `OnPOIInteract()` on clicked POI
-- Display interaction UI (defer to later tasks)
+### Configuration
+
+#### BP_FC_GameInstance (Pending Step 6.4.5)
+
+- **Class Defaults → FC | UI Manager**:
+  - POI Action Selection Widget Class: `WBP_ActionSelection`
+
+#### BP_FC_OverworldPOI Instance Configuration
+
+- **Class Defaults → FC | POI**:
+  - POI Name: "Village" (or unique name per instance)
+  - Available Actions: Array of FFCPOIActionData
+    - Element 0: ActionType=Talk, ActionText="Talk to Villagers", ActionDescription="..."
+    - Element 1: ActionType=Trade, ActionText="Trade Goods", ActionDescription="..."
+
+### Testing & Validation
+
+**Week 3 Testing Verified** ✅:
+
+- ✅ IFCInteractablePOI interface compiles with inline implementations
+- ✅ AFCOverworldPOI implements interface, returns configured actions
+- ✅ UFCInteractionComponent POI methods compile and integrate with UIManager
+- ✅ UFCUIManager POI widget lifecycle methods compile
+- ✅ Architecture properly separates concerns (Component=logic, UIManager=widgets, Controller=routing)
+
+**Pending Testing** (Step 6.4.3+):
+
+- [ ] Right-click POI → shows action selection widget
+- [ ] Single-action POI → auto-executes without widget
+- [ ] Multi-action POI → displays action buttons
+- [ ] Widget button click → calls InteractionComponent->OnPOIActionSelected()
+- [ ] Convoy overlap with pending action → executes stored action
+- [ ] Unintentional overlap → shows selection dialog for multi-action POI
+
+### Design Notes
+
+**Architecture Refactor Rationale**:
+
+- Initial prototype put 196 lines of POI logic in AFCPlayerController (violation of Single Responsibility Principle)
+- Refactored to use existing UFCInteractionComponent (already handles table interactions)
+- UIManager centralized widget lifecycle (consistent with main menu, pause menu, table widgets)
+- PlayerController reduced to ~20 lines of delegation (input routing only)
+
+**Component Reuse**:
+
+- UFCInteractionComponent already had DetectInteractables(), Interact(), UpdatePromptWidget() for table system
+- Extended with HandlePOIClick(), OnPOIActionSelected(), NotifyPOIOverlap() for POI system
+- Same component handles both table and POI interactions (unified interaction system)
+
+**Action-Based Design**:
+
+- POIs define available actions via interface (flexible, data-driven)
+- Single-action POIs auto-execute (better UX than forcing widget)
+- Multi-action POIs show selection (prevents accidental actions like Ambush)
+
+**Intentional vs Unintentional Overlap**:
+
+- Right-click POI → store pending action → move convoy → execute on overlap (intentional)
+- Convoy wanders into POI → query actions → auto-execute or show selection (unintentional)
+- Distinguishes player intent from accidental encounters
 
 ### Logging
 
-POI system uses dedicated log category:
+POI interaction system uses multiple log categories:
 
 ```cpp
-DEFINE_LOG_CATEGORY_STATIC(LogFCOverworldPOI, Log, All);
+DEFINE_LOG_CATEGORY_STATIC(LogFCOverworldPOI, Log, All);     // POI actor lifecycle
+DEFINE_LOG_CATEGORY_EXTERN(LogFCInteraction, Log, All);      // Interaction component
+DEFINE_LOG_CATEGORY_EXTERN(LogFCUIManager, Log, All);        // Widget lifecycle
+DEFINE_LOG_CATEGORY_EXTERN(LogFCPlayerController, Log, All); // Input routing
 ```
 
 ### Common Issues
 
-- **POI not detected by convoy**: Ensure InteractionBox has Generate Overlap Events enabled and overlaps Pawn channel
-- **Can't click POI**: Verify InteractionBox blocks Visibility channel for mouse raycast
-- **POI name not showing in logs**: Check POI Name property is set in Details panel for placed instance
+- **"POIActionSelectionWidgetClass not configured"**: Set widget class in BP_FC_GameInstance Details panel
+- **Widget doesn't show actions**: Blueprint needs to implement PopulateActions() graph (Step 6.4.6)
+- **Action button click doesn't work**: Verify OnClicked dispatcher calls InteractionComponent->OnPOIActionSelected()
+- **Convoy overlap not detected**: Ensure AFCConvoyMember calls InteractionComponent->NotifyPOIOverlap() (Step 6.4.4)
 
-### Future Enhancements (Task 6.3+)
+### Future Enhancements
 
-- ~~POI base class and Blueprint child~~ ✅ **Implemented in Task 6.2**
-- BPI_InteractablePOI interface implementation (Task 6.3)
-- Right-click interaction handler in AFCPlayerController (Task 6.4)
-- POI interaction UI and game logic (Task 6.5+)
-- Different POI types (villages, ruins, encounters, merchants)
-
-### Future Enhancements (Task 5.8+)
-
-- ~~Click-to-move leader navigation via player controller~~ ✅ **Implemented in Task 5.5.1**
-- ~~Camera attachment to convoy CameraAttachPoint~~ ✅ **Implemented in Task 5.6.1**
-- ~~Convoy placement in L_Overworld level~~ ✅ **Implemented in Task 5.7.1**
-- ~~POI base class for overworld interaction~~ ✅ **Implemented in Task 6.2**
-- Follower breadcrumb trail system (Task 5.8)
-- POI right-click interaction handler (Task 6.4)
-- POI interaction UI prompts (Task 6.5+)
-- Dynamic camera constraints based on convoy bounds (Week 6+ - Backlog Item 2)
-- Save/load convoy state (Future task)
+- ✅ **Task 6.2**: AFCOverworldPOI base class created
+- ✅ **Task 6.3**: IFCInteractablePOI interface with action system implemented
+- ✅ **Task 6.4.1**: WBP_ActionSelection and WBP_POIActionButton widgets created
+- ✅ **Task 6.4.2**: UFCInteractionComponent and UFCUIManager POI methods implemented
+- **Task 6.4.3**: PlayerController delegation cleanup (remove 196-line bloat)
+- **Task 6.4.4**: Convoy overlap routes to InteractionComponent
+- **Task 6.4.5**: Configure widget class in BP_FC_GameInstance
+- **Task 6.4.6**: Wire widget to InteractionComponent callbacks
+- **Task 6.5**: Place multiple POI instances in L_Overworld and test full flow
+- **Task 6.6+**: Implement actual game logic for each action type (dialogue, combat, trade, etc.)
 
 ---
 
-_Last updated: November 23, 2025 (Week 3 Task 6.2 complete: AFCOverworldPOI C++ base class created, BP_FC_OverworldPOI configured and placed in L_Overworld, convoy overlap detection verified)_
+_Last updated: November 23, 2025 (Week 3 Task 6.4.2 complete: UFCInteractionComponent and UFCUIManager extended with POI interaction methods, architecture refactored to component-based design, 196-line PlayerController bloat eliminated)_
