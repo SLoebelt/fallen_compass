@@ -127,6 +127,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Transition")
 	void FadeScreenIn(float Duration = 1.0f);
 
+	/** Get the possessed convoy reference */
+	UFUNCTION(BlueprintCallable, Category = "FC|Convoy")
+	AFCOverworldConvoy* GetPossessedConvoy() const { return PossessedConvoy; }
+
 protected:
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "State")
 	bool bIsPauseMenuDisplayed;

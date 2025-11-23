@@ -11,6 +11,9 @@
 #include "DrawDebugHelpers.h"
 #include "Core/UFCGameInstance.h"
 #include "Core/FCUIManager.h"
+#include "Core/FCPlayerController.h"
+#include "Characters/Convoy/FCOverworldConvoy.h"
+#include "Characters/Convoy/FCOverworldConvoy.h"
 
 DEFINE_LOG_CATEGORY(LogFCInteraction);
 
@@ -332,6 +335,18 @@ void UFCInteractionComponent::NotifyPOIOverlap(AActor* POIActor)
 		// Clear pending interaction
 		bHasPendingPOIInteraction = false;
 		PendingInteractionPOI = nullptr;
+
+		// Clear convoy interaction flag
+		AFCPlayerController* PC = Cast<AFCPlayerController>(GetWorld()->GetFirstPlayerController());
+		if (PC)
+		{
+			AFCOverworldConvoy* Convoy = PC->GetPossessedConvoy();
+			if (Convoy)
+			{
+				Convoy->SetInteractingWithPOI(false);
+				UE_LOG(LogFCInteraction, Log, TEXT("Cleared convoy interaction flag"));
+			}
+		}
 	}
 	else
 	{
@@ -350,6 +365,18 @@ void UFCInteractionComponent::NotifyPOIOverlap(AActor* POIActor)
 				*UEnum::GetValueAsString(AvailableActions[0].ActionType), *POIName);
 
 			POIInterface->Execute_ExecuteAction(POIActor, AvailableActions[0].ActionType, GetOwner());
+
+			// Clear convoy interaction flag
+			AFCPlayerController* PC = Cast<AFCPlayerController>(GetWorld()->GetFirstPlayerController());
+			if (PC)
+			{
+				AFCOverworldConvoy* Convoy = PC->GetPossessedConvoy();
+				if (Convoy)
+				{
+					Convoy->SetInteractingWithPOI(false);
+					UE_LOG(LogFCInteraction, Log, TEXT("Cleared convoy interaction flag after auto-execute"));
+				}
+			}
 		}
 		else
 		{

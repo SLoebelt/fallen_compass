@@ -11,6 +11,7 @@ DEFINE_LOG_CATEGORY_STATIC(LogFCOverworldConvoy, Log, All);
 AFCOverworldConvoy::AFCOverworldConvoy()
 {
 	PrimaryActorTick.bCanEverTick = false;
+	bIsInteractingWithPOI = false;
 
 	// Create component hierarchy
 	ConvoyRoot = CreateDefaultSubobject<USceneComponent>(TEXT("ConvoyRoot"));
@@ -140,6 +141,16 @@ void AFCOverworldConvoy::NotifyPOIOverlap(AActor* POIActor)
 	{
 		return;
 	}
+
+	// Check if already interacting - prevent multiple triggers
+	if (bIsInteractingWithPOI)
+	{
+		UE_LOG(LogFCOverworldConvoy, Log, TEXT("Convoy %s: Already interacting with POI, ignoring overlap"), *GetName());
+		return;
+	}
+
+	// Set interaction flag - InteractionComponent will clear this when done
+	bIsInteractingWithPOI = true;
 
 	// Get POI name (simplified - will use interface later)
 	FString POIName = POIActor->GetName();

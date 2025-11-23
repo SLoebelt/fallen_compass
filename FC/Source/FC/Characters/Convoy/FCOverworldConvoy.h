@@ -62,6 +62,9 @@ private:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "FC|Convoy", meta = (AllowPrivateAccess = "true"))
 	USceneComponent* Follower2SpawnPoint;
 
+	/** Flag to track if convoy is currently interacting with a POI */
+	bool bIsInteractingWithPOI;
+
 	/** Spawn convoy members at spawn points */
 	void SpawnConvoyMembers();
 
@@ -73,6 +76,14 @@ public:
 	/** Get camera attachment point for camera following */
 	UFUNCTION(BlueprintCallable, Category = "FC|Convoy")
 	USceneComponent* GetCameraAttachPoint() const { return CameraAttachPoint; }
+
+	/** Check if convoy is currently interacting with a POI */
+	UFUNCTION(BlueprintCallable, Category = "FC|Convoy")
+	bool IsInteractingWithPOI() const { return bIsInteractingWithPOI; }
+
+	/** Set interaction state (called by InteractionComponent) */
+	UFUNCTION(BlueprintCallable, Category = "FC|Convoy")
+	void SetInteractingWithPOI(bool bInteracting) { bIsInteractingWithPOI = bInteracting; }
 
 	/** Called by convoy members when they overlap a POI */
 	UFUNCTION(BlueprintCallable, Category = "FC|Convoy")

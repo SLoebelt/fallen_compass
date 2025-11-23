@@ -3,6 +3,9 @@
 #include "Characters/Convoy/FCConvoyMember.h"
 #include "Characters/Convoy/FCOverworldConvoy.h"
 #include "Components/CapsuleComponent.h"
+#include "Core/FCPlayerController.h"
+#include "Core/FCFirstPersonCharacter.h"
+#include "Interaction/FCInteractionComponent.h"
 #include "FC.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogFCConvoyMember, Log, All);
@@ -74,13 +77,47 @@ void AFCConvoyMember::SetParentConvoy(AFCOverworldConvoy* InConvoy)
 
 void AFCConvoyMember::NotifyPOIOverlap(AActor* POIActor)
 {
-	if (ParentConvoy)
+	// Check if parent convoy is already interacting
+	if (ParentConvoy && ParentConvoy->IsInteractingWithPOI())
 	{
-		UE_LOG(LogFCConvoyMember, Log, TEXT("ConvoyMember %s: Notifying parent convoy of POI overlap"), *GetName());
-		ParentConvoy->NotifyPOIOverlap(POIActor);
+		UE_LOG(LogFCConvoyMember, Log, TEXT("ConvoyMember %s: Parent convoy already interacting, skipping notification"), *GetName());
+		return;
+	}
+
+	// Get player controller's InteractionComponent
+	AFCPlayerController* PC = Cast<AFCPlayerController>(GetWorld()->GetFirstPlayerController());
+	if (PC)
+	{
+		// Get the InteractionComponent from the player's character
+		AFCFirstPersonCharacter* FPCharacter = Cast<AFCFirstPersonCharacter>(PC->GetPawn());
+		if (FPCharacter)
+		{
+			UFCInteractionComponent* InteractionComp = FPCharacter->GetInteractionComponent();
+			if (InteractionComp)
+			{
+				UE_LOG(LogFCConvoyMember, Log, TEXT("ConvoyMember %s: Notifying InteractionComponent of POI overlap"), *GetName());
+				InteractionComp->NotifyPOIOverlap(POIActor);
+				return;
+			}
+			else
+			{
+				UE_LOG(LogFCConvoyMember, Warning, TEXT("ConvoyMember %s: No InteractionComponent on character"), *GetName());
+			}
+		}
+		else
+		{
+			UE_LOG(LogFCConvoyMember, Warning, TEXT("ConvoyMember %s: Player pawn is not AFCFirstPersonCharacter"), *GetName());
+		}
 	}
 	else
 	{
-		UE_LOG(LogFCConvoyMember, Warning, TEXT("ConvoyMember %s: No parent convoy to notify!"), *GetName());
+		UE_LOG(LogFCConvoyMember, Warning, TEXT("ConvoyMember %s: No player controller found"), *GetName());
+	}
+
+	// Fallback: notify parent convoy (old behavior for backwards compatibility)
+	if (ParentConvoy)
+	{
+		UE_LOG(LogFCConvoyMember, Log, TEXT("ConvoyMember %s: Falling back to parent convoy notification"), *GetName());
+		ParentConvoy->NotifyPOIOverlap(POIActor);
 	}
 }

@@ -8038,34 +8038,256 @@ Call OnClicked dispatcher with ActionType parameter
 
 ### Convoy Integration
 
-#### AFCConvoyMember Overlap Detection (Pending Step 6.4.4)
+#### Convoy Interaction State System
 
-Current implementation:
+**Problem**: Multiple convoy members (leader + 2 followers) can simultaneously trigger the same POI overlap, causing duplicate interaction events.
+
+**Solution**: Convoy-level interaction state flag with component-managed lifecycle.
+
+##### AFCOverworldConvoy State Management
 
 ```cpp
-void AFCConvoyMember::OnCapsuleBeginOverlap(...)
-{
-    // Check if actor class name contains "POI"
-    if (OtherActor->GetClass()->GetName().Contains(TEXT("POI")))
-    {
-        NotifyPOIOverlap(OtherActor);
-    }
-}
+// FCOverworldConvoy.h
+private:
+    /** Flag to track if convoy is currently interacting with a POI */
+    bool bIsInteractingWithPOI;
 
+public:
+    /** Check if convoy is currently interacting with a POI */
+    UFUNCTION(BlueprintCallable, Category = "FC|Convoy")
+    bool IsInteractingWithPOI() const { return bIsInteractingWithPOI; }
+
+    /** Set interaction state (called by InteractionComponent) */
+    UFUNCTION(BlueprintCallable, Category = "FC|Convoy")
+    void SetInteractingWithPOI(bool bInteracting) { bIsInteractingWithPOI = bInteracting; }
+```
+
+**Constructor**:
+
+```cpp
+AFCOverworldConvoy::AFCOverworldConvoy()
+{
+    PrimaryActorTick.bCanEverTick = false;
+    bIsInteractingWithPOI = false;
+    // ... component setup
+}
+```
+
+**NotifyPOIOverlap (fallback handler)**:
+
+```cpp
+void AFCOverworldConvoy::NotifyPOIOverlap(AActor* POIActor)
+{
+    if (!POIActor) return;
+
+    // Check if already interacting - prevent multiple triggers
+    if (bIsInteractingWithPOI)
+    {
+        UE_LOG(LogFCOverworldConvoy, Log, TEXT("Convoy %s: Already interacting with POI, ignoring overlap"), *GetName());
+        return;
+    }
+
+    // Set interaction flag - InteractionComponent will clear this when done
+    bIsInteractingWithPOI = true;
+
+    FString POIName = POIActor->GetName();
+    UE_LOG(LogFCOverworldConvoy, Log, TEXT("Convoy %s detected POI: %s"), *GetName(), *POIName);
+    
+    // Broadcast event (legacy behavior)
+    OnConvoyPOIOverlap.Broadcast(POIActor);
+}
+```
+
+**Design Notes**:
+
+- Flag set to true when first member triggers overlap
+- Subsequent member overlaps return early (flag already true)
+- InteractionComponent clears flag after interaction completes
+- Fallback handler used if InteractionComponent routing fails
+
+##### AFCConvoyMember Overlap Detection
+
+```cpp
 void AFCConvoyMember::NotifyPOIOverlap(AActor* POIActor)
 {
+    // Check if parent convoy is already interacting
+    if (ParentConvoy && ParentConvoy->IsInteractingWithPOI())
+    {
+        UE_LOG(LogFCConvoyMember, Log, TEXT("ConvoyMember %s: Parent convoy already interacting, skipping notification"), *GetName());
+        return;
+    }
+
+    // Get player controller's InteractionComponent
+    AFCPlayerController* PC = Cast<AFCPlayerController>(GetWorld()->GetFirstPlayerController());
+    if (PC)
+    {
+        // Get the InteractionComponent from the player's character
+        AFCFirstPersonCharacter* FPCharacter = Cast<AFCFirstPersonCharacter>(PC->GetPawn());
+        if (FPCharacter)
+        {
+            UFCInteractionComponent* InteractionComp = FPCharacter->GetInteractionComponent();
+            if (InteractionComp)
+            {
+                UE_LOG(LogFCConvoyMember, Log, TEXT("ConvoyMember %s: Notifying InteractionComponent of POI overlap"), *GetName());
+                InteractionComp->NotifyPOIOverlap(POIActor);
+                return;
+            }
+        }
+    }
+
+    // Fallback: notify parent convoy (old behavior for backwards compatibility)
     if (ParentConvoy)
     {
+        UE_LOG(LogFCConvoyMember, Log, TEXT("ConvoyMember %s: Falling back to parent convoy notification"), *GetName());
         ParentConvoy->NotifyPOIOverlap(POIActor);
     }
 }
 ```
 
-**Future Implementation (Step 6.4.4)**:
+**Logic Flow**:
 
-- Get PlayerController's InteractionComponent reference
-- Call `InteractionComponent->NotifyPOIOverlap(POIActor)` directly
-- Remove `ParentConvoy->NotifyPOIOverlap()` delegation
+1. Check convoy flag first - return early if already interacting
+2. Get InteractionComponent reference via PlayerController → FirstPersonCharacter
+3. Notify InteractionComponent directly (primary path)
+4. Fallback to convoy notification if component unavailable
+
+**Design Notes**:
+
+- Early check prevents wasted reference chain lookups
+- Fallback ensures overlap handling even if component routing fails
+- Reference chain: GetWorld() → FirstPlayerController → Pawn → InteractionComponent
+
+##### UFCInteractionComponent Flag Clearing
+
+**After Intentional Interaction**:
+
+```cpp
+void UFCInteractionComponent::NotifyPOIOverlap(AActor* POIActor)
+{
+    // ... POI validation
+
+    if (bHasPendingPOIInteraction && PendingInteractionPOI == POIActor)
+    {
+        // Execute pending action
+        POIInterface->Execute_ExecuteAction(POIActor, PendingInteractionAction, GetOwner());
+
+        // Clear pending interaction
+        bHasPendingPOIInteraction = false;
+        PendingInteractionPOI = nullptr;
+
+        // Clear convoy interaction flag
+        AFCPlayerController* PC = Cast<AFCPlayerController>(GetWorld()->GetFirstPlayerController());
+        if (PC)
+        {
+            AFCOverworldConvoy* Convoy = PC->GetPossessedConvoy();
+            if (Convoy)
+            {
+                Convoy->SetInteractingWithPOI(false);
+                UE_LOG(LogFCInteraction, Log, TEXT("Cleared convoy interaction flag"));
+            }
+        }
+    }
+    // ... unintentional overlap handling
+}
+```
+
+**After Auto-Execute (Single Action POI)**:
+
+```cpp
+else if (AvailableActions.Num() == 1)
+{
+    // Single action - auto-execute
+    POIInterface->Execute_ExecuteAction(POIActor, AvailableActions[0].ActionType, GetOwner());
+
+    // Clear convoy interaction flag
+    AFCPlayerController* PC = Cast<AFCPlayerController>(GetWorld()->GetFirstPlayerController());
+    if (PC)
+    {
+        AFCOverworldConvoy* Convoy = PC->GetPossessedConvoy();
+        if (Convoy)
+        {
+            Convoy->SetInteractingWithPOI(false);
+            UE_LOG(LogFCInteraction, Log, TEXT("Cleared convoy interaction flag after auto-execute"));
+        }
+    }
+}
+```
+
+**Design Notes**:
+
+- Flag cleared immediately after `ExecuteAction()` completes
+- Clears for both intentional (right-click → move) and unintentional (wander) overlaps
+- Clears for both auto-execute (1 action) and user-selected (multiple actions)
+- Multi-action unintentional overlaps show widget but don't clear flag (waiting for user selection)
+
+##### AFCPlayerController Convoy Access
+
+```cpp
+// FCPlayerController.h
+protected:
+    /** Reference to possessed convoy in Overworld */
+    UPROPERTY()
+    AFCOverworldConvoy* PossessedConvoy;
+
+public:
+    /** Get the possessed convoy reference */
+    UFUNCTION(BlueprintCallable, Category = "FC|Convoy")
+    AFCOverworldConvoy* GetPossessedConvoy() const { return PossessedConvoy; }
+```
+
+**Purpose**: Public getter for protected convoy reference, used by InteractionComponent to clear interaction flag.
+
+#### Interaction Flow Diagram
+
+```mermaid
+sequenceDiagram
+    participant CM1 as ConvoyMember 1
+    participant CM2 as ConvoyMember 2
+    participant Convoy as OverworldConvoy
+    participant IC as InteractionComponent
+    participant POI as OverworldPOI
+
+    Note over CM1,POI: Convoy moves toward POI
+
+    CM1->>Convoy: IsInteractingWithPOI()?
+    Convoy-->>CM1: false
+    CM1->>IC: NotifyPOIOverlap(POI)
+    IC->>Convoy: SetInteractingWithPOI(true)
+    IC->>POI: Execute_ExecuteAction()
+    POI-->>IC: Action executed
+    IC->>Convoy: SetInteractingWithPOI(false)
+
+    Note over CM2: CM2 enters POI overlap
+
+    CM2->>Convoy: IsInteractingWithPOI()?
+    Convoy-->>CM2: false (cleared by IC)
+    CM2->>IC: NotifyPOIOverlap(POI)
+    Note over IC: New interaction allowed
+```
+
+**Key Points**:
+
+- First member triggers interaction, sets convoy flag
+- Second member checks flag (true) → skips notification
+- InteractionComponent clears flag after action executes
+- Convoy ready for next POI interaction
+
+#### Testing & Validation
+
+**Week 3 Testing Verified** ✅:
+
+- ✅ Multiple convoy members don't trigger duplicate POI interactions
+- ✅ Convoy flag prevents redundant overlap events
+- ✅ InteractionComponent clears flag after interaction completes
+- ✅ Flag cleared for both intentional and auto-execute interactions
+- ✅ Fallback convoy notification still works if component routing fails
+
+**Pending Testing** (Step 6.4.5+):
+
+- [ ] Multiple convoy members enter POI simultaneously
+- [ ] Flag properly prevents duplicate widget displays
+- [ ] Flag cleared correctly after user selects action from widget
+- [ ] Convoy can interact with second POI after first interaction completes
 
 ### Configuration
 

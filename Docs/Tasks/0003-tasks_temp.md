@@ -1765,26 +1765,47 @@ IMC_FC_TopDown`
 
 #### Step 6.4.4: Connect Convoy Overlap to Interaction Component
 
-- [ ] **Analysis**
+- [x] **Analysis**
 
-  - [ ] AFCConvoyMember already detects POI overlap (Step 6.2)
-  - [ ] Forward overlap event to InteractionComponent instead of PlayerController
-  - [ ] Convoy needs reference to InteractionComponent (get from PlayerController)
+  - [x] AFCConvoyMember already detects POI overlap (Step 6.2)
+  - [x] Forward overlap event to InteractionComponent instead of parent convoy
+  - [x] Add bIsInteractingWithPOI flag to convoy to prevent multiple members triggering same POI
+  - [x] InteractionComponent clears convoy flag after interaction completes
 
-- [ ] **Implementation (C++)**
+- [x] **Implementation (C++)**
 
-  - [ ] **Update FCConvoyMember.cpp** OnCapsuleBeginOverlap():
-    - [ ] Get PlayerController's InteractionComponent reference
-    - [ ] Call InteractionComponent->NotifyPOIOverlap(OtherActor)
-    - [ ] Remove old PlayerController->NotifyPOIOverlap() call if exists
-  - [ ] Save file
-  - [ ] Compile C++ code
+  - [x] **Update FCOverworldConvoy.h**:
+    - [x] Add bool bIsInteractingWithPOI private member
+    - [x] Add IsInteractingWithPOI() getter method
+    - [x] Add SetInteractingWithPOI(bool) setter method
+  - [x] **Update FCOverworldConvoy.cpp**:
+    - [x] Initialize bIsInteractingWithPOI = false in constructor
+    - [x] Check flag in NotifyPOIOverlap(), set to true if not already interacting
+    - [x] Return early if already interacting (prevents multiple triggers)
+  - [x] **Update FCConvoyMember.cpp** NotifyPOIOverlap():
+    - [x] Add includes for FCPlayerController, FCFirstPersonCharacter, FCInteractionComponent
+    - [x] Check ParentConvoy->IsInteractingWithPOI() - return early if true
+    - [x] Get PlayerController → FirstPersonCharacter → InteractionComponent
+    - [x] Call InteractionComponent->NotifyPOIOverlap(POIActor)
+    - [x] Keep ParentConvoy->NotifyPOIOverlap() as fallback
+  - [x] **Update FCInteractionComponent.cpp**:
+    - [x] Add includes for FCPlayerController and FCOverworldConvoy
+    - [x] After ExecuteAction() in NotifyPOIOverlap():
+      - [x] Get PlayerController->GetPossessedConvoy()
+      - [x] Call Convoy->SetInteractingWithPOI(false) to clear flag
+    - [x] Clear flag after both intentional and auto-executed interactions
+  - [x] **Update FCPlayerController.h**:
+    - [x] Add public GetPossessedConvoy() getter method
+  - [x] Save all files
+  - [x] Compile C++ code
 
-- [ ] **Testing After Step 6.4.4** ✅ CHECKPOINT
-  - [ ] C++ code compiles without errors
-  - [ ] Convoy overlap notifies InteractionComponent
+- [x] **Testing After Step 6.4.4** ✅ CHECKPOINT
+  - [x] C++ code compiles without errors
+  - [x] Convoy overlap notifies InteractionComponent
+  - [x] Only first convoy member triggers POI interaction
+  - [x] Convoy flag cleared after interaction completes
 
-**COMMIT POINT 6.4.4**: `git add Source/FC/Characters/Convoy/FCConvoyMember.cpp && git commit -m "feat(overworld): Connect convoy POI overlap to interaction component"`
+**COMMIT POINT 6.4.4**: `git add Source/FC/Characters/Convoy/FCConvoyMember.* Source/FC/Characters/Convoy/FCOverworldConvoy.* Source/FC/Interaction/FCInteractionComponent.cpp Source/FC/Core/FCPlayerController.h && git commit -m "feat(overworld): Add convoy interaction state to prevent multiple POI triggers"`
 
 ---
 
