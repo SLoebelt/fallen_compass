@@ -8,6 +8,7 @@
 #include "FCTransitionManager.h"
 #include "Core/FCLevelManager.h"
 #include "Core/FCUIManager.h"
+#include "Core/UFCWorldMapManager.h"
 
 void UFCGameInstance::Init()
 {
@@ -428,4 +429,27 @@ void UFCGameInstance::OnPostLoadMapWithWorld(UWorld* LoadedWorld)
             false
         );
     }
+}
+
+void UFCGameInstance::SavePlanningState(FName AreaID, FName StartPointID)
+{
+    CurrentPlanningState.SelectedAreaID = AreaID;
+    CurrentPlanningState.SelectedStartPointID = StartPointID;
+    CurrentPlanningState.bPlanningInProgress = (AreaID != NAME_None || StartPointID != NAME_None);
+    
+    UE_LOG(LogTemp, Log, TEXT("SavePlanningState: Area=%s, StartPoint=%s, InProgress=%s"), 
+        *AreaID.ToString(), 
+        *StartPointID.ToString(),
+        CurrentPlanningState.bPlanningInProgress ? TEXT("true") : TEXT("false"));
+}
+
+void UFCGameInstance::ClearPlanningState()
+{
+    CurrentPlanningState.ClearSelection();
+    UE_LOG(LogTemp, Log, TEXT("ClearPlanningState: Planning state cleared"));
+}
+
+UFCWorldMapManager* UFCGameInstance::GetWorldMapManager() const
+{
+    return GetSubsystem<UFCWorldMapManager>();
 }

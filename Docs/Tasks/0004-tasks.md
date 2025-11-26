@@ -50,23 +50,23 @@ To ensure the critical "Expedition Loop" and bug fixes are delivered within Week
 
 ### Step 4.0: Analysis & Discovery
 
-- [ ] **Analysis of Existing Implementations**
+- [x] **Analysis of Existing Implementations**
 
-  - [ ] **State Management**: Review `Source/FC/Core/FCGameStateManager.h` and `FCPlayerController.cpp` to understand the current state transition logic causing Issue #1.
-  - [ ] **UI Input**: Review `WBP_PauseMenu` and `FCPlayerController` input handling to address Issue #4 (ESC toggle).
-  - [ ] **Map System**: Check if any map assets exist in `Content/FC/UI/` or `Content/FC/Data/`. If not, plan the `UFCWorldMapSubsystem` or DataAssets needed for the complex map requirements.
-  - [ ] **Interaction System**: Verify if an Interaction Interface exists for the "Return Home" POI action. If not, plan `BPI_Interactable`.
+  - [x] **State Management**: Review `Source/FC/Core/FCGameStateManager.h` and `FCPlayerController.cpp` to understand the current state transition logic causing Issue #1.
+  - [x] **UI Input**: Review `WBP_PauseMenu` and `FCPlayerController` input handling to address Issue #4 (ESC toggle).
+  - [x] **Map System**: Check if any map assets exist in `Content/FC/UI/` or `Content/FC/Data/`. If not, plan the `UFCWorldMapSubsystem` or DataAssets needed for the complex map requirements.
+  - [x] **Interaction System**: Verify if an Interaction Interface exists for the "Return Home" POI action. If not, plan `BPI_Interactable`.
 
-- [ ] **Code Conventions Compliance Check**
+- [x] **Code Conventions Compliance Check**
 
-  - [ ] **Encapsulation**: Ensure new Map data structures (Routes, Areas) are properly encapsulated in C++ structs/classes or DataAssets.
-  - [ ] **Separation of Concerns**: Keep Map logic (Costs, Risks) separate from the UI Widget (`WBP_OverworldMap`). Use a Manager or Subsystem.
-  - [ ] **Naming**: Ensure new widgets use `WBP_` and C++ classes use `FC` prefix.
+  - [x] **Encapsulation**: Ensure new Map data structures (Routes, Areas) are properly encapsulated in C++ structs/classes or DataAssets.
+  - [x] **Separation of Concerns**: Keep Map logic (Costs, Risks) separate from the UI Widget (`WBP_OverworldMap`). Use a Manager or Subsystem.
+  - [x] **Naming**: Ensure new widgets use `WBP_` and C++ classes use `FC` prefix.
 
-- [ ] **Implementation Plan**
-  - [ ] **Task 4.1 (Bugs)**: Implement fixes for Issues #1, #2, #4 using the strategies defined in `backlog.md`.
-  - [ ] **Task 4.2 (Map)**: Create `UFCMapDataAsset` (for areas/routes), `WBP_WorldMap` (visuals), and logic for cost/risk calculation.
-  - [ ] **Task 4.3 (Return)**: Create `BP_ExtractionPoint` actor and `WBP_ExpeditionSummary`.
+- [x] **Implementation Plan**
+  - [x] **Task 4.1 (Bugs)**: Implement fixes for Issues #1, #2, #4 using the strategies defined in `backlog.md`.
+  - [x] **Task 4.2 (Map)**: Create `UFCMapDataAsset` (for areas/routes), `WBP_WorldMap` (visuals), and logic for cost/risk calculation.
+  - [x] **Task 4.3 (Return)**: Create `BP_ExtractionPoint` actor and `WBP_ExpeditionSummary`.
 
 ---
 
@@ -121,53 +121,184 @@ _Goal: Only show "Abort Expedition" when actually in the Overworld._
 
 ### Step 4.2: World Map & Expedition Planning System
 
-_Goal: Implement a comprehensive map system for both Expedition Planning (Office) and Orientation (Overworld), meeting specific user requirements._
+_Goal: Implement a data-driven map system for expedition planning (Office) and orientation (Overworld), following existing subsystem architecture._
 
-#### Step 4.2.1: Map Data Architecture
+#### Step 4.2.1: Map Data Architecture (C++ Structs & DataTable)
 
-- [ ] **Create Data Structures (C++ or Blueprint)**
-  - [ ] Create `FMapRouteSegment` struct:
-    - [ ] StartPoint (ID/Name), EndPoint (ID/Name).
-    - [ ] RiskValue (Float/Int).
-    - [ ] TravelCost (Money/Proviant).
-    - [ ] bIsKnown (Boolean).
-  - [ ] Create `FMapArea` struct:
-    - [ ] Name, Description, Image.
-    - [ ] bIsExplored (Fog of War status).
-    - [ ] List of EntryPoints/POIs.
-  - [ ] Create `UFCWorldMapData` (DataAsset) to hold the static world definition (Continents, Areas, Routes).
+- [x] **Create `FFCMapAreaData` struct in `UFCWorldMapManager.h`**
 
-#### Step 4.2.2: WBP_WorldMap Implementation
+  - [x] Derive from `FTableRowBase` for DataTable support
+  - [x] Add properties:
+    - [x] `AreaID` (FName) – unique identifier for this area
+    - [x] `AreaName` (FText) – display name (localized)
+    - [x] `Description` (FText) – lore/flavor text
+    - [x] `LevelName` (FName) – corresponding Overworld level (e.g., "L_Overworld_Forest")
+    - [x] `GridPosition` (FIntPoint) – position on world map grid (2km × 2km grid)
+    - [x] `StartPoints` (TArray<FName>) – list of 3 fixed start point IDs for this area
+    - [x] `ExploredSubCells` (TArray<bool>) – **12×12 sub-grid** (144 booleans) for gradual fog of war unveiling (~166m per cell)
+
+- [x] **Create `FFCStartPointData` struct in `UFCWorldMapManager.h`**
+
+  - [x] Derive from `FTableRowBase` for DataTable support
+  - [x] Add properties:
+    - [x] `StartPointID` (FName) – unique identifier
+    - [x] `StartPointName` (FText) – display name (e.g., "Northern Coast", "Mountain Pass")
+    - [x] `AreaID` (FName) – parent area reference
+    - [x] `RiskLevel` (int32) – event probability multiplier (0-100)
+    - [x] `MoneyCost` (int32) – gold required to reach this point
+    - [x] `SupplyCost` (int32) – provisions/days required
+    - [x] `SplinePoints` (TArray<FVector2D>) – route waypoints from office (bottom center) to start point
+    - [x] `Description` (FText) – tactical info for player
+
+- [x] **Create `FFCExpeditionPlanningState` struct in `UFCGameInstance.h`**
+  - [x] Add to campaign save data (non-DataTable, runtime state):
+    - [x] `SelectedAreaID` (FName)
+    - [x] `SelectedStartPointID` (FName)
+    - [x] `bPlanningInProgress` (bool) – true if player ESC'd from planning widget
+    - [x] Methods: `ClearSelection()`, `IsValid()` (checks if area+start point exist)
+
+#### Step 4.2.2: World Map Subsystem (C++ Manager)
+
+- [ ] **Create `UFCWorldMapManager` subsystem**
+  - [ ] Inherit from `UGameInstanceSubsystem` (like `UFCLevelManager`, `UFCUIManager`)
+  - [ ] File: `Source/FC/Core/UFCWorldMapManager.h/.cpp`
+  - [ ] Add properties:
+    - [ ] `UDataTable* AreaDataTable` – DT_MapAreas (editable, configured in GameInstance BP)
+    - [ ] `UDataTable* StartPointDataTable` – DT_StartPoints (editable, configured in GameInstance BP)
+  - [ ] Add methods:
+    - [ ] `Initialize()` – validate DataTables, cache office position
+    - [ ] `GetAreaData(FName AreaID)` – lookup area row
+    - [ ] `GetStartPointData(FName StartPointID)` – lookup start point row
+    - [ ] `GetStartPointsForArea(FName AreaID)` – return 3 start points for given area
+    - [ ] `CalculateRouteCost(FName StartPointID)` – return Money + Supply cost from DataTable
+    - [ ] `GetRouteSplinePoints(FName StartPointID)` – return waypoints for visual route drawing
+    - [ ] `IsSubCellExplored(FName AreaID, int32 SubCellIndex)` – check if sub-cell explored (0-143)
+    - [ ] `SetSubCellExplored(FName AreaID, int32 SubCellIndex, bool bExplored)` – update campaign save + mark dirty
+    - [ ] `UpdateExplorationAtWorldPosition(FVector WorldPosition)` – called by convoy Tick, converts world coords to area+sub-cell index
+    - [ ] `GetExploredPercentage(FName AreaID)` – return 0.0-1.0 for area completion tracking
+    - [ ] `ValidatePlanningState()` – ensure selected area+start point exist and are affordable
+
+#### Step 4.2.3: Planning State Persistence (GameInstance Integration)
+
+- [ ] **Extend `UFCGameInstance`**
+  - [ ] Add `FFCExpeditionPlanningState CurrentPlanningState` member
+  - [ ] Add methods:
+    - [ ] `SavePlanningState(AreaID, StartPointID)` – immediately save to CurrentPlanningState
+    - [ ] `LoadPlanningState()` – return CurrentPlanningState (called by widget on open)
+    - [ ] `ClearPlanningState()` – reset selections (called after expedition starts)
+    - [ ] `GetWorldMapManager()` – subsystem accessor helper
+
+#### Step 4.2.4: WBP_WorldMap Widget (Blueprint UI)
 
 - [ ] **Visual Setup**
-  - [ ] Create `WBP_WorldMap`.
-  - [ ] Add **Background Image** (Fictional World Map).
-  - [ ] Add **Fog of War Layer** (Masked image or separate overlay widgets for unexplored areas).
-  - [ ] Add **Route Visualization** (Splines or simple lines connecting POIs).
-  - [ ] Add **Area Click Detection** (Buttons or invisible interactable widgets over map regions).
 
-#### Step 4.2.3: Logic & Interaction
+  - [ ] Create `WBP_WorldMap` (UMG Widget)
+  - [ ] Add **Background Image** (world map texture with coastlines)
+  - [ ] Add **Fog of War Overlay** (Grid Panel 12×12 per area, or Image with material mask)
+    - [ ] **Option A (Simple)**: Use Uniform Grid Panel with 144 widgets per area (visibility toggled via `IsSubCellExplored`)
+    - [ ] **Option B (Optimized)**: Use single Image per area with Material Instance Dynamic (write sub-grid bool array to texture parameter)
+    - [ ] Bind visibility/opacity to `UFCWorldMapManager->IsSubCellExplored(AreaID, SubCellIndex)`
+  - [ ] Add **Area Buttons** (Invisible buttons positioned over each grid cell)
+    - [ ] On Click → call `SelectArea(AreaID)`
+  - [ ] Add **Start Point Selection Panel** (Hidden by default)
+    - [ ] 3 Radio Buttons (one per start point)
+    - [ ] For each: display Name, Risk, Money Cost, Supply Cost
+    - [ ] On Click → call `SelectStartPoint(StartPointID)`
+  - [ ] Add **Route Visualization** (Spline or Line Renderer)
+    - [ ] Draw from office position (bottom center) to selected start point
+    - [ ] Use `GetRouteSplinePoints()` waypoints
+  - [ ] Add **Resource Display** (Top bar)
+    - [ ] Show current Money, Supplies (from GameInstance)
+    - [ ] Highlight in red if insufficient for selected start point
+  - [ ] Add **Start Expedition Button**
+    - [ ] Enable only if: selection valid AND resources sufficient
+    - [ ] On Click → call `StartExpedition()`
 
-- [ ] **Area Interaction**
-  - [ ] On Area Click: Show `WBP_AreaInfo` popup (Name, Description).
-  - [ ] Display "Possible Entry Points" for the selected area.
-- [ ] **Route Calculation Logic**
-  - [ ] Implement function `CalculateRouteCost(Start, End)`:
-    - [ ] Sum up `TravelCost` (Money, Proviant) for all segments.
-    - [ ] Sum up `RiskValue`.
-  - [ ] Update UI to show "Required: X Gold, Y Proviant".
-- [ ] **Start Expedition Validation**
-  - [ ] Check Player Inventory (Mock or actual GameState).
-  - [ ] **IF** (PlayerGold >= Cost AND PlayerProviant >= Cost):
-    - [ ] Enable "Start Expedition" button.
-    - [ ] Allow start regardless of Crew count (as per requirement "own risk").
-  - [ ] **ELSE**: Disable button and show missing resources.
+- [ ] **Logic & Event Graph**
 
-#### Step 4.2.4: Overworld Integration (Minimap Mode)
+  - [ ] `Event Construct`:
+    - [ ] Get `UFCGameInstance` → `LoadPlanningState()`
+    - [ ] If state exists: restore area + start point selection, redraw route
+    - [ ] Query `UFCWorldMapManager` for all areas, populate buttons
+    - [ ] Refresh fog of war overlay (iterate through all sub-cells per area)
+  - [ ] `SelectArea(AreaID)`:
+    - [ ] Get `UFCWorldMapManager->GetStartPointsForArea(AreaID)`
+    - [ ] Populate start point radio buttons with data
+    - [ ] Show start point selection panel
+    - [ ] Call `UFCGameInstance->SavePlanningState(AreaID, NAME_None)` (area set, start point pending)
+  - [ ] `SelectStartPoint(StartPointID)`:
+    - [ ] Get start point data from `UFCWorldMapManager`
+    - [ ] Update route visualization (call `GetRouteSplinePoints()`)
+    - [ ] Update resource display (highlight costs)
+    - [ ] Enable/disable Start Expedition button based on affordability
+    - [ ] Call `UFCGameInstance->SavePlanningState(SelectedAreaID, StartPointID)`
+  - [ ] `StartExpedition()`:
+    - [ ] Validate via `UFCWorldMapManager->ValidatePlanningState()`
+    - [ ] Deduct costs from `UFCGameInstance` (Money, Supplies)
+    - [ ] Call `UFCGameStateManager->TransitionTo(Overworld_Travel)`
+    - [ ] Call `UFCLevelManager->LoadLevel(SelectedArea->LevelName)`
+    - [ ] Close widget
 
-- [ ] **Toggle Logic**
-  - [ ] In `AFCPlayerController` or `UFCUIManager`, add `IA_ToggleMap` (Key: M).
-  - [ ] On Toggle: Open `WBP_WorldMap` in "View Only" mode (Hide "Start Expedition" buttons, show "You are here" marker).
+- [ ] **Fog of War Update (Runtime)**
+  - [ ] In Overworld convoy pawn's `Tick()` or movement component:
+    - [ ] Call `UFCWorldMapManager->UpdateExplorationAtWorldPosition(GetActorLocation())` every frame
+    - [ ] Manager converts world position to area + sub-cell index
+    - [ ] Sets sub-cell explored if not already marked
+    - [ ] Marks save data dirty for persistence
+  - [ ] In `WBP_WorldMap`, on open or periodic refresh:
+    - [ ] Query `IsSubCellExplored()` for all sub-cells in visible areas
+    - [ ] Update fog overlay widgets/material accordingly
+
+#### Step 4.2.5: Office Integration (Table Interaction)
+
+- [ ] **Connect to existing table system**
+  - [ ] Ensure `BP_TableObject_Map` (from Week 2) triggers `WBP_WorldMap`
+  - [ ] On interact → `UFCUIManager->ShowTableWidget(WBP_WorldMap)`
+  - [ ] Widget handles own visibility and ESC behavior (close widget, persist state)
+
+#### Step 4.2.6: Overworld Integration (Minimap Mode)
+
+- [ ] **Add Map Toggle Input Action**
+
+  - [ ] Create `IA_ToggleMap` (Key: M) in `Content/FC/Input/Actions/`
+  - [ ] Bind in `AFCPlayerController` (TopDown input context)
+  - [ ] On press: call `UFCUIManager->ToggleWorldMap()`
+
+- [ ] **UFCUIManager Extension**
+  - [ ] Add method: `ToggleWorldMap()`
+    - [ ] If map not open: show `WBP_WorldMap` in "View Only" mode
+    - [ ] If map open: hide widget
+  - [ ] View Only Mode changes:
+    - [ ] Hide Start Expedition button
+    - [ ] Hide start point selection (show only if area explored)
+    - [ ] Add "You are here" marker (query current level from `UFCLevelManager`)
+
+#### Step 4.2.7: DataTable Assets (Content Creation)
+
+- [ ] **Create `DT_MapAreas` DataTable**
+
+  - [ ] Location: `Content/FC/Data/`
+  - [ ] Row Structure: `FFCMapAreaData`
+  - [ ] Populate with example areas:
+    - [ ] Forest (AreaID: "Forest", GridPosition: (2,3), LevelName: "L_Overworld_Forest", ExploredSubCells: 144 false entries)
+    - [ ] Mountains (AreaID: "Mountains", GridPosition: (3,2), LevelName: "L_Overworld_Mountains", ExploredSubCells: 144 false entries)
+    - [ ] Swamp (AreaID: "Swamp", GridPosition: (1,4), LevelName: "L_Overworld_Swamp", ExploredSubCells: 144 false entries)
+
+- [ ] **Create `DT_StartPoints` DataTable**
+
+  - [ ] Location: `Content/FC/Data/`
+  - [ ] Row Structure: `FFCStartPointData`
+  - [ ] Populate with 3 start points per area:
+    - [ ] Forest_North: Risk=20, Money=50, Supply=3, SplinePoints=[...], AreaID="Forest"
+    - [ ] Forest_East: Risk=30, Money=70, Supply=5, SplinePoints=[...], AreaID="Forest"
+    - [ ] Forest_South: Risk=10, Money=30, Supply=2, SplinePoints=[...], AreaID="Forest"
+    - [ ] (Repeat for Mountains, Swamp)
+
+- [ ] **Configure in `BP_FC_GameInstance`**
+  - [ ] Open `BP_FC_GameInstance`
+  - [ ] Find `UFCWorldMapManager` subsystem settings
+  - [ ] Assign `DT_MapAreas` to `AreaDataTable`
+  - [ ] Assign `DT_StartPoints` to `StartPointDataTable`
 
 ---
 

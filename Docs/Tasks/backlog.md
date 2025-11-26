@@ -619,6 +619,166 @@ After implementing fix:
 
 ---
 
+## Enhancement #5: Dynamic Texture-Based Fog of War System
+
+**Status**: 💡 Enhancement - Future Feature  
+**Severity**: N/A (Quality of Life)  
+**Priority**: Low (Post-Week 4)  
+**Affected Systems**: World Map, UFCWorldMapManager, Rendering Pipeline  
+**Proposed For**: Week 6+ or Polish Phase  
+**Dependencies**: Task 4.2 (Basic Map System with Sub-Grid)
+
+### Enhancement Summary
+
+Upgrade the Week 4 sub-grid fog of war system (12×12 boolean array) to a dynamic texture-based rendering approach for smooth, high-resolution fog unveiling. This will improve visual polish and enable real-time fog transitions, cinematic effects, and higher fidelity exploration tracking.
+
+### Current Implementation (Week 4)
+
+The Week 4 map system uses a **12×12 sub-grid** per 2km×2km area:
+
+- **Data Structure**: `TArray<bool> ExploredSubCells` (144 entries per area) in `FFCMapAreaData`
+- **Cell Size**: ~166m × 166m per sub-cell
+- **Update Frequency**: Every frame via `UFCWorldMapManager->UpdateExplorationAtWorldPosition()`
+- **Rendering**: Either Uniform Grid Panel (144 widgets) or Material Instance Dynamic with bool array parameter
+- **Pros**: Simple, predictable performance, easy to debug, sufficient for Week 4 scope
+- **Cons**: Blocky unveiling, limited visual fidelity, 144-cell granularity may show "stepping" at convoy edges
+
+### Proposed Enhancement: Dynamic Texture Rendering
+
+Replace boolean sub-grid with **512×512 grayscale texture** per area for smooth fog transitions:
+
+#### Architecture Changes
+
+1. **Data Structure**
+
+   - Replace `TArray<bool> ExploredSubCells` with `UTexture2D* FogOfWarTexture` in `FFCMapAreaData`
+   - Each pixel represents ~3.9m × 3.9m of world space (2000m / 512px)
+   - Grayscale values: 0 = unexplored (black), 255 = fully explored (white)
+   - Intermediate values (1-254) support smooth transitions and "partial visibility" zones
+
+2. **UFCWorldMapManager Enhancements**
+
+   - **Method**: `UpdateFogTextureAtWorldPosition(FVector WorldPosition, float RevealRadius)`
+     - Convert world position to texture UV coordinates
+     - Draw radial gradient (e.g., 50m radius = ~13 pixels) centered on convoy
+     - Use CPU-side pixel manipulation (`FUpdateTextureRegion2D`) or RenderTarget approach
+     - Lock/unlock texture for write access per frame or batch updates
+   - **Method**: `GetFogTextureForArea(FName AreaID)` → returns `UTexture2D*` for widget binding
+   - **Optimization**: Update only dirty regions (convoy bounding box + reveal radius), not entire 512×512 texture
+
+3. **Rendering Pipeline**
+
+   - **Material**: Create `M_FogOfWar` material with texture parameter (`FogTexture`)
+     - Sample texture at world UV coordinates
+     - Lerp between fog color (dark gray/black) and map color (full saturation) based on pixel value
+     - Support animated "wave" effect for newly unveiled areas (optional shader animation)
+   - **Widget Integration**: `WBP_WorldMap` uses single Image widget per area with Material Instance Dynamic
+     - Bind `FogTexture` parameter to `GetFogTextureForArea(AreaID)`
+     - Automatic refresh when texture updates (no manual widget iteration)
+
+4. **Convoy Integration**
+   - In convoy pawn's `Tick()`:
+     ```cpp
+     WorldMapManager->UpdateFogTextureAtWorldPosition(GetActorLocation(), RevealRadius = 50.0f);
+     ```
+   - **Reveal Radius**: Configurable (e.g., 50m, 100m) for fog "brush size"
+   - **Fade-In**: Optional smooth transition over 1-2 seconds for cinematic effect
+   - **Persistence**: Serialize texture to save file (use PNG compression or RLE encoding for ~100KB per area)
+
+#### Visual Features Enabled
+
+- **Smooth Gradients**: Fog recedes smoothly around convoy path, no blocky edges
+- **Partial Visibility**: "Fog of exploration" vs "fog of war" distinction (e.g., once-seen areas are lighter gray, not black)
+- **Animated Transitions**: Shader-based wave/ripple effect when fog clears
+- **High Fidelity**: 512×512 = 262,144 "cells" vs 144 sub-cells (1,820× resolution increase)
+- **Cinematic Moments**: Support for scripted fog reveals (e.g., cutscene flyover unveils entire region)
+
+#### Performance Considerations
+
+**GPU Cost**:
+
+- Texture sampling per pixel: Negligible (single grayscale texture lookup)
+- Material complexity: Low (1 texture sample + lerp operation)
+- No performance difference between 512×512 and 12×12 for rendering (both are single material instances)
+
+**CPU Cost**:
+
+- **Texture Update**: ~5-15ms per frame if updating entire 512×512 texture (262KB data)
+- **Optimization A**: Update only dirty 64×64 region around convoy → ~0.5ms
+- **Optimization B**: Batch updates every 5-10 frames → amortize cost
+- **Optimization C**: Use RenderTarget + GPU compute for convoy "brush" drawing → <1ms
+
+**Memory Cost**:
+
+- 512×512 grayscale = 256KB per area (uncompressed)
+- 10 areas = 2.56MB total (negligible for modern GPUs)
+- Save file: PNG compression reduces to ~50-100KB per area
+
+**Trade-Off**: 3-5× CPU cost vs sub-grid, but still well within frame budget (<1ms optimized)
+
+#### Implementation Roadmap
+
+**Phase 1: Core Texture System** (2-3 days)
+
+- [ ] Extend `FFCMapAreaData` with `UTexture2D* FogOfWarTexture` property
+- [ ] Implement `UFCWorldMapManager::InitializeFogTextures()` – create blank 512×512 textures
+- [ ] Implement `UpdateFogTextureAtWorldPosition()` with CPU-side pixel writes
+- [ ] Test texture updates in isolation (draw radial gradient at convoy position)
+
+**Phase 2: Material & Rendering** (1 day)
+
+- [ ] Create `M_FogOfWar` material (texture sample + lerp)
+- [ ] Update `WBP_WorldMap` to use Material Instance Dynamic per area
+- [ ] Bind `FogTexture` parameter to area data
+- [ ] Verify fog renders correctly at rest (static texture test)
+
+**Phase 3: Convoy Integration** (1 day)
+
+- [ ] Hook convoy `Tick()` to call `UpdateFogTextureAtWorldPosition()`
+- [ ] Tune reveal radius (50m, 100m, etc.)
+- [ ] Test fog unveiling during convoy movement
+- [ ] Verify save/load persistence (serialize texture to PNG)
+
+**Phase 4: Polish & Optimization** (1-2 days)
+
+- [ ] Implement dirty region optimization (64×64 bounding box updates)
+- [ ] Add optional fade-in shader animation (wave effect)
+- [ ] Profile CPU cost, ensure <1ms per frame
+- [ ] Add debug visualization (show texture UV overlay, dirty regions)
+
+**Phase 5: Testing & Edge Cases** (1 day)
+
+- [ ] Test with 10+ areas (memory/performance)
+- [ ] Test save/load with partially unveiled areas
+- [ ] Test convoy teleportation (large position deltas)
+- [ ] Test rapid back-and-forth across area boundaries
+
+**Total Estimated Time**: 5-8 days (assuming one engineer)
+
+#### Why Defer to Post-Week 4?
+
+1. **Scope Management**: Week 4 focuses on functional expedition loop, not visual polish
+2. **Risk Mitigation**: Sub-grid approach is proven and simple; texture system requires rendering pipeline knowledge
+3. **Dependencies**: Requires stable convoy movement and save system (both in flux during Week 4)
+4. **Player Testing**: Week 4 sub-grid validates fog of war gameplay before committing to texture overhaul
+5. **Incremental Quality**: Sub-grid is "good enough" for MVP; texture is "excellent" for final release
+
+#### Success Criteria
+
+- [ ] Fog unveils smoothly around convoy with no visible "steps" or blocky edges
+- [ ] Texture updates cost <1ms per frame (profiled via Unreal Insights)
+- [ ] Save/load preserves fog state with <100KB overhead per area
+- [ ] Visual quality matches AAA standards (e.g., Civilization VI, Total War series)
+- [ ] No regressions: Sub-grid functionality remains as fallback option (config toggle)
+
+#### Notes
+
+- **Fallback Strategy**: If performance issues arise, revert to sub-grid or use hybrid (low-res texture: 128×128)
+- **Art Direction**: Coordinate with art team on fog color, transition speed, and "wave" animation style
+- **Accessibility**: Ensure high contrast between explored/unexplored for colorblind players (use luminance, not hue)
+
+---
+
 ## Priority Summary
 
 ### High Priority (Week 4)
@@ -640,13 +800,21 @@ After implementing fix:
 4. **Issue #3**: Level Loading Order - Low severity, documentation task
    - Estimated: 30 min (standardize existing widgets)
 
+### Future Enhancements (Week 6+ / Polish Phase)
+
+5. **Enhancement #5**: Dynamic Texture-Based Fog of War - High visual impact, low urgency
+   - Estimated: 5-8 days (full implementation + testing)
+   - Requires: Task 4.2 completion (sub-grid baseline)
+   - Benefits: Smooth fog transitions, 1,820× resolution increase, cinematic effects
+
 ---
 
 ## Document History
 
-| Date       | Change                                        | Author       |
-| ---------- | --------------------------------------------- | ------------ |
-| 2025-11-23 | Initial backlog extraction from 0003-tasks.md | AI Assistant |
+| Date       | Change                                                 | Author       |
+| ---------- | ------------------------------------------------------ | ------------ |
+| 2025-11-23 | Initial backlog extraction from 0003-tasks.md          | AI Assistant |
+| 2025-11-26 | Added Enhancement #5: Dynamic Texture-Based Fog of War | AI Assistant |
 
 ---
 

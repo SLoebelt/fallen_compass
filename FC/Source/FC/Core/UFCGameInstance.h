@@ -40,6 +40,53 @@ struct FFCGameStateData
 };
 
 /**
+ * FFCExpeditionPlanningState
+ *
+ * Runtime state for expedition planning (non-DataTable).
+ * Stores player's current area and start point selections for the map UI.
+ * Persists across UI open/close to support interrupted planning sessions.
+ */
+USTRUCT(BlueprintType)
+struct FFCExpeditionPlanningState
+{
+    GENERATED_BODY()
+
+    /** Currently selected area ID */
+    UPROPERTY(BlueprintReadWrite, Category = "Planning")
+    FName SelectedAreaID;
+
+    /** Currently selected start point ID */
+    UPROPERTY(BlueprintReadWrite, Category = "Planning")
+    FName SelectedStartPointID;
+
+    /** True if player ESC'd from planning widget (resume planning on next open) */
+    UPROPERTY(BlueprintReadWrite, Category = "Planning")
+    bool bPlanningInProgress;
+
+    /** Default constructor */
+    FFCExpeditionPlanningState()
+        : SelectedAreaID(NAME_None)
+        , SelectedStartPointID(NAME_None)
+        , bPlanningInProgress(false)
+    {
+    }
+
+    /** Clear all selections */
+    void ClearSelection()
+    {
+        SelectedAreaID = NAME_None;
+        SelectedStartPointID = NAME_None;
+        bPlanningInProgress = false;
+    }
+
+    /** Check if state is valid (both area and start point selected) */
+    bool IsValid() const
+    {
+        return SelectedAreaID != NAME_None && SelectedStartPointID != NAME_None;
+    }
+};
+
+/**
  * UFCGameInstance centralizes long-lived expedition context per GDD §3.1.
  * Fields are placeholders for Week 1; they become real once meta-systems land.
  */
@@ -119,6 +166,10 @@ class FC_API UFCGameInstance : public UGameInstance
     UPROPERTY(BlueprintReadOnly, Category = "Game State")
     FFCGameStateData GameStateData;
 
+    /** Current expedition planning state (Week 4 feature) */
+    UPROPERTY(BlueprintReadOnly, Category = "Game State")
+    FFCExpeditionPlanningState CurrentPlanningState;
+
     /** Current supplies available for expeditions (Week 2 feature) - DEPRECATED: Use GameStateData.Supplies */
     UPROPERTY(BlueprintReadOnly, Category = "Resources")
     int32 CurrentSupplies = 100;
@@ -179,6 +230,22 @@ class FC_API UFCGameInstance : public UGameInstance
     /** Check if we're currently restoring from a save game */
     UFUNCTION(BlueprintPure, Category = "SaveGame")
     bool IsRestoringSaveGame() const { return PendingLoadData != nullptr; }
+
+    /** Save current planning state (called by WBP_WorldMap when selections change) */
+    UFUNCTION(BlueprintCallable, Category = "Expedition Planning")
+    void SavePlanningState(FName AreaID, FName StartPointID);
+
+    /** Load current planning state (called by WBP_WorldMap on open) */
+    UFUNCTION(BlueprintPure, Category = "Expedition Planning")
+    FFCExpeditionPlanningState LoadPlanningState() const { return CurrentPlanningState; }
+
+    /** Clear planning state (called after expedition starts) */
+    UFUNCTION(BlueprintCallable, Category = "Expedition Planning")
+    void ClearPlanningState();
+
+    /** Get World Map Manager subsystem (convenience accessor) */
+    UFUNCTION(BlueprintPure, Category = "Expedition Planning")
+    class UFCWorldMapManager* GetWorldMapManager() const;
 
     /** Called when a level finishes loading - triggers fade-in if transition is active */
     void OnPostLoadMapWithWorld(UWorld* LoadedWorld);
