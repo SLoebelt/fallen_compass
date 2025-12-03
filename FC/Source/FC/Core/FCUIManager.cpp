@@ -526,3 +526,59 @@ UUserWidget* UFCUIManager::ShowOverworldMapHUD(APlayerController* OwningPlayer)
 	UE_LOG(LogFCUIManager, Log, TEXT("ShowOverworldMapHUD: Created and added Overworld map HUD"));
 	return MapWidget;
 }
+
+UUserWidget* UFCUIManager::ShowExpeditionSummary(APlayerController* OwningPlayer)
+{
+	if (!OwningPlayer)
+	{
+		UE_LOG(LogFCUIManager, Error, TEXT("ShowExpeditionSummary: OwningPlayer is null"));
+		return nullptr;
+	}
+
+	if (!ExpeditionSummaryWidgetClass)
+	{
+		UE_LOG(LogFCUIManager, Error, TEXT("ShowExpeditionSummary: ExpeditionSummaryWidgetClass not configured on UIManager"));
+		return nullptr;
+	}
+
+	// Close any existing summary widget first.
+	if (ExpeditionSummaryWidget)
+	{
+		UE_LOG(LogFCUIManager, Log, TEXT("ShowExpeditionSummary: Closing existing expedition summary widget"));
+		ExpeditionSummaryWidget->RemoveFromParent();
+		ExpeditionSummaryWidget = nullptr;
+	}
+
+	UUserWidget* Summary = CreateWidget<UUserWidget>(OwningPlayer, ExpeditionSummaryWidgetClass);
+	if (!Summary)
+	{
+		UE_LOG(LogFCUIManager, Error, TEXT("ShowExpeditionSummary: CreateWidget returned null"));
+		return nullptr;
+	}
+
+	Summary->AddToViewport();
+	ExpeditionSummaryWidget = Summary;
+	FocusedBlockingWidget = Summary;
+
+	UE_LOG(LogFCUIManager, Log, TEXT("ShowExpeditionSummary: Created and added expedition summary widget"));
+	return Summary;
+}
+
+void UFCUIManager::CloseExpeditionSummary()
+{
+	if (!ExpeditionSummaryWidget)
+	{
+		UE_LOG(LogFCUIManager, Warning, TEXT("CloseExpeditionSummary: No expedition summary widget currently open"));
+		return;
+	}
+
+	ExpeditionSummaryWidget->RemoveFromParent();
+	UE_LOG(LogFCUIManager, Log, TEXT("CloseExpeditionSummary: Removed expedition summary widget from viewport"));
+
+	if (FocusedBlockingWidget == ExpeditionSummaryWidget)
+	{
+		FocusedBlockingWidget = nullptr;
+	}
+
+	ExpeditionSummaryWidget = nullptr;
+}

@@ -45,6 +45,7 @@ void UFCGameInstance::Init()
         UIManager->ActionSelectionWidgetClass = ActionSelectionWidgetClass;
         UIManager->TableWidgetMap = TableWidgetMap;
         UIManager->OverworldMapHUDWidgetClass = OverworldMapHUDWidgetClass;
+        UIManager->ExpeditionSummaryWidgetClass = ExpeditionSummaryWidgetClass;
         UE_LOG(LogTemp, Log, TEXT("UFCGameInstance: UIManager configured with widget classes"));
     }
     else

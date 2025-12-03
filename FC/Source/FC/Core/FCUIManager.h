@@ -37,6 +37,10 @@ public:
 	UPROPERTY()
 	TSubclassOf<UUserWidget> OverworldMapHUDWidgetClass;
 
+	/** Expedition summary widget class (configured by GameInstance, usually WBP_ExpeditionSummary). */
+	UPROPERTY()
+	TSubclassOf<UUserWidget> ExpeditionSummaryWidgetClass;
+
 	// Widget class registry: TableObjectClass → WidgetClass (configured from GameInstance)
 	UPROPERTY()
 	TMap<TSubclassOf<AActor>, TSubclassOf<UUserWidget>> TableWidgetMap;
@@ -54,6 +58,10 @@ public:
 	
 	UPROPERTY()
 	TObjectPtr<UUserWidget> PauseMenuWidget;
+
+	/** Currently displayed expedition summary widget (if any). */
+	UPROPERTY()
+	TObjectPtr<UUserWidget> ExpeditionSummaryWidget;
 
 	/** Optional focused UI widget that should block world interaction (e.g., expedition planning, overworld map). */
 	UPROPERTY(BlueprintReadWrite, Category = "UI|Focus")
@@ -132,6 +140,13 @@ public:
 	// Overworld HUD: view-only world map (Week 4)
 	UFUNCTION(BlueprintCallable, Category = "UI|Overworld")
 	UUserWidget* ShowOverworldMapHUD(APlayerController* OwningPlayer);
+
+	UFUNCTION(BlueprintCallable, Category = "UI|Summary")
+	void CloseExpeditionSummary();
+
+	// Expedition summary: blocking summary screen shown in Office after Overworld.
+	UFUNCTION(BlueprintCallable, Category = "UI|Summary")
+	UUserWidget* ShowExpeditionSummary(APlayerController* OwningPlayer);
 
 	// Button callback methods (called from Blueprint widgets)
 	UFUNCTION(BlueprintCallable, Category = "UI")

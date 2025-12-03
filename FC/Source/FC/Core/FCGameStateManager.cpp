@@ -4,6 +4,7 @@
 #include "Engine/World.h"
 
 DEFINE_LOG_CATEGORY(LogFCGameState);
+DEFINE_LOG_CATEGORY(LogFCLevelTransitionManager);
 
 void UFCGameStateManager::Initialize(FSubsystemCollectionBase& Collection)
 {
@@ -12,6 +13,7 @@ void UFCGameStateManager::Initialize(FSubsystemCollectionBase& Collection)
 	// Initialize to None state
 	CurrentState = EFCGameStateID::None;
 	PreviousState = EFCGameStateID::None;
+	LoadingTargetState = EFCGameStateID::None;
 
 	// Initialize valid state transitions
 	InitializeValidTransitions();
@@ -48,9 +50,17 @@ void UFCGameStateManager::InitializeValidTransitions()
 	// Overworld_Travel transitions
 	ValidTransitions.Add(EFCGameStateID::Overworld_Travel, {
 		EFCGameStateID::Combat_PlayerTurn,
-		EFCGameStateID::Office_Exploration,
+		EFCGameStateID::Combat_EnemyTurn,
 		EFCGameStateID::Paused,
-		EFCGameStateID::Loading
+		EFCGameStateID::Loading,
+		EFCGameStateID::ExpeditionSummary
+	});
+
+	// ExpeditionSummary transitions (summary screen shown in Office)
+	ValidTransitions.Add(EFCGameStateID::ExpeditionSummary, {
+		EFCGameStateID::Office_Exploration,
+		EFCGameStateID::Office_TableView,
+		EFCGameStateID::Paused
 	});
 
 	// Combat_PlayerTurn transitions
@@ -74,6 +84,7 @@ void UFCGameStateManager::InitializeValidTransitions()
 		EFCGameStateID::Overworld_Travel,
 		EFCGameStateID::Combat_PlayerTurn,
 		EFCGameStateID::Combat_EnemyTurn,
+		EFCGameStateID::ExpeditionSummary,
 		EFCGameStateID::Loading
 	});
 
@@ -82,7 +93,8 @@ void UFCGameStateManager::InitializeValidTransitions()
 		EFCGameStateID::MainMenu,
 		EFCGameStateID::Office_Exploration,
 		EFCGameStateID::Overworld_Travel,
-		EFCGameStateID::Combat_PlayerTurn
+		EFCGameStateID::Combat_PlayerTurn,
+		EFCGameStateID::ExpeditionSummary
 	});
 
 	// None transitions (initial state, can go anywhere)
@@ -149,6 +161,38 @@ bool UFCGameStateManager::TransitionTo(EFCGameStateID NewState)
 	// Broadcast state change event
 	OnStateChanged.Broadcast(OldState, NewState);
 
+	return true;
+}
+
+bool UFCGameStateManager::TransitionViaLoading(EFCGameStateID TargetState)
+{
+	// Helper for flows that should end in TargetState after a loading hop.
+	// Pattern: Current -> Loading (level load) -> TargetState, without MainMenu overriding.
+	LoadingTargetState = TargetState;
+
+	// First, transition into Loading if we're not already there.
+	if (CurrentState != EFCGameStateID::Loading)
+	{
+		if (!CanTransitionTo(EFCGameStateID::Loading))
+		{
+			UE_LOG(LogFCGameState, Error, TEXT("TransitionViaLoading: Cannot transition from %s to Loading"),
+				*UEnum::GetValueAsString(CurrentState));
+			return false;
+		}
+
+		EFCGameStateID OldState = CurrentState;
+		PreviousState = CurrentState;
+		CurrentState = EFCGameStateID::Loading;
+
+		UE_LOG(LogFCGameState, Log, TEXT("State transition (via loading): %s -> Loading (target: %s)"),
+			*UEnum::GetValueAsString(OldState),
+			*UEnum::GetValueAsString(TargetState));
+
+		OnStateChanged.Broadcast(OldState, EFCGameStateID::Loading);
+	}
+
+	// After external systems finish loading the desired level, they should call TransitionTo(TargetState).
+	// We do not perform the final hop automatically here to keep level-loading responsibilities outside the manager.
 	return true;
 }
 

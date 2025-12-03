@@ -13,6 +13,7 @@
 #include "Core/FCGameStateManager.h"
 #include "Core/FCLevelManager.h"
 #include "Core/FCPlayerController.h"
+#include "Core/FCLevelTransitionManager.h"
 #include "Expedition/FCExpeditionManager.h"
 #include "Kismet/GameplayStatics.h"
 
@@ -150,10 +151,12 @@ void UFCExpeditionPlanningWidget::OnStartExpeditionClicked()
         ExpeditionManager->OnExpeditionStateChanged.Broadcast(CurrentExpedition);
     }
 
-    UFCGameStateManager* GameStateManager = GameInstance->GetSubsystem<UFCGameStateManager>();
-    if (!GameStateManager)
+    // Delegate the actual state/level transition to UFCLevelTransitionManager so
+    // that all complex flows live in one place.
+    UFCLevelTransitionManager* TransitionManager = GameInstance->GetSubsystem<UFCLevelTransitionManager>();
+    if (!TransitionManager)
     {
-        const FString Reason = TEXT("Cannot start expedition: GameStateManager subsystem missing");
+        const FString Reason = TEXT("Cannot start expedition: LevelTransitionManager subsystem missing");
         UE_LOG(LogTemp, Error, TEXT("OnStartExpeditionClicked: %s"), *Reason);
         if (GEngine)
         {
@@ -162,34 +165,7 @@ void UFCExpeditionPlanningWidget::OnStartExpeditionClicked()
         return;
     }
 
-    if (!GameStateManager->TransitionTo(EFCGameStateID::Overworld_Travel))
-    {
-        const FString Reason = TEXT("Cannot start expedition: Game state transition to Overworld_Travel failed");
-        UE_LOG(LogTemp, Error, TEXT("OnStartExpeditionClicked: %s"), *Reason);
-        if (GEngine)
-        {
-            GEngine->AddOnScreenDebugMessage(-1, 3.0f, FColor::Red, Reason);
-        }
-        return;
-    }
-
-    UFCLevelManager* LevelManager = GameInstance->GetSubsystem<UFCLevelManager>();
-    if (!LevelManager)
-    {
-        const FString Reason = TEXT("Cannot start expedition: LevelManager subsystem missing");
-        UE_LOG(LogTemp, Error, TEXT("OnStartExpeditionClicked: %s"), *Reason);
-        if (GEngine)
-        {
-            GEngine->AddOnScreenDebugMessage(-1, 3.0f, FColor::Red, Reason);
-        }
-        return;
-    }
-
-    // TODO: Make overworld level configurable; for Week 4 we use a hard-coded demo map name.
-    const FName OverworldLevelName(TEXT("L_Overworld"));
-    LevelManager->LoadLevel(OverworldLevelName, /*bShowLoadingScreen*/ false);
-
-    UE_LOG(LogTemp, Log, TEXT("OnStartExpeditionClicked: Expedition started, loading overworld level %s"), *OverworldLevelName.ToString());
+    TransitionManager->StartExpeditionFromOfficeTableView();
 
     RemoveFromParent();
 }

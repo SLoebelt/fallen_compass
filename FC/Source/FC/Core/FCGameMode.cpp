@@ -5,6 +5,7 @@
 #include "FCPlayerController.h"
 #include "Engine/Engine.h"
 #include "Engine/World.h"
+#include "Core/FCLevelTransitionManager.h"
 
 DEFINE_LOG_CATEGORY(LogFallenCompassGameMode);
 
@@ -42,4 +43,14 @@ void AFCGameMode::BeginPlay()
 		const FString DebugLine = FString::Printf(TEXT("AFCGameMode active | Pawn=%s | Controller=%s | Level=%s"), *PawnName, *ControllerName, *MapName);
 		GEngine->AddOnScreenDebugMessage(-1, 4.f, FColor::Green, DebugLine);
 	}
+
+    // Notify LevelTransitionManager so it can complete any pending
+    // TransitionViaLoading() flows (e.g., Overworld -> Office -> ExpeditionSummary).
+    if (UGameInstance* GI = GetGameInstance())
+    {
+        if (UFCLevelTransitionManager* TransitionMgr = GI->GetSubsystem<UFCLevelTransitionManager>())
+        {
+            TransitionMgr->InitializeLevelTransitionOnLevelStart();
+        }
+    }
 }

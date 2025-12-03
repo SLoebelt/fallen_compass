@@ -131,24 +131,13 @@ _Goal: Drive the new 16×16 planning map by wiring the UMG widget to UFCExpediti
   - [x] **Note**: For milestone, you can hardcode single start point; later add radio buttons for 3 start points per area
 
 - [ ] **Route Preview Controls**
-
-  - [ ] Add **Button**: `Button_PreviewRoute` with text "Preview Route"
-  - [ ] Position: Near start point panel or top bar
-  - [ ] Add **Button**: `Button_StopPreview` with text "Stop Preview"
-  - [ ] Set Visibility: `Collapsed` (show when preview running)
+  - (moved) See **Clustered Remaining Tasks** section below for Route & UX cluster.
 
 - [ ] **Resource Display (Top Bar)**
-
-  - [ ] Add **Horizontal Box**: `Panel_Resources` at top of screen
-  - [ ] Add **Text Block**: `Text_PlayerMoney` (format: "Gold: {Money}")
-  - [ ] Add **Text Block**: `Text_PlayerSupplies` (format: "Supplies: {Supplies}")
-  - [ ] Set font size: 18-24, bold
-  - [ ] **Purpose**: Show if player can afford selected route
+  - (moved) See **Clustered Remaining Tasks** section below for Route & UX cluster.
 
 - [ ] **Close Button**
-  - [ ] Add **Button**: `Button_Close` in top-right corner
-  - [ ] Add **Text Block** child: "X" or "Close"
-  - [ ] Will call cleanup and close widget
+  - (moved) See **Clustered Remaining Tasks** section below for Route & UX cluster.
 
 #### Step 4.2.2: Wire Event Graph - Subsystem Connection & Initialization
 
@@ -231,12 +220,7 @@ _Goal: Drive the new 16×16 planning map by wiring the UMG widget to UFCExpediti
       - [x] Keep `Panel_StartPointSelection` collapsed (no selection yet)
 
 - [ ] **Event Construct - Resource Display Update**
-  - [ ] Add node: `Get Game Instance → Cast to UFCGameInstance`
-  - [ ] Get `GameStateData` (assuming you have `FFCGameStateData` struct with Money/Supplies)
-  - [ ] Format string: "Gold: {0}" with `GameStateData.Money`
-  - [ ] Set `Text_PlayerMoney → Set Text`
-  - [ ] Format string: "Supplies: {0}" with `GameStateData.Supplies`
-  - [ ] Set `Text_PlayerSupplies → Set Text`
+  - (moved) See **Clustered Remaining Tasks** section below for Route & UX cluster.
 
 #### Step 4.2.3: Create M_FogOfWar Material (Fog Visualization)
 
@@ -350,25 +334,10 @@ _Goal: Drive the new 16×16 planning map by wiring the UMG widget to UFCExpediti
       - [x] Keep `Panel_StartPointSelection` collapsed
 
 - [ ] **Button_StartExpedition → OnClicked Event**
-
-  - [ ] Add node: `ExpeditionManager → GetCurrentExpedition`
-  - [ ] **Branch**: Validate `PlannedRouteGlobalIds.Num() > 0` AND resources sufficient
-    - [ ] **True Path**:
-      - [ ] Add node: `UFCGameInstance → DeductResources` (custom function to subtract Money/Supplies)
-        - [ ] Amount: `PlannedMoneyCost`
-      - [ ] Add node: `Get Game Instance → UFCGameStateManager → TransitionTo`
-        - [ ] New State: `Overworld_Travel` (or appropriate enum)
-      - [ ] Add node: `UFCLevelManager → LoadLevel`
-        - [ ] Level Name: Get from expedition data (e.g., "L_Overworld_Forest")
-      - [ ] Add node: `Remove from Parent` (close widget)
-      - [ ] Add node: `Print String` → "Expedition started!" (green)
-    - [ ] **False Path**:
-      - [ ] Add node: `Print String` → "ERROR: Cannot start expedition (invalid route or insufficient resources)" (red)
+  - (moved) See **Clustered Remaining Tasks** section below for Start-Expedition cluster.
 
 - [ ] **Button_Close → OnClicked Event**
-  - [ ] Add node: `ExpeditionManager → WorldMap_ClearRoutePreview()` (cleanup)
-  - [ ] Add node: `Remove from Parent`
-  - [ ] **Note**: Planning state persists in UFCExpeditionManager subsystem
+  - (moved) See **Clustered Remaining Tasks** section below for Route & UX cluster.
 
 #### Step 4.2.6: Implement Fog of War Refresh (Delegate Binding)
 
@@ -515,59 +484,7 @@ _Goal: Drive the new 16×16 planning map by wiring the UMG widget to UFCExpediti
   - [x] Stop PIE
 
 #### Step 4.2.9: Feed Overworld Exploration Updates (Convoy Integration)
-
-- [ ] **Locate Overworld Convoy Pawn**
-
-  - [ ] Navigate to `Content/FC/Blueprints/Overworld/` (or similar)
-  - [ ] Open `BP_ConvoyPawn` (or `BP_PlayerOverworld`, or your convoy actor)
-  - [ ] Switch to **Event Graph**
-
-- [ ] **Create Variable: CachedExpeditionManager**
-
-  - [ ] Add variable: `CachedExpeditionManager` (Type: `UFCExpeditionManager`, Object Reference)
-  - [ ] Set Instance Editable: false
-  - [ ] Tooltip: "Cached subsystem reference for performance"
-
-- [ ] **Event BeginPlay - Cache Subsystem**
-
-  - [ ] Find `Event BeginPlay` node
-  - [ ] Add node: `Get Game Instance → Cast to UFCGameInstance`
-  - [ ] Add node: `Get Subsystem` (Class: `UFCExpeditionManager`)
-  - [ ] Set `CachedExpeditionManager` variable
-  - [ ] **Branch**: Check if valid
-    - [ ] **True**: Print "Convoy: Expedition Manager connected"
-    - [ ] **False**: Print "ERROR: Convoy failed to get Expedition Manager" (red)
-
-- [ ] **Event Tick - Record Exploration**
-
-  - [ ] Find `Event Tick` node (or create if doesn't exist)
-  - [ ] **Optimization Gate**: Add `DoOnce` or timer (optional, for reducing frequency)
-    - [ ] If you want to throttle updates, add `Delay` node (0.1-0.5 seconds) or check distance moved
-  - [ ] **Validation Branch**: Check all conditions:
-    - [ ] `CachedExpeditionManager` Is Valid
-    - [ ] AND `CachedExpeditionManager → IsExpeditionActive()` (returns bool)
-    - [ ] AND Current Level Name contains "Overworld" (use `Get Current Level Name` → `Contains`)
-  - [ ] **True Path**:
-    - [ ] Add node: `Get Actor Location` (returns FVector world position)
-    - [ ] Add node: `CachedExpeditionManager → WorldMap_RecordVisitedWorldLocation`
-      - [ ] WorldLocation: Connected to `Get Actor Location`
-    - [ ] **Optional Debug**: Add `Print String` → "Recording exploration at {location}" (very verbose, comment out for release)
-
-- [ ] **Throttling Optimization (Optional but Recommended)**
-
-  - [ ] Create variable: `LastRecordedGlobalCell` (Type: `int32`, default: -1)
-  - [ ] Before calling `WorldMap_RecordVisitedWorldLocation`:
-    - [ ] Add node: `CachedExpeditionManager → WorldLocationToGlobalCell` (helper function, if exists)
-      - [ ] If not exists: Calculate manually: `Floor(WorldLocation.X / CellSize) + Floor(WorldLocation.Y / CellSize) * 16`
-    - [ ] **Branch**: Check if `CurrentGlobalCell != LastRecordedGlobalCell`
-      - [ ] **True**: Call `WorldMap_RecordVisitedWorldLocation`, set `LastRecordedGlobalCell = CurrentGlobalCell`
-      - [ ] **False**: Skip (already recorded this cell)
-  - [ ] **Purpose**: Avoid calling subsystem hundreds of times per second in same cell
-
-- [ ] **Event EndPlay - Cleanup**
-  - [ ] Add `Event EndPlay` node
-  - [ ] Set `CachedExpeditionManager` = None (clear reference)
-  - [ ] **Optional**: Call `ClearTimer` if you used timer-based throttling
+  - (moved) See **Clustered Remaining Tasks** section below for Convoy integration cluster.
 
 ---
 
@@ -800,17 +717,190 @@ _Goal: Allow the player to successfully return from the Overworld to the Office.
 
 #### Step 4.3.3: Transition Logic
 
-- [ ] **Introduce `EFCGameStateID::ExpeditionSummary` and wire transitions**
-  - [ ] In `EFCGameStateID` (GameStateManager), add a new value `ExpeditionSummary`.
-  - [ ] Ensure `UFCGameStateManager::TransitionTo` only allows `ExpeditionSummary` when the current level is `L_Office` and the previous state was `Paused` or `Overworld_Travel`.
-  - [ ] In `AFCPlayerController::ApplyInputAndCameraModeForState`, add handling for `ExpeditionSummary`:
-    - [ ] Set camera to TableView (same camera mode used for map/desk widgets).
-    - [ ] Set input mode to Game and UI; apply the static scene input mapping context (IMC for table/static scene).
-  - [ ] Update the return flow from Overworld so that, after loading `L_Office`, the game transitions into `ExpeditionSummary` instead of directly into `Office_Exploration` and shows `WBP_ExpeditionSummary`.
-  - [ ] Implement ESC handling (and optional "Close Summary" button) so that both:
-    - [ ] Transition from `ExpeditionSummary` back to `Office_Exploration`.
-    - [ ] Restore first-person camera/input in office (no cursor, default office IMC).
+- [x] **Introduce `EFCGameStateID::ExpeditionSummary` and wire basic transitions**
+  - [x] In `EFCGameStateID` (GameStateManager), add a new value `ExpeditionSummary`.
+  - [x] Extend `ValidTransitions` so that:
+    - [x] `Overworld_Travel` can transition to `ExpeditionSummary` and `Paused`.
+    - [x] `ExpeditionSummary` can transition back to `Office_Exploration` and `Paused`.
+    - [x] `Paused` can resume back to `ExpeditionSummary`.
+- [x] **Support Loading hops for summary-related transitions**
+  - [x] Add helper `UFCGameStateManager::TransitionViaLoading(EFCGameStateID TargetState)` to support flows that go through `Loading` without losing the intended target state.
+- [x] **Controller handling for `ExpeditionSummary`**
+  - [x] In `AFCPlayerController::OnGameStateChanged`, handle `ExpeditionSummary` by:
+    - [x] Setting input mode to the static-scene mapping (`EFCInputMappingMode::StaticScene`).
+    - [ ] (Future) Applying a dedicated table-view camera blend helper once 4.1.1 is implemented.
+- [x] **ESC / Close behaviour for `ExpeditionSummary`**
+  - [x] Replace `HandleReturnToOfficeClicked` with a `CloseSummary()` function on `UFCExpeditionSummaryWidget` that delegates to `UFCLevelTransitionManager::CloseExpeditionSummaryAndReturnToOffice()`.
+  - [x] Implement `UFCLevelTransitionManager::CloseExpeditionSummaryAndReturnToOffice()` so it:
+    - [x] Validates current state (logs if not `ExpeditionSummary`).
+    - [x] Transitions back to `Office_Exploration` and lets `AFCPlayerController::OnGameStateChanged` restore office camera/input.
+  - [x] Extend ESC handling in `AFCPlayerController::HandlePausePressed` so that pressing ESC while in `ExpeditionSummary` calls `CloseExpeditionSummaryAndReturnToOffice()` instead of toggling pause.
+
+- [ ] **Overworld → Office → ExpeditionSummary flow (final wiring)**
+  - [x] Implement `UFCLevelTransitionManager::ReturnFromOverworldToOfficeWithSummary()` to:
+    - [x] Validate current state is `Overworld_Travel`.
+    - [x] Call `TransitionViaLoading(EFCGameStateID::ExpeditionSummary)`.
+    - [x] Trigger fade-out and load `L_Office` via `UFCLevelManager`.
+  - [ ] Implement `UFCLevelTransitionManager::InitializeLevelTransitionOnLevelStart()` and call it from Office level startup so that when entering `L_Office` with a pending `ExpeditionSummary` target it:
+    - [ ] Transitions the game state into `ExpeditionSummary`.
+    - [ ] Asks `UFCUIManager` to show the expedition summary widget.
+  - [ ] Add `UFCUIManager::ShowExpeditionSummary()` as a helper that spawns `WBP_ExpeditionSummary` and passes current expedition result data into it.
   - [ ] **Verify**: Summary is only ever shown in Office, fully blocks world interaction while open, and both ESC and the close button reliably return to normal office gameplay.
+
+---
+
+### Step 4.6: Centralize Level & State Transitions (FCLevelTransitionManager)
+
+_Goal: Move all complex "state + level + UI" transitions into `UFCLevelTransitionManager`, removing ad-hoc logic from widgets and the player controller, and ensuring old code paths are cleaned up._
+
+- [x] **4.6.1: Define Responsibilities & API of `UFCLevelTransitionManager`**
+  - [x] Open `Source/FC/Core/FCLevelTransitionManager.h/.cpp`.
+  - [x] Define `UFCLevelTransitionManager` as a `UGameInstanceSubsystem` that coordinates:
+    - [x] Game state changes (`UFCGameStateManager`).
+    - [x] Level loads (`UFCLevelManager` / `UGameplayStatics::OpenLevel`).
+    - [x] Screen fades / transitions (`UFCTransitionManager`).
+    - [x] High-level UI screen entry points (`UFCUIManager`, e.g. pause, main menu, expedition summary).
+  - [x] Expose a clear, minimal C++ API for flows used in Week 4:
+    - [x] `void StartExpeditionFromOfficeTableView();` (Office_TableView  Overworld_Travel).
+    - [x] `void ReturnToMainMenuFromGameplay();` (any gameplay/overworld  Main Menu in Office).
+    - [x] `void ReturnFromOverworldToOfficeWithSummary();` (Overworld_Travel  ExpeditionSummary in Office).
+  - [x] Document these responsibilities in a short comment block in the header and add a reminder that **old transition code in other classes must be removed when moved here**.
+
+- [x] **4.6.2: Refactor Start Expedition Flow to use `UFCLevelTransitionManager`**
+  - [x] Open `Source/FC/UI/FCExpeditionPlanningWidget.cpp` and locate the existing `OnStartExpeditionClicked` implementation.
+  - [x] Replace its direct calls to `UFCGameStateManager::TransitionTo(Overworld_Travel)` and `UFCLevelManager::LoadLevel` / custom fade logic with a single call to `UFCLevelTransitionManager::StartExpeditionFromOfficeTableView()`.
+  - [x] In `StartExpeditionFromOfficeTableView()`:
+    - [x] Validate the current game state is `Office_TableView` and that the planned expedition data is valid (via `UFCExpeditionManager`).
+    - [x] Call `UFCGameStateManager::TransitionViaLoading(EFCGameStateID::Overworld_Travel)`.
+    - [x] Trigger fade-out using `UFCTransitionManager`.
+    - [x] Use `UFCLevelManager` (or `OpenLevel`) to load the overworld map level defined by the expedition data.
+  - [x] **Remove** any now-duplicated or obsolete level/state transition code from `FCExpeditionPlanningWidget.cpp` to avoid two competing implementations.
+
+- [x] **4.6.3: Refactor "Return to Main Menu" to use `UFCLevelTransitionManager`**
+  - [x] Inspect `AFCPlayerController::ReturnToMainMenu` in `Source/FC/Core/FCPlayerController.cpp`.
+  - [x] Introduce a new method `UFCLevelTransitionManager::ReturnToMainMenuFromGameplay()` that:
+    - [x] Uses `UFCGameStateManager::TransitionViaLoading(EFCGameStateID::MainMenu)` or the appropriate menu state.
+    - [x] Hides the pause menu via `UFCUIManager` if necessary.
+    - [x] Starts a fade-out via `UFCTransitionManager`.
+    - [x] Loads `L_Office` (main menu lives in the office map).
+  - [x] Change call sites (e.g. pause menu button logic, controller helper) to call `ReturnToMainMenuFromGameplay()` instead of implementing their own fade + `OpenLevel("L_Office")` sequence.
+  - [x] **Remove** the direct `UGameplayStatics::OpenLevel(this, FName(TEXT("L_Office")))` call from `AFCPlayerController::ReturnToMainMenu` once the new flow is verified.
+
+- [x] **4.6.4: Implement Overworld  Office + Expedition Summary via `UFCLevelTransitionManager` (first stage)**
+  - [x] Add `ReturnFromOverworldToOfficeWithSummary()` to `UFCLevelTransitionManager`.
+  - [x] In this method:
+    - [x] Require that the current game state is `Overworld_Travel`.
+    - [x] Use `UFCGameStateManager::TransitionViaLoading(EFCGameStateID::ExpeditionSummary)` to enter a `Loading` hop destined for the summary state.
+    - [x] Trigger fade-out via `UFCTransitionManager`.
+    - [x] Use `UFCLevelManager` to load `L_Office` (or `OfficeMap` from `UFCGameInstance` data).
+  - [ ] Wire Office-level startup (see new 4.6.5) so that after `L_Office` is loaded, the state moves into `ExpeditionSummary` and shows the summary widget.
+  - [ ] Update `BP_ExtractionPoint` (or its interaction handler) so it calls only this function (`ReturnFromOverworldToOfficeWithSummary()`) instead of making any direct state/level/UI calls itself.
+
+- [x] **4.6.5: Initialize Level Transitions on Level Start**
+  - [x] Add `InitializeLevelTransitionOnLevelStart()` to `UFCLevelTransitionManager`.
+  - [x] Call it from level startup logic (e.g. Office Level Blueprint, Office GameMode BeginPlay, and any other core levels).
+  - [ ] In this function:
+    [x] Read current `EFCGameStateID` from `UFCGameStateManager` and the current map name.
+    [x] If current map is `L_Office` and the last hop used `TransitionViaLoading(ExpeditionSummary)`, transition into `ExpeditionSummary` and call `UFCUIManager::ShowExpeditionSummary()`.
+    [ ] If current map is `L_Office` and state is `MainMenu` at PIE start, call into `FCPlayerController` / `UFCUIManager` to initialize the main menu flow (camera to menu, show main menu widget).
+    [ ] Add additional cases for other level setups in the existing game flow as they are migrated (e.g. direct Office_Exploration start, Overworld-only test maps).
+
+- [x] **4.6.6: Hook Summary Widget & ESC Behaviour into the Centralized Flow (remaining pieces)**
+  - [x] Extend `UFCUIManager` with a helper like `ShowExpeditionSummary(APlayerController* OwningPlayer)` that:
+    - [x] Spawns `WBP_ExpeditionSummary` (parent `UFCExpeditionSummaryWidget`).
+    - [ ] Optionally pulls the latest expedition result data from `UFCExpeditionManager` and forwards it into the widget via a Blueprint-exposed function or `BlueprintImplementableEvent`.
+  - [x] Ensure `AFCPlayerController::OnGameStateChanged` for `EFCGameStateID::ExpeditionSummary` remains responsible only for camera/input (table-view camera + static-scene IMC), while `UFCLevelTransitionManager` / `UFCUIManager` handle widget creation.
+  - [ ] Note: post-summary target state (`Office_TableView` vs `Office_Exploration`) may still be refined in a later table-view refactor.
+
+- [ ] **4.6.7: Cleanup & Remove Old Transition Code**
+  - [ ] Search the codebase for any remaining ad-hoc sequences that combine:
+    - [ ] `OpenLevel("L_Office")` / direct level name strings.
+    - [ ] Manual `GameStateManager->TransitionTo(...)` around level loads.
+    - [ ] Direct fade calls in widgets or controller that duplicate `UFCTransitionManager` responsibilities.
+  - [ ] For each such site, either:
+    - [ ] Replace it with a call into `UFCLevelTransitionManager`.
+    - [ ] Or explicitly document why it remains a special case.
+  - [ ] Remove dead/obsolete code paths once the new centralized flows are validated (to prevent future regressions and ensure only one implementation of each transition exists).
+
+---
+
+### Step 4.7: Align Core Managers & Introduce Reusable Transition Pattern
+
+_Goal: Restore explicit game state transitions for Office table view and unify how state, level, UI, and camera/input transitions are coordinated across core managers (GameInstance, GameStateManager, LevelManager, TransitionManager, UIManager, LevelTransitionManager, PlayerController)._
+
+- [x] **4.7.1: Document Desired Transition Responsibilities**
+  - [x] **Design**:
+    - [x] In `Docs/Technical_Documentation.md`, add a short “Transition Responsibilities” section that states:
+      - [x] `UFCGameStateManager`: pure game state machine and validated transitions (no level or UI knowledge).
+      - [x] `UFCLevelManager`: level identity, metadata, and low-level level loading (`LoadLevel`, `OpenLevel` call site).
+      - [x] `UFCTransitionManager`: fades and loading overlays, no game-logic decisions.
+      - [x] `UFCUIManager`: widget lifecycle and high-level screens (main menu, pause, summary, table, overworld HUD).
+      - [x] `UFCLevelTransitionManager`: orchestration of multi-step flows (state + level + fade + UI entry).
+      - [x] `AFCPlayerController` / `UFCCameraManager`: react to state changes to set camera + input modes, no direct level loads.
+  - [x] **Implementation Tasks**:
+    - [x] Add the new section to `Docs/Technical_Documentation.md` under the existing GameInstance / State / UI chapters.
+    - [ ] Cross-link from the `UFCLevelTransitionManager` and `UFCGameStateManager` sections to this responsibility overview.
+    - [ ] Add a short comment block to `FCLevelTransitionManager.h` summarizing its orchestrator role (matching the doc text).
+
+- [ ] **4.7.2: Design a Reusable Transition Helper API**
+  - [x] **Design**:
+    - [x] Specify a small API on `UFCLevelTransitionManager` such as:
+      - [x] `void RequestTransition(EFCGameStateID TargetState, FName TargetLevelName = NAME_None, bool bUseFade = true);`
+      - [x] `void EnterOfficeTableView(AActor* TableActor);`
+      - [x] `void ExitOfficeTableView();`
+      - [x] `void InitializeOnLevelStart();` (general front-end for the existing `InitializeLevelTransitionOnLevelStart` logic).
+    - [x] Define rules:
+      - [x] `RequestTransition` is the only place that combines state + level + fade; it delegates to `UFCGameStateManager`, `UFCLevelManager`, and `UFCTransitionManager`.
+      - [x] Flows that don’t change level (e.g., only camera/input) still go through LevelTransitionManager for consistency (no direct `TransitionTo` from UI/PC).
+  - [ ] **Implementation Tasks**:
+    - [x] Add these function declarations (or a subset) to `FCLevelTransitionManager.h` with TODO comments referencing Step 4.7.
+    - [x] Add stub implementations in `FCLevelTransitionManager.cpp` that log and early-return.
+    - [x] Update `Docs/Technical_Documentation.md` with a small “Transition API” diagram showing how requests flow into LevelTransitionManager.
+
+- [x] **4.7.3: Plan Table View State Flow**
+  - [x] **Design**:
+    - [x] Define the desired state transitions:
+      - [x] `Office_Exploration → Office_TableView` when interacting with the office table.
+      - [x] `Office_TableView → Office_Exploration` when closing the table (ESC with no widget open, or an explicit back action).
+    - [x] Define trigger points:
+      - [x] Entry: `AFCPlayerController::OnTableObjectClicked` calls `UFCLevelTransitionManager::EnterOfficeTableView(TableActor)`.
+      - [x] Exit: `AFCPlayerController::HandlePausePressed` calls `UFCLevelTransitionManager::ExitOfficeTableView()` instead of directly calling `TransitionTo(Office_Exploration)` + `SetCameraModeLocal`.
+    - [x] Document expected camera/input modes:
+      - [x] `Office_Exploration`: FirstPerson camera, exploration IMC.
+      - [x] `Office_TableView`: TableView camera, static-scene/input-for-UI IMC.
+      - [x] `ExpeditionSummary`: table-view camera + summary widget blocking input (just like now).
+  - [x] **Implementation Tasks**:
+    - [x] In `Docs/Technical_Documentation.md`, add a small “Office Table View Flow” subsection with a simple state diagram and the entry/exit triggers.
+    - [x] Add TODO comments in `AFCPlayerController::OnTableObjectClicked` and the table-view branch of `HandlePausePressed` pointing to `EnterOfficeTableView` / `ExitOfficeTableView` (without changing behavior yet).
+    - [x] Add stub functions `EnterOfficeTableView` / `ExitOfficeTableView` in `FCLevelTransitionManager.cpp` that currently just log and return.
+
+- [x] **4.7.4: Plan Startup & Main Menu Initialization Flow**
+  - [x] **Design**:
+    - [x] Define a unified startup path:
+      - [x] Office `BeginPlay` (via GameMode or Level BP) calls `UFCLevelTransitionManager::InitializeOnLevelStart()`.
+      - [x] `InitializeOnLevelStart()` internally:
+        - [x] If current state is `None`: transition to `MainMenu`, call a “menu setup” helper (camera to menu + show main menu widget).
+        - [x] If current state is `Loading` with target `ExpeditionSummary` and level is `L_Office`: run the existing summary path (already implemented in `InitializeLevelTransitionOnLevelStart`).
+        - [x] For other states (e.g., `Office_Exploration` loaded from save): call a helper to restore camera/input without re-showing the main menu.
+    - [x] Decide whether `AFCPlayerController::InitializeMainMenu` remains as an internal helper (called only from LevelTransitionManager) or is deprecated.
+  - [x] **Implementation Tasks**:
+    - [x] In `Docs/Technical_Documentation.md`, update the “L_Office dual purpose” section to describe the new `InitializeOnLevelStart` orchestration instead of the Level BP calling `InitializeMainMenu` directly.
+    - [x] Add a TODO comment near the existing `UFCLevelTransitionManager::InitializeLevelTransitionOnLevelStart` noting it will be folded into `InitializeOnLevelStart` in a later task.
+    - [x] Add a brief comment above `AFCPlayerController::InitializeMainMenu` marking it as “called only from LevelTransitionManager in future (see 4.7.4)” without changing call sites yet.
+
+- [x] **4.7.5: Create Implementation Checklists for Future Refactor**
+  - [x] **Design**:
+    - [x] Enumerate where code should change once the new API is ready, without touching behavior now.
+  - [x] **Implementation Tasks**:
+    - [x] In `0004-tasks.md` or a new small section in `Docs/Technical_Documentation.md`, create a checklist of call sites to migrate:
+      - [x] `AFCPlayerController::OnTableObjectClicked` (table view entry).
+      - [x] `AFCPlayerController::HandlePausePressed` (table view exit and ExpeditionSummary ESC path).
+      - [x] `AFCPlayerController::InitializeMainMenu` and `TransitionToGameplay`.
+      - [x] `UFCGameInstance::LoadGameAsync` cross-level transitions (decide whether to route via `RequestTransition` or document as a save/load-special case).
+      - [x] Any remaining direct `UGameplayStatics::OpenLevel` usages outside `UFCLevelManager` that are gameplay-related.
+    - [x] For each item, add a one-liner: “Replace with `LevelTransitionManager::RequestTransition(...)` once 4.7 API is implemented” or “Document as a special-case path (save/load only).”.
+
+_Goal: Restore explicit game state transitions for Office table view and unify how state, level, UI, and camera/input transitions are coordinated across core managers (GameInstance, GameStateManager, LevelManager, TransitionManager, UIManager, LevelTransitionManager, PlayerController)._
 
 ---
 

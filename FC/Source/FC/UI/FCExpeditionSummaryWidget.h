@@ -36,8 +36,8 @@ protected:
 	 *  Bind this to the WBP button's OnClicked in Blueprint if not using
 	 *  the automatic binding from NativeConstruct.
 	 */
-	UFUNCTION(BlueprintCallable, Category = "Expedition|Summary")
-	void HandleReturnToOfficeClicked();
+		UFUNCTION(BlueprintCallable, Category = "Expedition|Summary")
+		void CloseSummary();
 
 	/** Internal helper used by NativeConstruct to bind the button if present. */
 	UFUNCTION()

@@ -5,6 +5,7 @@
 #include "Core/UFCGameInstance.h"
 #include "Core/FCLevelManager.h"
 #include "Core/FCGameStateManager.h"
+#include "Core/FCLevelTransitionManager.h"
 
 void UFCExpeditionSummaryWidget::NativeConstruct()
 {
@@ -19,10 +20,9 @@ void UFCExpeditionSummaryWidget::NativeConstruct()
 
 void UFCExpeditionSummaryWidget::OnReturnButtonClickedInternal()
 {
-	HandleReturnToOfficeClicked();
+	CloseSummary();
 }
-
-void UFCExpeditionSummaryWidget::HandleReturnToOfficeClicked()
+void UFCExpeditionSummaryWidget::CloseSummary()
 {
 	UWorld* World = GetWorld();
 	if (!World)
@@ -36,17 +36,8 @@ void UFCExpeditionSummaryWidget::HandleReturnToOfficeClicked()
 		return;
 	}
 
-	// Game state transition to Office_Exploration
-	if (UFCGameStateManager* GameStateManager = FCGameInstance->GetSubsystem<UFCGameStateManager>())
+	if (UFCLevelTransitionManager* TransitionMgr = FCGameInstance->GetSubsystem<UFCLevelTransitionManager>())
 	{
-		GameStateManager->TransitionTo(EFCGameStateID::Office_Exploration);
+		TransitionMgr->CloseExpeditionSummaryAndReturnToOffice();
 	}
-
-	// Level transition back to L_Office (can be data-driven later)
-	if (UFCLevelManager* LevelManager = FCGameInstance->GetSubsystem<UFCLevelManager>())
-	{
-		LevelManager->LoadLevel(FName(TEXT("L_Office")), true);
-	}
-
-	RemoveFromParent();
 }

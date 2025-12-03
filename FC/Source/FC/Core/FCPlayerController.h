@@ -40,6 +40,15 @@ enum class EFCGameState : uint8
 	Loading
 };
 
+/** Sub-mode for Office table view to distinguish desk vs. object focus. */
+UENUM(BlueprintType)
+enum class EOfficeTableViewSubMode : uint8
+{
+	None = 0,
+	Desk,
+	Object
+};
+
 /**
  * Lightweight PlayerController scaffold for Week 1 prototypes.
  * Provides logging hooks for interaction, pause, and camera-mode changes.
@@ -71,7 +80,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Camera")
 	void SetCameraModeLocal(EFCPlayerCameraMode NewMode, float BlendTime = 2.0f);
 
-	/** Initialize the main menu state (called on level start) */
+	// 4.7.4: InitializeMainMenu is intended to be driven by
+	// UFCLevelTransitionManager (via InitializeOnLevelStart) rather
+	// than called directly from Level Blueprints once the startup
+	// refactor is complete.
 	UFUNCTION(BlueprintCallable, Category = "GameFlow")
 	void InitializeMainMenu();
 
@@ -138,6 +150,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "FC|Convoy")
 	void MoveConvoyToLocation(const FVector& TargetLocation);
 
+	/** Set the menu camera actor used by the camera manager for main menu view. */
+	UFUNCTION(BlueprintCallable, Category = "Camera")
+	void SetMenuCameraActor(ACameraActor* InMenuCamera);
+
 protected:
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "State")
 	bool bIsPauseMenuDisplayed;
@@ -198,6 +214,10 @@ protected:
 	UPROPERTY()
 	TObjectPtr<UUserWidget> CurrentOverworldMapWidget;
 
+	/** Sub-mode within Office table view (desk overview vs. object focus). */
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "State")
+	EOfficeTableViewSubMode OfficeTableViewSubMode = EOfficeTableViewSubMode::None;
+
 	void HandleInteractPressed();
 	void HandlePausePressed();
 	void HandleQuickSavePressed();
@@ -214,7 +234,7 @@ protected:
 
 	UFUNCTION(BlueprintCallable, Category = "Game State")
 	void ResumeGame();
-	
+
 	void ShowPauseMenuPlaceholder();
 	void HidePauseMenuPlaceholder();
 	void SetFallenCompassCameraMode(EFCPlayerCameraMode NewMode);

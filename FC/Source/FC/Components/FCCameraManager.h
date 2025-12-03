@@ -101,8 +101,8 @@ public:
 protected:
 	// --- Camera References ---
 
-	/** Main menu camera actor (static camera in office) */
-	UPROPERTY(EditInstanceOnly, BlueprintReadWrite, Category = "Camera")
+	/** Main menu camera actor (static camera in office). Editable per-instance in BP. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera|Menu")
 	TObjectPtr<ACameraActor> MenuCamera;
 
 	/** Temporary table view camera (spawned dynamically) */

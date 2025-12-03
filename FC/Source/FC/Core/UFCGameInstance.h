@@ -99,6 +99,10 @@ class FC_API UFCGameInstance : public UGameInstance
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "UI")
     TSubclassOf<UUserWidget> OverworldMapHUDWidgetClass;
 
+    /** Expedition summary widget class (configured in Blueprint, used by UIManager) */
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "UI")
+    TSubclassOf<UUserWidget> ExpeditionSummaryWidgetClass;
+
     /** Table widget registry: Maps table object classes to their widget classes */
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "UI")
     TMap<TSubclassOf<AActor>, TSubclassOf<UUserWidget>> TableWidgetMap;

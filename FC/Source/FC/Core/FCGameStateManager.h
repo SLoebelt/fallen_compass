@@ -7,6 +7,7 @@
 #include "FCGameStateManager.generated.h"
 
 DECLARE_LOG_CATEGORY_EXTERN(LogFCGameState, Log, All);
+DECLARE_LOG_CATEGORY_EXTERN(LogFCLevelTransitionManager, Log, All);
 
 /**
  * EFCGameStateID
@@ -21,6 +22,7 @@ enum class EFCGameStateID : uint8
 	MainMenu          UMETA(DisplayName = "Main Menu"),
 	Office_Exploration UMETA(DisplayName = "Office Exploration"),
 	Office_TableView  UMETA(DisplayName = "Office Table View"),
+	ExpeditionSummary UMETA(DisplayName = "Expedition Summary"),
 	Overworld_Travel  UMETA(DisplayName = "Overworld Travel"),
 	Combat_PlayerTurn UMETA(DisplayName = "Combat - Player Turn"),
 	Combat_EnemyTurn  UMETA(DisplayName = "Combat - Enemy Turn"),
@@ -63,6 +65,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "FC|GameState")
 	EFCGameStateID GetPreviousState() const { return PreviousState; }
 
+	/** Get the pending target state when in Loading after TransitionViaLoading */
+	UFUNCTION(BlueprintCallable, Category = "FC|GameState")
+	EFCGameStateID GetLoadingTargetState() const { return LoadingTargetState; }
+
 	/** 
 	 * Attempt to transition to a new state
 	 * @param NewState The target state
@@ -70,6 +76,14 @@ public:
 	 */
 	UFUNCTION(BlueprintCallable, Category = "FC|GameState")
 	bool TransitionTo(EFCGameStateID NewState);
+
+	/**
+	 * Transition to a new state, optionally performing a level load first.
+	 * This helper is intended for flows like "Overworld -> Load Office -> ExpeditionSummary".
+	 * It stores the desired target state so MainMenu or intermediate states don't override it.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "FC|GameState")
+	bool TransitionViaLoading(EFCGameStateID TargetState);
 
 	/**
 	 * Check if a transition to the given state is valid from current state
@@ -128,6 +142,10 @@ private:
 	/** State stack for pause/modal states (supports nested state transitions) */
 	UPROPERTY()
 	TArray<EFCGameStateID> StateStack;
+
+	/** Target state to reach after completing a TransitionViaLoading hop */
+	UPROPERTY()
+	EFCGameStateID LoadingTargetState = EFCGameStateID::None;
 
 	/** 
 	 * Valid state transitions map

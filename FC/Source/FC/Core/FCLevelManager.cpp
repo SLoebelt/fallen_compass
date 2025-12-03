@@ -186,6 +186,11 @@ void UFCLevelManager::OnFadeOutCompleteForLevelLoad()
 	// Load new level
 	UGameplayStatics::OpenLevel(this, LevelToLoad);
 
+	// Update our cached level info so subsystems querying the manager
+	// (e.g., UFCLevelTransitionManager on Office BeginPlay) see the
+	// correct normalized level name instead of the previous one.
+	UpdateCurrentLevel(LevelToLoad);
+
 	// Note: FadeIn will be handled automatically by new level's BeginPlay or PlayerController
 	// For Week 2, we rely on existing fade-in logic; Week 3+ will add explicit loading screen handling
 }

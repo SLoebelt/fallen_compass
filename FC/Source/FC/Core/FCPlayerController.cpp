@@ -22,6 +22,7 @@
 #include "Core/FCLevelManager.h"
 #include "Core/FCUIManager.h"
 #include "Core/FCGameStateManager.h"
+#include "Core/FCLevelTransitionManager.h"
 #include "Components/FCInputManager.h"
 #include "../Interaction/FCTableInteractable.h"
 #include "GameFramework/Character.h"
@@ -155,12 +156,10 @@ void AFCPlayerController::BeginPlay()
 	UFCGameInstance* GameInstance = Cast<UFCGameInstance>(GetGameInstance());
 	if (GameInstance)
 	{
+		// For now we always restore the player position when a save
+		// load is pending; otherwise, the Blueprint-level startup
+		// calls InitializeMainMenu after setting the menu camera.
 		GameInstance->RestorePlayerPosition();
-		
-		// Note: L_Office serves as BOTH menu and gameplay location
-		// Input mode will be set by InitializeMainMenu() or TransitionToGameplay()
-		// Don't set input mode here to avoid race conditions
-		
 		UE_LOG(LogFallenCompassPlayerController, Log, TEXT("BeginPlay: Controller ready, input mode will be set by game state transitions"));
 
 		// Subscribe to game state changes
@@ -175,10 +174,14 @@ void AFCPlayerController::BeginPlay()
 			UE_LOG(LogFallenCompassPlayerController, Log, TEXT("BeginPlay: Current game state is %s"), 
 				*UEnum::GetValueAsString(CurrentState));
 			
-			// If we're already in Overworld_Travel state, manually trigger the handler
-			if (CurrentState == EFCGameStateID::Overworld_Travel)
+			// If we're already in Overworld_Travel or ExpeditionSummary state, manually
+			// trigger the handler so camera/input are set up correctly on load.
+			if (CurrentState == EFCGameStateID::Overworld_Travel ||
+				CurrentState == EFCGameStateID::ExpeditionSummary)
 			{
-				UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("BeginPlay: Already in Overworld_Travel state, manually triggering camera/input switch"));
+				UE_LOG(LogFallenCompassPlayerController, Warning,
+					TEXT("BeginPlay: Already in state %s, manually triggering camera/input switch"),
+					*UEnum::GetValueAsString(CurrentState));
 				OnGameStateChanged(EFCGameStateID::None, CurrentState);
 			}
 		}
@@ -414,6 +417,7 @@ void AFCPlayerController::HandleInteractPressed()
 			UFCInteractionComponent* InteractionComp = FPCharacter->GetInteractionComponent();
 			if (InteractionComp)
 			{
+				// Let the InteractionComponent handle interaction (desk BP OnInteract, etc.).
 				InteractionComp->Interact();
 			}
 			else
@@ -428,37 +432,43 @@ void AFCPlayerController::HandleInteractPressed()
 	}
 	else
 	{
-		UE_LOG(LogFallenCompassPlayerController, Log, TEXT("TODO: Route table-view interaction to board UI or exit handles."));
-		if (GEngine)
-		{
-			GEngine->AddOnScreenDebugMessage(-1, 3.f, FColor::Yellow, TEXT("Interact: Route table-view interaction to board UI"));
-		}
+		// In table view or other modes, interaction is handled via click/ESC.
 	}
 }
 
 void AFCPlayerController::HandlePausePressed()
 {
-	// If viewing a table object with widget, ESC closes widget and stays in TableView
-	// If in TableView without widget, ESC returns to first-person
+	// Table view: ESC either closes an open table widget (object focus)
+	// or exits back to Office_Exploration when no widget is open.
 	if (GetCameraMode() == EFCPlayerCameraMode::TableView)
 	{
 		UE_LOG(LogFallenCompassPlayerController, Log, TEXT("ESC pressed in TableView mode"));
 		
-		// Check if widget is open via UIManager
 		UFCGameInstance* GI = GetGameInstance<UFCGameInstance>();
-		UFCUIManager* UIManager = GI ? GI->GetSubsystem<UFCUIManager>() : nullptr;
-		
+		if (!GI)
+		{
+			return;
+		}
+
+		UFCUIManager* UIManager = GI->GetSubsystem<UFCUIManager>();
+		UFCLevelTransitionManager* LevelTransitionMgr = GI->GetSubsystem<UFCLevelTransitionManager>();
+
+		// If any table widget is open, close it and remain in table view.
 		if (UIManager && UIManager->IsTableWidgetOpen())
 		{
-			CloseTableWidget();
-			UE_LOG(LogFallenCompassPlayerController, Log, TEXT("Closed table widget, staying in TableView"));
+			UIManager->CloseTableWidget();
+			OfficeTableViewSubMode = EOfficeTableViewSubMode::Desk;
+			UE_LOG(LogFallenCompassPlayerController, Log, TEXT("HandlePausePressed: Closed table widget, staying in TableView (desk)"));
+			return;
 		}
-		else
+
+		// No widget open: exit table view back to Office_Exploration.
+		if (LevelTransitionMgr)
 		{
-			// No widget open - return to FirstPerson
-			UE_LOG(LogFallenCompassPlayerController, Log, TEXT("No widget open, returning to FirstPerson"));
-			SetCameraModeLocal(EFCPlayerCameraMode::FirstPerson, 2.0f);
+			LevelTransitionMgr->ExitOfficeTableView();
 		}
+		OfficeTableViewSubMode = EOfficeTableViewSubMode::None;
+		UE_LOG(LogFallenCompassPlayerController, Log, TEXT("HandlePausePressed: No table widget open, exiting TableView to Office_Exploration"));
 		return;
 	}
 
@@ -472,6 +482,17 @@ void AFCPlayerController::HandlePausePressed()
 	
 	if (!StateMgr || !UIManager) return;
 
+	// If we're in ExpeditionSummary, ESC should behave like closing the summary widget
+	if (StateMgr->GetCurrentState() == EFCGameStateID::ExpeditionSummary)
+	{
+		UFCLevelTransitionManager* TransitionMgr = GI->GetSubsystem<UFCLevelTransitionManager>();
+		if (TransitionMgr)
+		{
+			TransitionMgr->CloseExpeditionSummaryAndReturnToOffice();
+		}
+		return;
+	}
+
 	// Check if we're currently paused
 	if (StateMgr->GetCurrentState() == EFCGameStateID::Paused)
 	{
@@ -482,6 +503,18 @@ void AFCPlayerController::HandlePausePressed()
 			bIsPauseMenuDisplayed = false;
 			UE_LOG(LogFallenCompassPlayerController, Log, TEXT("HandlePausePressed: Resumed from pause, returned to %s"),
 				*UEnum::GetValueAsString(StateMgr->GetCurrentState()));
+
+			// If we resumed back into Overworld_Travel, restore cursor and
+			// game+UI input mode so the overworld can still be controlled.
+			if (StateMgr->GetCurrentState() == EFCGameStateID::Overworld_Travel)
+			{
+				bShowMouseCursor = true;
+				FInputModeGameAndUI InputMode;
+				InputMode.SetHideCursorDuringCapture(false);
+				InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+				SetInputMode(InputMode);
+				UE_LOG(LogFallenCompassPlayerController, Log, TEXT("HandlePausePressed: Resumed Overworld_Travel with cursor visible"));
+			}
 		}
 		return;
 	}
@@ -561,6 +594,18 @@ void AFCPlayerController::ResumeGame()
 			bIsPauseMenuDisplayed = false;
 			UE_LOG(LogFallenCompassPlayerController, Log, TEXT("ResumeGame: Resumed from pause via PopState, returned to %s"),
 				*UEnum::GetValueAsString(StateMgr->GetCurrentState()));
+
+			// Mirror HandlePausePressed: if we resumed into Overworld_Travel,
+			// restore cursor and GameAndUI input mode.
+			if (StateMgr->GetCurrentState() == EFCGameStateID::Overworld_Travel)
+			{
+				bShowMouseCursor = true;
+				FInputModeGameAndUI InputMode;
+				InputMode.SetHideCursorDuringCapture(false);
+				InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+				SetInputMode(InputMode);
+				UE_LOG(LogFallenCompassPlayerController, Log, TEXT("ResumeGame: Resumed Overworld_Travel with cursor visible"));
+			}
 		}
 	}
 	
@@ -846,43 +891,21 @@ void AFCPlayerController::ReturnToMainMenu()
 {
 	UE_LOG(LogFallenCompassPlayerController, Log, TEXT("ReturnToMainMenu: Starting fade and reload"));
 
-	// Transition to Loading state via GameStateManager
 	UFCGameInstance* GI = Cast<UFCGameInstance>(GetGameInstance());
-	if (GI)
+	if (!GI)
 	{
-		UFCGameStateManager* StateMgr = GI->GetSubsystem<UFCGameStateManager>();
-		if (StateMgr)
-		{
-			StateMgr->TransitionTo(EFCGameStateID::Loading);
-		}
-
-		// Hide pause menu if it's open
-		if (bIsPauseMenuDisplayed)
-		{
-			UFCUIManager* UIManager = GI->GetSubsystem<UFCUIManager>();
-			if (UIManager)
-			{
-				UIManager->HidePauseMenu();
-				bIsPauseMenuDisplayed = false;
-			}
-		}
+		UE_LOG(LogFallenCompassPlayerController, Error, TEXT("ReturnToMainMenu: GameInstance is null"));
+		return;
 	}
 
-	CurrentGameState = EFCGameState::Loading; // DEPRECATED: Keep for backward compatibility (Week 3 cleanup)
-
-	// Fade to black
-	PlayerCameraManager->StartCameraFade(0.0f, 1.0f, 1.0f, FLinearColor::Black, false, true);
-
-	// TODO: Play door open sound (Task 5.9)
-
-	// Reload L_Office after fade completes
-	FTimerHandle ReloadTimer;
-	GetWorldTimerManager().SetTimer(ReloadTimer, [this]()
+	UFCLevelTransitionManager* TransitionMgr = GI->GetSubsystem<UFCLevelTransitionManager>();
+	if (!TransitionMgr)
 	{
-		UGameplayStatics::OpenLevel(this, FName(TEXT("L_Office")));
-	}, 1.0f, false);
+		UE_LOG(LogFallenCompassPlayerController, Error, TEXT("ReturnToMainMenu: LevelTransitionManager subsystem missing"));
+		return;
+	}
 
-	LogStateChange(TEXT("Returning to Main Menu"));
+	TransitionMgr->ReturnToMainMenuFromGameplay();
 }
 
 void AFCPlayerController::DevQuickSave()
@@ -1042,16 +1065,56 @@ void AFCPlayerController::OnGameStateChanged(EFCGameStateID OldState, EFCGameSta
 		// Note: Convoy pawn is controlled by its AIController, not possessed by PlayerController
 		// PlayerController sends movement commands to the AIController via HandleOverworldClickMove()
 	}
+	// React to entering ExpeditionSummary state (summary shown in Office)
+	else if (NewState == EFCGameStateID::ExpeditionSummary)
+	{
+		// While in ExpeditionSummary we want to reuse the Office table-view
+		// camera setup, but keep gameplay input in a static-scene mode.
+		if (InputManager)
+		{
+			InputManager->SetInputMappingMode(EFCInputMappingMode::StaticScene);
+			UE_LOG(LogFallenCompassPlayerController, Log, TEXT("OnGameStateChanged: Switched to StaticScene input mode for ExpeditionSummary"));
+		}
+
+		// Blend camera to the table/desk view; this uses the same logic as
+		// the regular TableView mode (searching for BP_OfficeDesk and its
+		// CameraTargetPoint) but without opening any table widgets.
+		SetCameraModeLocal(EFCPlayerCameraMode::TableView, 2.0f);
+	}
 	// React to leaving Overworld_Travel state
 	else if (OldState == EFCGameStateID::Overworld_Travel)
 	{
-		// Restore FirstPerson input mode when leaving Overworld
+		// When leaving Overworld, either go to ExpeditionSummary (summary in Office)
+		// or back to first-person Office exploration.
 		if (InputManager && NewState == EFCGameStateID::Office_Exploration)
 		{
 			InputManager->SetInputMappingMode(EFCInputMappingMode::FirstPerson);
-			CameraManager->BlendToFirstPerson(2.0f);
-			UE_LOG(LogFallenCompassPlayerController, Log, TEXT("OnGameStateChanged: Returned to FirstPerson mode"));
+			if (CameraManager)
+			{
+				CameraManager->BlendToFirstPerson(2.0f);
+			}
+			UE_LOG(LogFallenCompassPlayerController, Log, TEXT("OnGameStateChanged: Returned to FirstPerson mode from Overworld"));
 		}
+	}
+	// Generic entry into Office_Exploration from any non-Overworld state
+	else if (NewState == EFCGameStateID::Office_Exploration)
+	{
+		if (InputManager)
+		{
+			InputManager->SetInputMappingMode(EFCInputMappingMode::FirstPerson);
+		}
+		if (CameraManager)
+		{
+			CameraManager->BlendToFirstPerson(2.0f);
+		}
+		bShowMouseCursor = false;
+		bEnableClickEvents = false;
+		bEnableMouseOverEvents = false;
+
+		FInputModeGameOnly InputMode;
+		SetInputMode(InputMode);
+
+		UE_LOG(LogFallenCompassPlayerController, Log, TEXT("OnGameStateChanged: Entered Office_Exploration, restored FirstPerson camera/input"));
 	}
 }
 
@@ -1197,50 +1260,77 @@ void AFCPlayerController::OnTableObjectClicked(AActor* TableObject)
 		return;
 	}
 
-	// Get UIManager for widget management
 	UFCGameInstance* GI = GetGameInstance<UFCGameInstance>();
-	UFCUIManager* UIManager = GI ? GI->GetSubsystem<UFCUIManager>() : nullptr;
-
-	// Close current widget if one is open (switching between table objects)
-	if (UIManager && UIManager->IsTableWidgetOpen())
+	if (!GI)
 	{
-		UIManager->CloseTableWidget();
-		UE_LOG(LogFallenCompassPlayerController, Log, TEXT("Closed previous table widget"));
+		UE_LOG(LogFallenCompassPlayerController, Error, TEXT("OnTableObjectClicked: GameInstance is null"));
+		return;
 	}
 
-	// Get camera target transform from table object
-	FTransform CameraTargetTransform = IFCTableInteractable::Execute_GetCameraTargetTransform(TableObject);
+	UFCGameStateManager* StateMgr = GI->GetSubsystem<UFCGameStateManager>();
+	UFCUIManager* UIManager = GI->GetSubsystem<UFCUIManager>();
+	if (!StateMgr || !UIManager)
+	{
+		UE_LOG(LogFallenCompassPlayerController, Error, TEXT("OnTableObjectClicked: StateMgr or UIManager is null"));
+		return;
+	}
 
-	// Camera transitions now handled by CameraManager component
-	// Delegate to CameraManager for camera spawning and blending
+	EFCGameStateID CurrentState = StateMgr->GetCurrentState();
+	// Allow clicks either directly from Office_Exploration (legacy path) or
+	// from desk-level Office_TableView when sub-mode is Desk.
+	const bool bFromOfficeExploration = (CurrentState == EFCGameStateID::Office_Exploration);
+	const bool bFromDeskTableView = (CurrentState == EFCGameStateID::Office_TableView &&
+		OfficeTableViewSubMode == EOfficeTableViewSubMode::Desk);
+
+	if (!bFromOfficeExploration && !bFromDeskTableView)
+	{
+		UE_LOG(LogFallenCompassPlayerController, Warning,
+			TEXT("OnTableObjectClicked: Ignored because state is %s and sub-mode is %s (expected Office_Exploration or Office_TableView+Desk)"),
+			*UEnum::GetValueAsString(CurrentState),
+			*UEnum::GetValueAsString(OfficeTableViewSubMode));
+		return;
+	}
+
+	// Close any existing table widget before opening a new one.
+	if (UIManager->IsTableWidgetOpen())
+	{
+		UIManager->CloseTableWidget();
+	}
+
+	// Delegate high-level state change to LevelTransitionManager when coming
+	// directly from Office_Exploration; from desk-level Office_TableView we
+	// stay in the same global state and only adjust sub-mode/camera/UI.
+	if (bFromOfficeExploration)
+	{
+		UFCLevelTransitionManager* LevelTransitionMgr = GI->GetSubsystem<UFCLevelTransitionManager>();
+		if (LevelTransitionMgr)
+		{
+			LevelTransitionMgr->EnterOfficeTableView(TableObject);
+		}
+	}
+
+	// Perform the table-view camera blend and open the table widget using
+	// existing helpers so behaviour matches the pre-refactor flow.
 	if (CameraManager)
 	{
 		CameraManager->BlendToTableObject(TableObject, 2.0f);
 	}
 
-	UE_LOG(LogFallenCompassPlayerController, Log, TEXT("Blending camera to table object: %s"), *TableObject->GetName());
+	// Switch input/cursor to table interaction mode.
+	SetInputMappingMode(EFCInputMappingMode::StaticScene);
+	bShowMouseCursor = true;
+	bEnableClickEvents = true;
+	bEnableMouseOverEvents = true;
 
-	// Show widget after camera blend completes (delay via timer)
-	FTimerHandle ShowWidgetTimerHandle;
-	GetWorldTimerManager().SetTimer(ShowWidgetTimerHandle, [this, TableObject, UIManager]()
-	{
-		if (UIManager)
-		{
-			UIManager->ShowTableWidget(TableObject);
+	FInputModeGameAndUI InputMode;
+	InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+	InputMode.SetHideCursorDuringCapture(false);
+	SetInputMode(InputMode);
 
-			// Set input mode to focus the currently open table widget so clicks
-			// are captured by the UI instead of hitting world interactables.
-			if (UUserWidget* TableWidget = UIManager->GetCurrentTableWidget())
-			{
-				FInputModeGameAndUI InputMode;
-				InputMode.SetWidgetToFocus(TableWidget->TakeWidget());
-				InputMode.SetHideCursorDuringCapture(false);
-				InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::LockAlways);
-				SetInputMode(InputMode);
-				bShowMouseCursor = true;
-			}
-		}
-	}, 2.0f, false);
+	// Finally, show the appropriate table widget for this object and mark
+	// that we are now focused on a table object.
+	UIManager->ShowTableWidget(TableObject);
+	OfficeTableViewSubMode = EOfficeTableViewSubMode::Object;
 }
 
 void AFCPlayerController::CloseTableWidget()
@@ -1394,5 +1484,21 @@ void AFCPlayerController::MoveConvoyToLocation(const FVector& TargetLocation)
 			UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("MoveConvoyToLocation: Failed to project to NavMesh"));
 		}
 	}
+}
+
+void AFCPlayerController::SetMenuCameraActor(ACameraActor* InMenuCamera)
+{
+	if (!CameraManager)
+	{
+		UE_LOG(LogFallenCompassPlayerController, Error, TEXT("SetMenuCameraActor: CameraManager is null"));
+		return;
+	}
+
+	if (!InMenuCamera)
+	{
+		UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("SetMenuCameraActor: InMenuCamera is null"));
+	}
+
+	CameraManager->SetMenuCamera(InMenuCamera);
 }
 
