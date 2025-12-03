@@ -33,6 +33,10 @@ public:
 	UPROPERTY()
 	TSubclassOf<UUserWidget> PauseMenuWidgetClass;
 
+	/** Overworld view-only map HUD widget class (configured by GameInstance) */
+	UPROPERTY()
+	TSubclassOf<UUserWidget> OverworldMapHUDWidgetClass;
+
 	// Widget class registry: TableObjectClass → WidgetClass (configured from GameInstance)
 	UPROPERTY()
 	TMap<TSubclassOf<AActor>, TSubclassOf<UUserWidget>> TableWidgetMap;
@@ -50,6 +54,10 @@ public:
 	
 	UPROPERTY()
 	TObjectPtr<UUserWidget> PauseMenuWidget;
+
+	/** Optional focused UI widget that should block world interaction (e.g., expedition planning, overworld map). */
+	UPROPERTY(BlueprintReadWrite, Category = "UI|Focus")
+	TObjectPtr<UUserWidget> FocusedBlockingWidget;
 
 	// Currently displayed table widget
 	UPROPERTY()
@@ -96,6 +104,13 @@ public:
 	UFUNCTION(BlueprintPure, Category = "UI|Table")
 	bool IsTableWidgetOpen() const { return CurrentTableWidget != nullptr; }
 
+	// Focused widget helpers (used to gate world interaction)
+	UFUNCTION(BlueprintCallable, Category = "UI|Focus")
+	void SetFocusedBlockingWidget(UUserWidget* Widget) { FocusedBlockingWidget = Widget; }
+
+	UFUNCTION(BlueprintPure, Category = "UI|Focus")
+	bool IsFocusedWidgetOpen() const { return FocusedBlockingWidget != nullptr && FocusedBlockingWidget->IsInViewport(); }
+
 	// POI action selection widget lifecycle methods
 	UFUNCTION(BlueprintCallable, Category = "UI|POI")
 	UUserWidget* ShowPOIActionSelection(const TArray<FFCPOIActionData>& Actions, class UFCInteractionComponent* InteractionComponent);
@@ -113,6 +128,10 @@ public:
 	// POI action callback (mediator between widget and InteractionComponent)
 	UFUNCTION(BlueprintCallable, Category = "UI|POI")
 	void HandlePOIActionSelected(EFCPOIAction Action);
+
+	// Overworld HUD: view-only world map (Week 4)
+	UFUNCTION(BlueprintCallable, Category = "UI|Overworld")
+	UUserWidget* ShowOverworldMapHUD(APlayerController* OwningPlayer);
 
 	// Button callback methods (called from Blueprint widgets)
 	UFUNCTION(BlueprintCallable, Category = "UI")

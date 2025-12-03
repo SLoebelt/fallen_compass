@@ -90,6 +90,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "FC|Table Interaction")
 	void HandleTableObjectClick();
 
+	/** Returns true if UI state allows world interaction traces (no blocking map/table widgets). */
+	bool CanProcessWorldInteraction() const;
+
 	/**
 	 * Perform table interaction with clicked object
 	 * @param TableObject The actor to interact with (must implement IFCTableInteractable)
@@ -187,6 +190,14 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "FC|Input|Actions")
 	TObjectPtr<UInputAction> OverworldZoomAction;
 
+	/** Input action for toggling the Overworld map (M key) - Week 4 */
+	UPROPERTY(EditDefaultsOnly, Category = "FC|Input|Actions")
+	TObjectPtr<UInputAction> ToggleOverworldMapAction;
+
+	/** View-only Overworld map widget currently open (if any) */
+	UPROPERTY()
+	TObjectPtr<UUserWidget> CurrentOverworldMapWidget;
+
 	void HandleInteractPressed();
 	void HandlePausePressed();
 	void HandleQuickSavePressed();
@@ -195,6 +206,7 @@ protected:
 	void HandleOverworldZoom(const FInputActionValue& Value);
 	void HandleClick(const FInputActionValue& Value);
 	void HandleOverworldClickMove();
+	void HandleToggleOverworldMap();
 
 	/** Handle game state changes (bind to GameStateManager.OnStateChanged) */
 	UFUNCTION()

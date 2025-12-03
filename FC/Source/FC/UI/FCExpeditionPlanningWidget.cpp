@@ -8,8 +8,12 @@
 #include "Components/Border.h"
 #include "Components/Button.h"
 #include "Components/TextBlock.h"
+#include "Components/NamedSlot.h"
 #include "Core/UFCGameInstance.h"
+#include "Core/FCGameStateManager.h"
+#include "Core/FCLevelManager.h"
 #include "Core/FCPlayerController.h"
+#include "Expedition/FCExpeditionManager.h"
 #include "Kismet/GameplayStatics.h"
 
 void UFCExpeditionPlanningWidget::NativeConstruct()
@@ -39,7 +43,7 @@ void UFCExpeditionPlanningWidget::NativeConstruct()
         UE_LOG(LogTemp, Warning, TEXT("BackButton is null - check widget binding"));
     }
 
-    // Initialize supplies display
+    // Initialize supplies and money display
     UpdateSuppliesDisplay();
 }
 
@@ -61,19 +65,133 @@ void UFCExpeditionPlanningWidget::NativeDestruct()
 
 void UFCExpeditionPlanningWidget::OnStartExpeditionClicked()
 {
-    UE_LOG(LogTemp, Log, TEXT("Start Expedition button clicked"));
+    UE_LOG(LogTemp, Log, TEXT("UFCExpeditionPlanningWidget::OnStartExpeditionClicked"));
 
-    // Week 3 feature: Show "Coming Soon" message
-    // For now, just log it
-    if (GEngine)
+    UWorld* World = GetWorld();
+    if (!World)
     {
-        GEngine->AddOnScreenDebugMessage(
-            -1, 
-            3.0f, 
-            FColor::Yellow, 
-            TEXT("Coming Soon - Overworld in Week 3")
-        );
+        const FString Reason = TEXT("Cannot start expedition: World is null");
+        UE_LOG(LogTemp, Error, TEXT("OnStartExpeditionClicked: %s"), *Reason);
+        if (GEngine)
+        {
+            GEngine->AddOnScreenDebugMessage(-1, 3.0f, FColor::Red, Reason);
+        }
+        return;
     }
+
+    UFCGameInstance* GameInstance = Cast<UFCGameInstance>(World->GetGameInstance());
+    if (!GameInstance)
+    {
+        const FString Reason = TEXT("Cannot start expedition: GameInstance is not UFCGameInstance");
+        UE_LOG(LogTemp, Error, TEXT("OnStartExpeditionClicked: %s"), *Reason);
+        if (GEngine)
+        {
+            GEngine->AddOnScreenDebugMessage(-1, 3.0f, FColor::Red, Reason);
+        }
+        return;
+    }
+
+    UFCExpeditionManager* ExpeditionManager = GameInstance->GetSubsystem<UFCExpeditionManager>();
+    if (!ExpeditionManager)
+    {
+        const FString Reason = TEXT("Cannot start expedition: ExpeditionManager subsystem missing");
+        UE_LOG(LogTemp, Error, TEXT("OnStartExpeditionClicked: %s"), *Reason);
+        if (GEngine)
+        {
+            GEngine->AddOnScreenDebugMessage(-1, 3.0f, FColor::Red, Reason);
+        }
+        return;
+    }
+
+    // Reuse the shared affordability helper to validate the plan and
+    // fetch the planned cost/current money in a single place.
+    int32 PlannedCost = 0;
+    int32 CurrentMoney = 0;
+    if (!CanAffordCurrentExpedition(PlannedCost, CurrentMoney))
+    {
+        const FString Reason = FString::Printf(
+            TEXT("Cannot start expedition: Plan invalid or insufficient funds (Cost=%d, Current=%d)"),
+            PlannedCost,
+            CurrentMoney);
+        UE_LOG(LogTemp, Warning, TEXT("OnStartExpeditionClicked: %s"), *Reason);
+        if (GEngine)
+        {
+            GEngine->AddOnScreenDebugMessage(-1, 3.0f, FColor::Yellow, Reason);
+        }
+        return;
+    }
+
+    // At this point we know the plan is valid and affordable; consume money.
+    if (!GameInstance->ConsumeMoney(PlannedCost))
+    {
+        // This should be rare, but handle race conditions or external
+        // money changes gracefully.
+        CurrentMoney = GameInstance->GetMoney();
+        const FString Reason = FString::Printf(
+            TEXT("Cannot start expedition: ConsumeMoney failed (Cost=%d, Current=%d)"),
+            PlannedCost,
+            CurrentMoney);
+        UE_LOG(LogTemp, Warning, TEXT("OnStartExpeditionClicked: %s"), *Reason);
+        if (GEngine)
+        {
+            GEngine->AddOnScreenDebugMessage(-1, 3.0f, FColor::Yellow, Reason);
+        }
+        return;
+    }
+
+    UE_LOG(LogTemp, Log, TEXT("OnStartExpeditionClicked: Money consumed for expedition (Cost=%d, Remaining=%d)"),
+        PlannedCost,
+        GameInstance->GetMoney());
+
+    UFCExpeditionData* CurrentExpedition = ExpeditionManager->GetCurrentExpedition();
+    if (CurrentExpedition && CurrentExpedition->ExpeditionStatus == EFCExpeditionStatus::Planning)
+    {
+        CurrentExpedition->ExpeditionStatus = EFCExpeditionStatus::InProgress;
+        ExpeditionManager->OnExpeditionStateChanged.Broadcast(CurrentExpedition);
+    }
+
+    UFCGameStateManager* GameStateManager = GameInstance->GetSubsystem<UFCGameStateManager>();
+    if (!GameStateManager)
+    {
+        const FString Reason = TEXT("Cannot start expedition: GameStateManager subsystem missing");
+        UE_LOG(LogTemp, Error, TEXT("OnStartExpeditionClicked: %s"), *Reason);
+        if (GEngine)
+        {
+            GEngine->AddOnScreenDebugMessage(-1, 3.0f, FColor::Red, Reason);
+        }
+        return;
+    }
+
+    if (!GameStateManager->TransitionTo(EFCGameStateID::Overworld_Travel))
+    {
+        const FString Reason = TEXT("Cannot start expedition: Game state transition to Overworld_Travel failed");
+        UE_LOG(LogTemp, Error, TEXT("OnStartExpeditionClicked: %s"), *Reason);
+        if (GEngine)
+        {
+            GEngine->AddOnScreenDebugMessage(-1, 3.0f, FColor::Red, Reason);
+        }
+        return;
+    }
+
+    UFCLevelManager* LevelManager = GameInstance->GetSubsystem<UFCLevelManager>();
+    if (!LevelManager)
+    {
+        const FString Reason = TEXT("Cannot start expedition: LevelManager subsystem missing");
+        UE_LOG(LogTemp, Error, TEXT("OnStartExpeditionClicked: %s"), *Reason);
+        if (GEngine)
+        {
+            GEngine->AddOnScreenDebugMessage(-1, 3.0f, FColor::Red, Reason);
+        }
+        return;
+    }
+
+    // TODO: Make overworld level configurable; for Week 4 we use a hard-coded demo map name.
+    const FName OverworldLevelName(TEXT("L_Overworld"));
+    LevelManager->LoadLevel(OverworldLevelName, /*bShowLoadingScreen*/ false);
+
+    UE_LOG(LogTemp, Log, TEXT("OnStartExpeditionClicked: Expedition started, loading overworld level %s"), *OverworldLevelName.ToString());
+
+    RemoveFromParent();
 }
 
 void UFCExpeditionPlanningWidget::OnBackButtonClicked()
@@ -109,10 +227,64 @@ void UFCExpeditionPlanningWidget::UpdateSuppliesDisplay()
         SuppliesValue->SetText(SuppliesText);
 
         UE_LOG(LogTemp, Log, TEXT("Updated supplies display: %d"), CurrentSupplies);
+
+        // Update money display in the same pass if possible
+        if (MoneyValue)
+        {
+            const int32 CurrentMoney = GameInstance->GetMoney();
+            const FText MoneyText = FText::AsNumber(CurrentMoney);
+            MoneyValue->SetText(MoneyText);
+
+            UE_LOG(LogTemp, Log, TEXT("Updated money display: %d"), CurrentMoney);
+        }
+        else
+        {
+            UE_LOG(LogTemp, Warning, TEXT("MoneyValue TextBlock is null - cannot update money display"));
+        }
     }
     else
     {
         UE_LOG(LogTemp, Warning, TEXT("Failed to get FCGameInstance in UpdateSuppliesDisplay"));
         SuppliesValue->SetText(FText::FromString(TEXT("???")));
     }
+}
+
+bool UFCExpeditionPlanningWidget::CanAffordCurrentExpedition(int32& OutPlannedCost, int32& OutCurrentMoney) const
+{
+    OutPlannedCost = 0;
+    OutCurrentMoney = 0;
+
+    UWorld* World = GetWorld();
+    if (!World)
+    {
+        return false;
+    }
+
+    UFCGameInstance* GameInstance = Cast<UFCGameInstance>(World->GetGameInstance());
+    if (!GameInstance)
+    {
+        return false;
+    }
+
+    UFCExpeditionManager* ExpeditionManager = GameInstance->GetSubsystem<UFCExpeditionManager>();
+    if (!ExpeditionManager)
+    {
+        return false;
+    }
+
+    UFCExpeditionData* CurrentExpedition = ExpeditionManager->GetCurrentExpedition();
+    if (!CurrentExpedition)
+    {
+        return false;
+    }
+
+    if (CurrentExpedition->PlannedRouteGlobalIds.Num() <= 0 || CurrentExpedition->PlannedMoneyCost <= 0)
+    {
+        return false;
+    }
+
+    OutPlannedCost = CurrentExpedition->PlannedMoneyCost;
+    OutCurrentMoney = GameInstance->GetMoney();
+
+    return OutCurrentMoney >= OutPlannedCost;
 }

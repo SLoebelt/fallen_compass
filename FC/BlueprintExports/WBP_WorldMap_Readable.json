@@ -1,0 +1,500 @@
+{
+	"name": "WBP_WorldMap",
+	"nodes": [
+		{
+			"title": "On Clicked (Button_StartExpedition)",
+			"inputs":
+			{
+			},
+			"children": []
+		},
+		{
+			"title": "On Clicked (Button_Grid24)",
+			"inputs":
+			{
+			},
+			"children": [
+				{
+					"pin": "then",
+					"title": "World Map Select Grid Area\nTarget is FCExpedition Manager  (self = FCExpedition Manager, GridId = 24)",
+					"inputs":
+					{
+						"self": "FCExpedition Manager",
+						"GridId": "24"
+					},
+					"children": [
+						{
+							"pin": "then",
+							"title": "Branch",
+							"inputs":
+							{
+							},
+							"children": [
+								{
+									"pin": "then",
+									"title": "Set SelectedGridIndex  (SelectedGridIndex = 24)",
+									"inputs":
+									{
+										"SelectedGridIndex": "24"
+									},
+									"children": [
+										{
+											"pin": "then",
+											"title": "Setup Route Info\nTarget is WBP World Map  (Target = Get CurrentExpedition)",
+											"inputs":
+											{
+												"Target": "Get CurrentExpedition"
+											},
+											"children": [
+												{
+													"pin": "then",
+													"title": "Branch  (Condition = Not Equal (Boolean))",
+													"inputs":
+													{
+														"Condition": "Not Equal (Boolean)"
+													},
+													"children": [
+														{
+															"pin": "then",
+															"title": "World Map Begin Route Preview Paint\nTarget is FCExpedition Manager  (self = FCExpedition Manager, StepSeconds = 0.500000)",
+															"inputs":
+															{
+																"self": "FCExpedition Manager",
+																"StepSeconds": "0.500000"
+															},
+															"children": [
+																{
+																	"pin": "then",
+																	"title": "Cast To FCGameInstance  (Object = Get Game Instance\nTarget is Widget)",
+																	"inputs":
+																	{
+																		"Object": "Get Game Instance\nTarget is Widget"
+																	},
+																	"children": [
+																		{
+																			"pin": "then",
+																			"title": "Set Is Enabled\nTarget is Widget  (self = Get Button_StartExpedition, bInIsEnabled = integer >= integer)",
+																			"inputs":
+																			{
+																				"self": "Get Button_StartExpedition",
+																				"bInIsEnabled": "integer >= integer"
+																			},
+																			"children": []
+																		}
+																	]
+																}
+															]
+														},
+														{
+															"pin": "else"
+														}
+													]
+												}
+											]
+										}
+									]
+								}
+							]
+						}
+					]
+				}
+			]
+		},
+		{
+			"title": "Event Construct",
+			"inputs":
+			{
+			},
+			"children": [
+				{
+					"pin": "then",
+					"title": "Setup Fog Overlay\nTarget is WBP World Map  (ExpeditionManager = FCExpedition Manager)",
+					"inputs":
+					{
+						"ExpeditionManager": "FCExpedition Manager"
+					},
+					"children": [
+						{
+							"pin": "then",
+							"title": "Setup Route Overlay\nTarget is WBP World Map  (self2 = FCExpedition Manager)",
+							"inputs":
+							{
+								"self2": "FCExpedition Manager"
+							},
+							"children": [
+								{
+									"pin": "then",
+									"title": "Bind Event to On World Map Changed  (self = FCExpedition Manager, Delegate = Create Event)",
+									"inputs":
+									{
+										"self": "FCExpedition Manager",
+										"Delegate": "Create Event"
+									},
+									"children": [
+										{
+											"pin": "then",
+											"title": "Set CurrentExpedition  (CurrentExpedition = Get Current Expedition\nTarget is FCExpedition Manager)",
+											"inputs":
+											{
+												"CurrentExpedition": "Get Current Expedition\nTarget is FCExpedition Manager"
+											},
+											"children": [
+												{
+													"pin": "then",
+													"title": "Is Valid",
+													"inputs":
+													{
+													},
+													"children": [
+														{
+															"pin": "Is Valid",
+															"title": "Switch on EFCExpeditionStatus  (Selection = Get ExpeditionStatus, NotEqual_ByteByte = Default__KismetMathLibrary)",
+															"inputs":
+															{
+																"Selection": "Get ExpeditionStatus",
+																"NotEqual_ByteByte": "Default__KismetMathLibrary"
+															},
+															"children": [
+																{
+																	"pin": "Planning",
+																	"title": "Set SelectedGridIndex  (SelectedGridIndex = Get SelectedGridId)",
+																	"inputs":
+																	{
+																		"SelectedGridIndex": "Get SelectedGridId"
+																	},
+																	"children": [
+																		{
+																			"pin": "then",
+																			"title": "Setup Route Info\nTarget is WBP World Map  (Target = Get CurrentExpedition)",
+																			"inputs":
+																			{
+																				"Target": "Get CurrentExpedition"
+																			},
+																			"children": [
+																				{
+																					"pin": "then",
+																					"title": "Branch  (Condition = Not Equal (Boolean))",
+																					"inputs":
+																					{
+																						"Condition": "Not Equal (Boolean)"
+																					},
+																					"children": [
+																						{
+																							"pin": "then",
+																							"title": "World Map Begin Route Preview Paint\nTarget is FCExpedition Manager  (self = FCExpedition Manager, StepSeconds = 0.500000)",
+																							"inputs":
+																							{
+																								"self": "FCExpedition Manager",
+																								"StepSeconds": "0.500000"
+																							},
+																							"children": []
+																						}
+																					]
+																				}
+																			]
+																		}
+																	]
+																},
+																{
+																	"pin": "InProgress"
+																}
+															]
+														}
+													]
+												}
+											]
+										}
+									]
+								}
+							]
+						}
+					]
+				}
+			]
+		},
+		{
+			"title": "OnExplorationChanged\nCustom Event",
+			"inputs":
+			{
+			},
+			"children": [
+				{
+					"pin": "then",
+					"title": "Set Texture Parameter Value\nTarget is Material Instance Dynamic  (self = Get FogMaterialInstance, ParameterName = FogTexture, Value = World Map Get Fog Texture\nTarget is FCExpedition Manager)",
+					"inputs":
+					{
+						"self": "Get FogMaterialInstance",
+						"ParameterName": "FogTexture",
+						"Value": "World Map Get Fog Texture\nTarget is FCExpedition Manager"
+					},
+					"children": [
+						{
+							"pin": "then",
+							"title": "Print String  (self = Default__KismetSystemLibrary, InString = FoW updated, bPrintToScreen = true, bPrintToLog = true, TextColor = (R=0.000000,G=0.660000,B=1.000000,A=1.000000), Duration = 2.000000, Key = None)",
+							"inputs":
+							{
+								"self": "Default__KismetSystemLibrary",
+								"InString": "FoW updated",
+								"bPrintToScreen": "true",
+								"bPrintToLog": "true",
+								"TextColor": "(R=0.000000,G=0.660000,B=1.000000,A=1.000000)",
+								"Duration": "2.000000",
+								"Key": "None"
+							},
+							"children": []
+						}
+					]
+				}
+			]
+		},
+		{
+			"title": "Event Destruct",
+			"inputs":
+			{
+			},
+			"children": [
+				{
+					"pin": "then",
+					"title": "Unbind all Events from On World Map Changed  (self = FCExpedition Manager)",
+					"inputs":
+					{
+						"self": "FCExpedition Manager"
+					},
+					"children": []
+				}
+			]
+		},
+		{
+			"function_name": "SetupFogOverlay",
+			"entry":
+			{
+				"title": "SetupFogOverlay",
+				"inputs":
+				{
+				},
+				"children": [
+					{
+						"pin": "then",
+						"title": "Set FogTexture  (FogTexture = World Map Get Fog Texture\nTarget is FCExpedition Manager)",
+						"inputs":
+						{
+							"FogTexture": "World Map Get Fog Texture\nTarget is FCExpedition Manager"
+						},
+						"children": [
+							{
+								"pin": "then",
+								"title": "Branch  (Condition = Is Valid)",
+								"inputs":
+								{
+									"Condition": "Is Valid"
+								},
+								"children": [
+									{
+										"pin": "then",
+										"title": "Create Dynamic Material Instance  (self = Default__KismetMaterialLibrary, Parent = M_FogOfWar, OptionalName = None, CreationFlags = None)",
+										"inputs":
+										{
+											"self": "Default__KismetMaterialLibrary",
+											"Parent": "M_FogOfWar",
+											"OptionalName": "None",
+											"CreationFlags": "None"
+										},
+										"children": [
+											{
+												"pin": "then",
+												"title": "Set FogMaterialInstance",
+												"inputs":
+												{
+												},
+												"children": [
+													{
+														"pin": "then",
+														"title": "Set Texture Parameter Value\nTarget is Material Instance Dynamic  (ParameterName = FogTexture, Value = Get FogTexture)",
+														"inputs":
+														{
+															"ParameterName": "FogTexture",
+															"Value": "Get FogTexture"
+														},
+														"children": [
+															{
+																"pin": "then",
+																"title": "Set Brush from Material\nTarget is Image  (self = Get Image_FogOverlay)",
+																"inputs":
+																{
+																	"self": "Get Image_FogOverlay"
+																},
+																"children": []
+															}
+														]
+													}
+												]
+											}
+										]
+									},
+									{
+										"pin": "else",
+										"title": "Print String  (self = Default__KismetSystemLibrary, InString = WARNING: Fog Texture not available, bPrintToScreen = true, bPrintToLog = true, TextColor = (R=1.000000,G=0.000000,B=0.000000,A=1.000000), Duration = 10.000000, Key = None)",
+										"inputs":
+										{
+											"self": "Default__KismetSystemLibrary",
+											"InString": "WARNING: Fog Texture not available",
+											"bPrintToScreen": "true",
+											"bPrintToLog": "true",
+											"TextColor": "(R=1.000000,G=0.000000,B=0.000000,A=1.000000)",
+											"Duration": "10.000000",
+											"Key": "None"
+										},
+										"children": []
+									}
+								]
+							}
+						]
+					}
+				]
+			}
+		},
+		{
+			"function_name": "SetupRouteOverlay",
+			"entry":
+			{
+				"title": "SetupRouteOverlay",
+				"inputs":
+				{
+				},
+				"children": [
+					{
+						"pin": "then",
+						"title": "Set RouteTexture  (RouteTexture = World Map Get Route Texture\nTarget is FCExpedition Manager)",
+						"inputs":
+						{
+							"RouteTexture": "World Map Get Route Texture\nTarget is FCExpedition Manager"
+						},
+						"children": [
+							{
+								"pin": "then",
+								"title": "Branch  (Condition = Is Valid)",
+								"inputs":
+								{
+									"Condition": "Is Valid"
+								},
+								"children": [
+									{
+										"pin": "then",
+										"title": "Create Dynamic Material Instance  (self = Default__KismetMaterialLibrary, Parent = M_RouteOverlay, OptionalName = None, CreationFlags = None)",
+										"inputs":
+										{
+											"self": "Default__KismetMaterialLibrary",
+											"Parent": "M_RouteOverlay",
+											"OptionalName": "None",
+											"CreationFlags": "None"
+										},
+										"children": [
+											{
+												"pin": "then",
+												"title": "Set RouteMaterialInstance",
+												"inputs":
+												{
+												},
+												"children": [
+													{
+														"pin": "then",
+														"title": "Set Texture Parameter Value\nTarget is Material Instance Dynamic  (ParameterName = RouteTexture, Value = Get RouteTexture)",
+														"inputs":
+														{
+															"ParameterName": "RouteTexture",
+															"Value": "Get RouteTexture"
+														},
+														"children": [
+															{
+																"pin": "then",
+																"title": "Set Brush from Material\nTarget is Image  (self = Get Image_RouteOverlay)",
+																"inputs":
+																{
+																	"self": "Get Image_RouteOverlay"
+																},
+																"children": []
+															}
+														]
+													}
+												]
+											}
+										]
+									},
+									{
+										"pin": "else",
+										"title": "Print String  (self = Default__KismetSystemLibrary, InString = WARNING: Route Texture not available, bPrintToScreen = true, bPrintToLog = true, TextColor = (R=1.000000,G=0.000000,B=0.000000,A=1.000000), Duration = 10.000000, Key = None)",
+										"inputs":
+										{
+											"self": "Default__KismetSystemLibrary",
+											"InString": "WARNING: Route Texture not available",
+											"bPrintToScreen": "true",
+											"bPrintToLog": "true",
+											"TextColor": "(R=1.000000,G=0.000000,B=0.000000,A=1.000000)",
+											"Duration": "10.000000",
+											"Key": "None"
+										},
+										"children": []
+									}
+								]
+							}
+						]
+					}
+				]
+			}
+		},
+		{
+			"function_name": "SetupRouteInfo",
+			"entry":
+			{
+				"title": "SetupRouteInfo",
+				"inputs":
+				{
+				},
+				"children": [
+					{
+						"pin": "then",
+						"title": "Branch  (Condition = Not Equal (Integer))",
+						"inputs":
+						{
+							"Condition": "Not Equal (Integer)"
+						},
+						"children": [
+							{
+								"pin": "then",
+								"title": "Set Text  (Text = Format Text, self = Get Text_MoneyCost)",
+								"inputs":
+								{
+									"Text": "Format Text",
+									"self": "Get Text_MoneyCost"
+								},
+								"children": [
+									{
+										"pin": "then",
+										"title": "Set Text  (Text = Format Text, self = Get Text_RiskCost)",
+										"inputs":
+										{
+											"Text": "Format Text",
+											"self": "Get Text_RiskCost"
+										},
+										"children": [
+											{
+												"pin": "then",
+												"title": "Set Visibility  (Visibility = Visible, self = Get Panel_StartPointSelection)",
+												"inputs":
+												{
+													"Visibility": "Visible",
+													"self": "Get Panel_StartPointSelection"
+												},
+												"children": []
+											}
+										]
+									}
+								]
+							}
+						]
+					}
+				]
+			}
+		}
+	]
+}

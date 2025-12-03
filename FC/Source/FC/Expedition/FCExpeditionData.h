@@ -54,6 +54,38 @@ public:
 	UPROPERTY(BlueprintReadWrite, Category = "Expedition")
 	EFCExpeditionStatus ExpeditionStatus;
 
+	/** Selected planning grid area (INDEX_NONE if unset) */
+	UPROPERTY(BlueprintReadWrite, Category = "Expedition|Planning")
+	int32 SelectedGridId;
+
+	/** Selected start grid when planning (INDEX_NONE if unset) */
+	UPROPERTY(BlueprintReadWrite, Category = "Expedition|Planning")
+	int32 SelectedStartGridId;
+
+	/** Selected start subcell index (INDEX_NONE if unset) */
+	UPROPERTY(BlueprintReadWrite, Category = "Expedition|Planning")
+	int32 SelectedStartSubId;
+
+	/** Preview target grid for milestone route (INDEX_NONE if unset) */
+	UPROPERTY(BlueprintReadWrite, Category = "Expedition|Planning")
+	int32 PreviewTargetGridId;
+
+	/** Preview target subcell for milestone route (INDEX_NONE if unset) */
+	UPROPERTY(BlueprintReadWrite, Category = "Expedition|Planning")
+	int32 PreviewTargetSubId;
+
+	/** Cached planned route as global subcell ids */
+	UPROPERTY(BlueprintReadWrite, Category = "Expedition|Planning")
+	TArray<int32> PlannedRouteGlobalIds;
+
+	/** Cached money cost for the planned route */
+	UPROPERTY(BlueprintReadWrite, Category = "Expedition|Planning")
+	int32 PlannedMoneyCost;
+
+	/** Cached risk cost for the planned route */
+	UPROPERTY(BlueprintReadWrite, Category = "Expedition|Planning")
+	int32 PlannedRiskCost;
+
 	/** Constructor with default values */
 	UFCExpeditionData();
 };

@@ -498,3 +498,31 @@ void UFCUIManager::HandlePOIActionSelected(EFCPOIAction Action)
 	// Close the widget
 	ClosePOIActionSelection();
 }
+
+UUserWidget* UFCUIManager::ShowOverworldMapHUD(APlayerController* OwningPlayer)
+{
+	if (!OwningPlayer)
+	{
+		UE_LOG(LogFCUIManager, Error, TEXT("ShowOverworldMapHUD: OwningPlayer is null"));
+		return nullptr;
+	}
+
+	// Expect widget class to be configured via BP_FC_GameInstance
+	if (!OverworldMapHUDWidgetClass)
+	{
+		UE_LOG(LogFCUIManager, Error, TEXT("ShowOverworldMapHUD: OverworldMapHUDWidgetClass not configured on UIManager"));
+		return nullptr;
+	}
+
+	UUserWidget* MapWidget = CreateWidget<UUserWidget>(OwningPlayer, OverworldMapHUDWidgetClass);
+	if (!MapWidget)
+	{
+		UE_LOG(LogFCUIManager, Error, TEXT("ShowOverworldMapHUD: CreateWidget returned null"));
+		return nullptr;
+	}
+
+	MapWidget->AddToViewport();
+	FocusedBlockingWidget = MapWidget;
+	UE_LOG(LogFCUIManager, Log, TEXT("ShowOverworldMapHUD: Created and added Overworld map HUD"));
+	return MapWidget;
+}

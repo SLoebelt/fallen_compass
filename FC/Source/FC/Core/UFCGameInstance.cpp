@@ -8,7 +8,6 @@
 #include "FCTransitionManager.h"
 #include "Core/FCLevelManager.h"
 #include "Core/FCUIManager.h"
-#include "Core/UFCWorldMapManager.h"
 
 void UFCGameInstance::Init()
 {
@@ -45,6 +44,7 @@ void UFCGameInstance::Init()
         UIManager->PauseMenuWidgetClass = PauseMenuWidgetClass;
         UIManager->ActionSelectionWidgetClass = ActionSelectionWidgetClass;
         UIManager->TableWidgetMap = TableWidgetMap;
+        UIManager->OverworldMapHUDWidgetClass = OverworldMapHUDWidgetClass;
         UE_LOG(LogTemp, Log, TEXT("UFCGameInstance: UIManager configured with widget classes"));
     }
     else
@@ -144,6 +144,45 @@ int32 UFCGameInstance::ConsumeSupplies(int32 Amount, bool& bSuccess)
     }
     
     return GameStateData.Supplies;
+}
+
+void UFCGameInstance::AddMoney(int32 Delta)
+{
+    if (Delta == 0)
+    {
+        return;
+    }
+
+    const int32 OldMoney = GameStateData.Money;
+    GameStateData.Money = FMath::Max(0, GameStateData.Money + Delta);
+    bIsSessionDirty = true;
+
+    UE_LOG(LogTemp, Log, TEXT("AddMoney: %d (Old: %d, New: %d)"), Delta, OldMoney, GameStateData.Money);
+
+    OnExpeditionContextChanged.Broadcast();
+}
+
+bool UFCGameInstance::ConsumeMoney(int32 Amount)
+{
+    if (Amount < 0)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("ConsumeMoney: Negative amount (%d), ignoring"), Amount);
+        return false;
+    }
+
+    if (GameStateData.Money < Amount)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("ConsumeMoney: Insufficient funds (Have: %d, Need: %d)"), GameStateData.Money, Amount);
+        return false;
+    }
+
+    GameStateData.Money -= Amount;
+    bIsSessionDirty = true;
+
+    UE_LOG(LogTemp, Log, TEXT("ConsumeMoney: %d (Remaining: %d)"), Amount, GameStateData.Money);
+
+    OnExpeditionContextChanged.Broadcast();
+    return true;
 }
 
 bool UFCGameInstance::SaveGame(const FString& SlotName)
@@ -431,25 +470,3 @@ void UFCGameInstance::OnPostLoadMapWithWorld(UWorld* LoadedWorld)
     }
 }
 
-void UFCGameInstance::SavePlanningState(FName AreaID, FName StartPointID)
-{
-    CurrentPlanningState.SelectedAreaID = AreaID;
-    CurrentPlanningState.SelectedStartPointID = StartPointID;
-    CurrentPlanningState.bPlanningInProgress = (AreaID != NAME_None || StartPointID != NAME_None);
-    
-    UE_LOG(LogTemp, Log, TEXT("SavePlanningState: Area=%s, StartPoint=%s, InProgress=%s"), 
-        *AreaID.ToString(), 
-        *StartPointID.ToString(),
-        CurrentPlanningState.bPlanningInProgress ? TEXT("true") : TEXT("false"));
-}
-
-void UFCGameInstance::ClearPlanningState()
-{
-    CurrentPlanningState.ClearSelection();
-    UE_LOG(LogTemp, Log, TEXT("ClearPlanningState: Planning state cleared"));
-}
-
-UFCWorldMapManager* UFCGameInstance::GetWorldMapManager() const
-{
-    return GetSubsystem<UFCWorldMapManager>();
-}

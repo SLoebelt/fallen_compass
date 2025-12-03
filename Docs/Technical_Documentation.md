@@ -24,7 +24,7 @@
 9. [Level Management & Transitions (Week 2)](#level-management--transitions-week-2)
 10. [Office ↔ Overworld Level Transitions (Task 7)](#office--overworld-level-transitions-task-7)
 11. [Conditional Pause System (Task 8)](#conditional-pause-system-task-8)
-12. [Expedition System (Week 2)](#expedition-system-week-2)
+12. [Expedition System (Week 2 → Week 4)](#expedition-system-week-2--week-4)
 13. [Logging & Debugging](#logging--debugging)
 14. [Build & Configuration](#build--configuration)
 
@@ -5168,7 +5168,7 @@ UPROPERTY(meta = (BindWidget))
 TObjectPtr<UBorder> MapContainer;
 
 UPROPERTY(meta = (BindWidget))
-TObjectPtr<UImage> MapPlaceholder;
+TObjectPtr<UNamedSlot> WorldMapSlot;
 
 UPROPERTY(meta = (BindWidget))
 TObjectPtr<UButton> StartExpeditionButton;
@@ -5284,7 +5284,7 @@ WBP_ExpeditionPlanning
 │       │   ├── SuppliesLabel (Text Block) - "Supplies:"
 │       │   └── SuppliesValue (Text Block) - Bound to GameInstance
 │       ├── MapContainer (Border)
-│       │   └── MapPlaceholder (Image) - World map placeholder
+│       │   └── WorldMapSlot (Named Slot) - Contains WBP_WorldMap widget
 │       └── ButtonPanel (Horizontal Box)
 │           ├── StartExpeditionButton (Button)
 │           │   └── StartButtonText (Text Block) - "Start Test Expedition"
@@ -6564,334 +6564,283 @@ void AFCPlayerController::HandlePausePressed()
 
 ---
 
-## Expedition System (Week 2)
+## Expedition System (Week 2 → Week 4)
 
 ### Overview
 
-The `UFCExpeditionManager` subsystem manages expedition lifecycle, status tracking, and context management. Week 2 implemented the foundation with expedition creation, status queries, and GameInstance integration.
+Week 2 added the expedition foundation (lifecycle tracking and GameInstance integration). Week 4 keeps the same subsystem but expands it into the world-map planning feature. UFCExpeditionManager now owns both the expedition lifecycle and the data needed for the 16x16 planning grid, including fog-of-war textures, land-mask loading, and planned-route state.
 
 ### Architecture
 
-```mermaid
+`mermaid
 classDiagram
-    class UGameInstanceSubsystem {
-        <<Unreal>>
-        +Initialize()
-        +Deinitialize()
-    }
+class UGameInstanceSubsystem {
+<<Unreal>>
++Initialize()
++Deinitialize()
+}
 
     class UFCExpeditionManager {
-        -FName CurrentExpeditionName
-        -EFCExpeditionStatus CurrentExpeditionStatus
-        +HasActiveExpedition() bool
-        +GetExpeditionStatus() EFCExpeditionStatus
-        +CreateExpedition(FName)
-        +CompleteExpedition()
-        +CancelExpedition()
+        +StartNewExpedition(FString, int32) : UFCExpeditionData*
+        +EndExpedition(bool)
+        +IsExpeditionActive() bool
+        +WorldMap_GetFogTexture() UTexture2D*
+        +WorldMap_GetRouteTexture() UTexture2D*
+        +WorldMap_SelectGridArea(int32) bool
+        +WorldMap_BeginRoutePreviewPaint(float)
+        +WorldMap_ClearRoutePreview()
+        +WorldMap_RecordVisitedWorldLocation(FVector)
     }
 
-    class EFCExpeditionStatus {
-        <<enumeration>>
-        NotStarted
-        Planning
-        InProgress
-        Completed
-        Failed
+    class UFCExpeditionData {
+        +ExpeditionName : FString
+        +ExpeditionStatus : EFCExpeditionStatus
+        +PlannedRouteGlobalIds : TArray<int32>
+        +PlannedMoneyCost : int32
+        +PlannedRiskCost : int32
     }
 
-    class UFCGameInstance {
-        +GetSubsystem<UFCExpeditionManager>()
-        +OnExpeditionContextChanged
+    class FFCWorldMapExploration {
+        +GlobalSize : int32 = 256
+        +GetRevealMask() : const TArray<uint8>&
+        +SetRevealed_Global(int32, bool) bool
+        +FindShortestPath_BFS(int32, int32, TArray<int32>&) bool
     }
+
+    class UFCWorldMapSaveGame {
+        <<USaveGame>>
+        +RevealMask : TArray<uint8>
+        +LandMask : TArray<uint8>
+    }
+
+    class UTexture2D
 
     UGameInstanceSubsystem <|-- UFCExpeditionManager
-    UFCExpeditionManager --> EFCExpeditionStatus : uses
-    UFCGameInstance --> UFCExpeditionManager : owns subsystem
+    UFCExpeditionManager --> UFCExpeditionData : owns
+    UFCExpeditionManager --> FFCWorldMapExploration : embeds
+    UFCExpeditionManager --> UFCWorldMapSaveGame : serializes
+    UFCExpeditionManager --> UTexture2D : exposes fog/route
 
-    style UFCExpeditionManager fill:#e91e63
-    style EFCExpeditionStatus fill:#50c878
-```
+`
+
+### Files
+
+- Source/FC/Expedition/FCExpeditionData.h/.cpp
+- Source/FC/Expedition/FCExpeditionManager.h/.cpp
+- Source/FC/WorldMap/FCWorldMapExploration.h/.cpp
+- Source/FC/WorldMap/FCWorldMapSaveGame.h
 
 ### EFCExpeditionStatus Enum
 
-- **Files**: `Source/FC/Core/UFCExpeditionManager.h`
-- **Type**: `UENUM(BlueprintType)`
-- **Purpose**: Track expedition lifecycle states
+The lifecycle enum remains unchanged from Week 2. It still lives in FCExpeditionData.h and defines Planning, InProgress, Completed, and Failed. The manager keeps using it to gate UI state and to report IsExpeditionActive().
 
-#### Enum Values
+### UFCExpeditionData Updates
 
-```cpp
-UENUM(BlueprintType)
-enum class EFCExpeditionStatus : uint8
+`cpp
+UCLASS(BlueprintType)
+class FC_API UFCExpeditionData : public UObject
 {
-    /** No expedition currently active */
-    NotStarted = 0 UMETA(DisplayName = "Not Started"),
+GENERATED_BODY()
+public:
+UPROPERTY(BlueprintReadWrite, Category = "Expedition")
+FString ExpeditionName;
 
-    /** Expedition is being planned (in table view) */
-    Planning UMETA(DisplayName = "Planning"),
+    UPROPERTY(BlueprintReadWrite, Category = "Expedition")
+    FString StartDate;
 
-    /** Expedition is currently in progress (gameplay) */
-    InProgress UMETA(DisplayName = "In Progress"),
+    UPROPERTY(BlueprintReadWrite, Category = "Expedition")
+    FString TargetRegion;
 
-    /** Expedition completed successfully */
-    Completed UMETA(DisplayName = "Completed"),
+    UPROPERTY(BlueprintReadWrite, Category = "Expedition")
+    int32 StartingSupplies = 0;
 
-    /** Expedition failed or was abandoned */
-    Failed UMETA(DisplayName = "Failed")
+    UPROPERTY(BlueprintReadWrite, Category = "Expedition")
+    EFCExpeditionStatus ExpeditionStatus = EFCExpeditionStatus::Planning;
+
+    UPROPERTY(BlueprintReadWrite, Category = "Expedition|Planning")
+    int32 SelectedGridId = INDEX_NONE;
+
+    UPROPERTY(BlueprintReadWrite, Category = "Expedition|Planning")
+    int32 SelectedStartGridId = INDEX_NONE;
+
+    UPROPERTY(BlueprintReadWrite, Category = "Expedition|Planning")
+    int32 SelectedStartSubId = INDEX_NONE;
+
+    UPROPERTY(BlueprintReadWrite, Category = "Expedition|Planning")
+    int32 PreviewTargetGridId = INDEX_NONE;
+
+    UPROPERTY(BlueprintReadWrite, Category = "Expedition|Planning")
+    int32 PreviewTargetSubId = INDEX_NONE;
+
+    UPROPERTY(BlueprintReadWrite, Category = "Expedition|Planning")
+    TArray<int32> PlannedRouteGlobalIds;
+
+    UPROPERTY(BlueprintReadWrite, Category = "Expedition|Planning")
+    int32 PlannedMoneyCost = 0;
+
+    UPROPERTY(BlueprintReadWrite, Category = "Expedition|Planning")
+    int32 PlannedRiskCost = 0;
+
 };
-```
+`
 
-**State Transitions**:
+These fields allow the UI to reopen the planning table and restore the previously selected grid, preview target, and cost totals without needing a separate GameInstance struct.
 
-- `NotStarted` → `Planning` (player clicks map in Office)
-- `Planning` → `InProgress` (player confirms expedition start)
-- `InProgress` → `Completed` (expedition objectives met)
-- `InProgress` → `Failed` (player retreats or loses)
-- `Completed`/`Failed` → `NotStarted` (player returns to Office)
+### UFCExpeditionManager (Week 4 API)
 
-### UFCExpeditionManager
+| Responsibility       | Implementation Notes                                                                                                                                                                     |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Expedition lifecycle | StartNewExpedition, EndExpedition, IsExpeditionActive replace the earlier CreateExpedition / CompleteExpedition helpers.                                                                 |
+| Fog-of-war textures  | WorldMap_GetFogTexture() and WorldMap_GetRouteTexture() return transient 256x256 PF_G8 textures that the widget binds via MID.                                                           |
+| Selection flow       | WorldMap_SelectGridArea(int32 GridId) validates milestone selections (currently grid 24) and populates UFCExpeditionData with preview IDs and route cost.                                |
+| Route preview        | WorldMap_BeginRoutePreviewPaint(float StepSeconds) animates the route by writing into a runtime texture. WorldMap_ClearRoutePreview() resets the buffer.                                 |
+| Exploration updates  | WorldMap_RecordVisitedWorldLocation(FVector WorldPosition) converts the pawn location into a global sub-cell index and toggles the reveal mask. Autosave runs on a short debounce timer. |
+| Persistence          | WorldMap_SaveNow() writes UFCWorldMapSaveGame (RevealMask + LandMask). WorldMap_InitOrLoad() seeds the masks and applies the default revealed areas (bottom row + 16/17/30/31).          |
 
-- **Files**: `Source/FC/Core/UFCExpeditionManager.h/.cpp`
-- **Inheritance**: `UGameInstanceSubsystem`
-- **Purpose**: Centralized expedition state management and lifecycle orchestration
+> **Integration change**: UFCGameInstance no longer stores FFCExpeditionPlanningState. Widgets access planning information through the subsystem's CurrentExpedition instance.
 
-#### Key Properties
+### Week 4 – Expedition Loop, World Map UI & Input Blocking
 
-```cpp
-/** Name of the current expedition (e.g., "FirstExpedition", "MountainPass") */
-UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Expedition")
-FName CurrentExpeditionName;
+Week 4 focuses on closing the expedition planning loop, wiring the 16×16 world map into `UFCExpeditionManager`, and hardening input so modal UI widgets cannot leak clicks into the 3D world.
 
-/** Current status of the active expedition */
-UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Expedition")
-EFCExpeditionStatus CurrentExpeditionStatus;
-```
+#### UFCGameInstance – Money Helpers
 
-#### Key Methods
+Files: `Source/FC/Core/UFCGameInstance.h/.cpp`
 
-##### HasActiveExpedition
+- Added `int32 GetMoney() const` to expose `GameStateData.Money`.
+- Added `void AddMoney(int32 Delta)` to adjust money, clamp it to non‑negative, mark the session dirty, and broadcast `OnExpeditionContextChanged` so UI can refresh.
+- Added `bool ConsumeMoney(int32 Amount)` to validate sufficient funds, subtract the cost, log warnings on insufficient funds, and return success/failure.
 
-```cpp
-/**
- * Check if an expedition is currently active
- * @return True if status is Planning or InProgress, false otherwise
- */
-UFUNCTION(BlueprintCallable, Category = "Expedition")
-bool HasActiveExpedition() const;
-```
+These helpers are the single entry point for expedition‑related money checks in C++ and Blueprint.
 
-**Implementation**:
+#### UFCExpeditionPlanningWidget – Shared Affordability & Start Flow
 
-```cpp
-bool UFCExpeditionManager::HasActiveExpedition() const
+Files: `Source/FC/UI/FCExpeditionPlanningWidget.h/.cpp`
+
+- Introduced a BlueprintCallable helper:
+    - `bool CanAffordCurrentExpedition(int32& OutPlannedCost, int32& OutCurrentMoney) const`
+        - Reads the current expedition from `UFCExpeditionManager` (planned route IDs and `PlannedMoneyCost`).
+        - Validates that a route is selected and cost > 0.
+        - Looks up `UFCGameInstance::GetMoney()` and compares to `PlannedMoneyCost`.
+        - Returns `true` when the route is affordable and writes both out values for UI display.
+- Refactored `OnStartExpeditionClicked()` to:
+    - Early‑out if `CanAffordCurrentExpedition` fails (no route or not enough money).
+    - Call `GameInstance->ConsumeMoney(PlannedCost)` and bail on rare failure.
+    - Re‑read `CurrentExpedition`, set `ExpeditionStatus` to `InProgress`, and broadcast any listeners.
+    - Use `UFCGameStateManager` to move into the travel state and `UFCLevelManager` to load `L_Overworld`.
+    - Remove the planning widget from its parent after a successful transition.
+
+This centralizes expedition start logic and ensures money is consumed atomically with the state change.
+
+#### Modal UI Input Blocking – UFCBlockingWidgetBase, UFCUIManager, AFCPlayerController
+
+To prevent clicks on the expedition planning widget or overworld HUD map from affecting the underlying world, Week 4 introduces a generalized "blocking widget" pattern.
+
+**UFCBlockingWidgetBase**
+
+Files: `Source/FC/UI/FCBlockingWidgetBase.h/.cpp`
+
+- New base class deriving from `UUserWidget`.
+- `NativeConstruct()` resolves `UFCGameInstance` → `UFCUIManager` and calls `SetFocusedBlockingWidget(this)`.
+- `NativeDestruct()` resolves `UFCUIManager` and, if `FocusedBlockingWidget == this`, clears it by calling `SetFocusedBlockingWidget(nullptr)` before chaining to `Super::NativeDestruct()`.
+- Any widget inheriting from this base automatically becomes the "focused blocking" widget while visible and releases it when destroyed.
+
+`UFCExpeditionPlanningWidget` now inherits from `UFCBlockingWidgetBase` instead of `UUserWidget`, so it participates in this pattern without extra code.
+
+**UFCUIManager – Focused Blocking Widget State**
+
+Files: `Source/FC/Core/FCUIManager.h/.cpp`
+
+- Added `UPROPERTY(BlueprintReadWrite) UUserWidget* FocusedBlockingWidget`.
+- Added `void SetFocusedBlockingWidget(UUserWidget* Widget)` to update the reference.
+- Added `bool IsFocusedWidgetOpen() const` which returns `true` if `FocusedBlockingWidget` is non‑null and still in the viewport.
+- Updated `ShowOverworldMapHUD(APlayerController* OwningPlayer)` to register the created `WBP_OverworldMap` instance as `FocusedBlockingWidget` when displayed. When the widget is removed, `UFCBlockingWidgetBase::NativeDestruct` clears the focus.
+
+**AFCPlayerController – World Interaction Gate**
+
+Files: `Source/FC/Core/FCPlayerController.h/.cpp`
+
+- Added `bool CanProcessWorldInteraction() const;` which:
+    - Resolves `UFCGameInstance` → `UFCUIManager`.
+    - Returns `false` if `UIManager->IsFocusedWidgetOpen()` is `true`.
+    - Otherwise returns `!UIManager->IsTableWidgetOpen()` to preserve existing table‑view behavior.
+- Updated interaction entry points to respect this gate:
+    - `HandleTableObjectClick()` – early‑out if `CanProcessWorldInteraction()` is `false`, preventing table interactions under modal UIs.
+    - `HandleOverworldClickMove()` – early‑out when blocked, so convoy click‑to‑move is disabled while the overworld map HUD or planning widget is open.
+
+**UFCInteractionComponent – Trace Suppression**
+
+Files: `Source/FC/Interaction/FCInteractionComponent.cpp`
+
+- `DetectInteractables()` now:
+    - Resolves the owning `AFCPlayerController`.
+    - If present and `CanProcessWorldInteraction()` is `false`, clears `CurrentInteractable` and returns early without running line traces.
+- This eliminates interaction prompt spam and prevents interactables from reacting while a blocking widget is in focus.
+
+#### WBP_WorldMap – World Map Widget Blueprint
+
+Asset: `Content/FC/UI/ReusableWidgets/WBP_WorldMap`
+
+- Layout: full‑screen canvas containing `Image_MapBackground`, `Image_FogOverlay`, and `Image_RouteOverlay`, plus grid buttons (initial milestone: a single debug cell) and a side panel for area name, cost, and risk.
+- Subsystem wiring:
+    - On Construct, resolves `UFCGameInstance` and `UFCExpeditionManager`.
+    - If the subsystem is missing, logs an error and removes itself.
+    - Obtains fog and route textures via `WorldMap_GetFogTexture()` / `WorldMap_GetRouteTexture()` and binds them to dynamic material instances assigned to the overlay images.
+- Planning integration:
+    - Area selection updates `UFCExpeditionData` (grid IDs, preview targets, cost/risk fields).
+    - `UFCExpeditionPlanningWidget` uses `CanAffordCurrentExpedition` to gate the "Start Expedition" button and display planned cost vs. current money.
+
+Dynamic route construction and live fog‑of‑war unveiling remain deferred; Week 4 delivers a stable, data‑driven planning loop with robust input blocking.
+
+### FFCWorldMapExploration Helper
+
+`cpp
+class FFCWorldMapExploration
 {
-    return CurrentExpeditionStatus == EFCExpeditionStatus::Planning
-        || CurrentExpeditionStatus == EFCExpeditionStatus::InProgress;
-}
-```
+public:
+static constexpr int32 GridSize = 16;
+static constexpr int32 SubSize = 16;
+static constexpr int32 GlobalSize = GridSize _ SubSize; // 256
+static constexpr int32 GlobalCount = GlobalSize _ GlobalSize; // 65,536
 
-**Use Cases**:
+    const TArray<uint8>& GetRevealMask() const;
+    TArray<uint8>& GetRevealMaskMutable();
+    bool SetRevealed_Global(int32 GlobalId, bool bRevealed);
+    bool FindShortestPath_BFS(int32 StartGlobalId, int32 GoalGlobalId, TArray<int32>& OutPath) const;
 
-- Disable "New Expedition" button if expedition already active
-- Block level transitions during active expeditions
-- Validate expedition-specific actions
+    static int32 AreaSubToGlobalId(int32 GridId, int32 SubId);
+    static void GlobalIdToXY(int32 GlobalId, int32& OutGX, int32& OutGY);
 
-##### GetExpeditionStatus
+};
+`
 
-```cpp
-/**
- * Get the current expedition status
- * @return Current expedition status enum value
- */
-UFUNCTION(BlueprintCallable, Category = "Expedition")
-EFCExpeditionStatus GetExpeditionStatus() const { return CurrentExpeditionStatus; }
-```
+- Maintains reveal and land masks in CPU memory.
+- Converts between area IDs, sub-cell IDs, and global 256x256 indices.
+- BFS treats water as always traversable and allows unrevealed land only for the goal node, matching the Week 4 concept.
 
-##### CreateExpedition
+### UFCWorldMapSaveGame
 
-```cpp
-/**
- * Create and start planning a new expedition
- * @param ExpeditionName Name/ID of the expedition to create
- */
-UFUNCTION(BlueprintCallable, Category = "Expedition")
-void CreateExpedition(const FName& ExpeditionName);
-```
+A lightweight USaveGame container that serializes the two mask arrays. Autosave runs whenever exploration toggles a new cell (after a short delay). Slots use the fixed name FC_WorldMapExploration.
 
-**Implementation**:
+### Asset Requirements
 
-- Checks if expedition already active (logs warning if so)
-- Sets `CurrentExpeditionName` to `ExpeditionName`
-- Sets `CurrentExpeditionStatus` to `Planning`
-- Broadcasts `OnExpeditionContextChanged` delegate (via GameInstance)
-- Logs the expedition creation
+- **Land Mask**: Import T_LandMask_256 (256x256 grayscale). Set sRGB = false, Compression = Grayscale, Mip Gen Settings = NoMipmaps, and enable Allow CPU Access. Assign it to UFCExpeditionManager::LandMaskTexture.
+- **UI Materials**: Fog and route overlays should expose Texture2D parameters so the subsystem textures can be injected at runtime.
 
-**Code Example**:
+### Integration Checklist
 
-```cpp
-void UFCExpeditionManager::CreateExpedition(const FName& ExpeditionName)
+1. In WBP*WorldMap, cache the subsystem in Event Construct, assign fog/route textures, and hook up the WorldMap*\* Blueprint API for selection, preview, and delegate binding.
+2. Keep the land mask texture configured per the requirements above to avoid Land mask texture size mismatch warnings.
+3. Ensure the overworld convoy pawn calls WorldMap_RecordVisitedWorldLocation while an expedition is active so fog data persists between sessions.
+
+`// Overworld pawn tick pseudo-code
+if (UFCExpeditionManager* EM = GetGameInstance()->GetSubsystem<UFCExpeditionManager>())
 {
-    if (HasActiveExpedition())
+    if (EM->IsExpeditionActive())
     {
-        UE_LOG(LogFCExpedition, Warning, TEXT("CreateExpedition: Expedition already active (%s)"),
-            *CurrentExpeditionName.ToString());
-        return;
+        EM->WorldMap_RecordVisitedWorldLocation(GetActorLocation());
     }
-
-    CurrentExpeditionName = ExpeditionName;
-    CurrentExpeditionStatus = EFCExpeditionStatus::Planning;
-
-    UE_LOG(LogFCExpedition, Log, TEXT("CreateExpedition: %s (Status: Planning)"), *ExpeditionName.ToString());
-
-    // Notify GameInstance of context change
-    UFCGameInstance* GameInstance = GetGameInstance<UFCGameInstance>();
-    if (GameInstance)
-    {
-        GameInstance->OnExpeditionContextChanged.Broadcast();
-    }
-}
-```
-
-##### CompleteExpedition
-
-```cpp
-/**
- * Mark the current expedition as completed successfully
- */
-UFUNCTION(BlueprintCallable, Category = "Expedition")
-void CompleteExpedition();
-```
-
-**Implementation**:
-
-- Validates expedition is active
-- Sets `CurrentExpeditionStatus` to `Completed`
-- Broadcasts `OnExpeditionContextChanged` delegate
-- Logs the completion
-- Future: Trigger rewards, unlock next expedition, update campaign progress
-
-##### CancelExpedition
-
-```cpp
-/**
- * Cancel/abandon the current expedition
- */
-UFUNCTION(BlueprintCallable, Category = "Expedition")
-void CancelExpedition();
-```
-
-**Implementation**:
-
-- Validates expedition is active
-- Sets `CurrentExpeditionStatus` to `Failed`
-- Clears `CurrentExpeditionName`
-- Broadcasts `OnExpeditionContextChanged` delegate
-- Logs the cancellation
-- Future: Apply failure penalties (lost supplies, morale, etc.)
-
-### Integration with Table Interaction System
-
-**Expedition Creation Flow**:
-
-```mermaid
-sequenceDiagram
-    participant Player
-    participant PC as AFCPlayerController
-    participant TO as BP_TableObject_Map
-    participant EM as UFCExpeditionManager
-    participant Widget as WBP_ExpeditionPlanning
-
-    Player->>PC: Click BP_TableObject_Map
-    PC->>TO: OnTableObjectClicked()
-    TO->>EM: CreateExpedition("TestExpedition")
-    EM->>EM: CurrentExpeditionStatus = Planning
-    EM->>Widget: OnExpeditionContextChanged.Broadcast()
-    Widget->>Widget: Update UI (show planning interface)
-    PC->>Widget: ShowTableWidget()
-
-    Note over Widget: Player reviews supplies, selects route
-
-    Player->>Widget: Click "Start Expedition"
-    Widget->>EM: SetExpeditionStatus(InProgress)
-    Widget->>PC: LoadLevel("L_Expedition", true)
-```
-
-### Blueprint Usage
-
-**Create Expedition** (L_Office Level Blueprint BeginPlay):
-
-```
-Get Game Instance → Get Subsystem (FCExpeditionManager) → Create Expedition
-  └─ Expedition Name: "TestExpedition"
-```
-
-**Check Active Expedition**:
-
-```
-Get Game Instance → Get Subsystem (FCExpeditionManager) → Has Active Expedition
-  ├─ True → Show "Resume Expedition" button
-  └─ False → Show "New Expedition" button
-```
-
-**Get Expedition Status**:
-
-```
-Get Game Instance → Get Subsystem (FCExpeditionManager) → Get Expedition Status
-  ├─ Planning → Enable table interaction
-  ├─ InProgress → Show expedition UI
-  └─ NotStarted → Show office idle state
-```
-
-### Testing & Validation
-
-**Week 2 Testing Verified** ✅:
-
-- ✅ CreateExpedition called from L_Office Level Blueprint BeginPlay
-- ✅ HasActiveExpedition returns `true` after creation
-- ✅ GetExpeditionStatus returns `Planning` status
-- ✅ OnExpeditionContextChanged delegate broadcasts successfully
-- ✅ Widget displays correct status
-- ✅ "Start Test Expedition" button shows placeholder message (no actual transition yet)
-- ✅ Logging at all lifecycle points
-
-**Console Testing**:
-
-```cpp
-// Create expedition
-GetGameInstance()->GetSubsystem<UFCExpeditionManager>()->CreateExpedition(FName("TestExpedition"))
-
-// Check active status
-GetGameInstance()->GetSubsystem<UFCExpeditionManager>()->HasActiveExpedition()
-
-// Get status
-GetGameInstance()->GetSubsystem<UFCExpeditionManager>()->GetExpeditionStatus()
-
-// Complete expedition
-GetGameInstance()->GetSubsystem<UFCExpeditionManager>()->CompleteExpedition()
-
-// Cancel expedition
-GetGameInstance()->GetSubsystem<UFCExpeditionManager>()->CancelExpedition()
-```
-
-### Design Notes
-
-**Subsystem Pattern**: Extends `UGameInstanceSubsystem` for automatic lifecycle management and global access without singleton boilerplate.
-
-**Status Enum**: `EFCExpeditionStatus` provides clear state machine for expedition lifecycle, enabling UI state binding and validation logic.
-
-**Delegate Integration**: Uses `UFCGameInstance::OnExpeditionContextChanged` for loose coupling between systems (widgets don't need direct manager references).
-
-**Week 2 Scope**: Foundation only—actual expedition gameplay (level loading, encounter system, failure conditions) deferred to later weeks.
-
-**Future Extensions**:
-
-- Expedition data structures (route, objectives, participants)
-- Resource consumption during planning
-- Save/load expedition state
-- Expedition templates and procedural generation
-- Failure condition handling (retreat, death, time limits)
-
----
+}`
 
 ## Logging & Debugging
 

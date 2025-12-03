@@ -86,6 +86,17 @@ void UFCInteractionComponent::DetectInteractables()
 		return;
 	}
 
+	// If UI (e.g., table/map widgets) is currently blocking interaction,
+	// skip world traces so prompts and logs aren't spammed behind UIs.
+	if (const AFCPlayerController* FCPC = Cast<AFCPlayerController>(PC))
+	{
+		if (!FCPC->CanProcessWorldInteraction())
+		{
+			CurrentInteractable = nullptr;
+			return;
+		}
+	}
+
 	// Get camera location and direction
 	FVector CameraLocation;
 	FRotator CameraRotation;

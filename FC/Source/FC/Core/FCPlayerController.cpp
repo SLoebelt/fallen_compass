@@ -122,6 +122,18 @@ AFCPlayerController::AFCPlayerController()
 	{
 		UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("Failed to load IA_OverworldZoom."));
 	}
+
+	// Week 4: Overworld map toggle action (M key)
+	static ConstructorHelpers::FObjectFinder<UInputAction> ToggleOverworldMapActionFinder(TEXT("/Game/FC/Input/IA_ToggleOverworldMap"));
+	if (ToggleOverworldMapActionFinder.Succeeded())
+	{
+		ToggleOverworldMapAction = ToggleOverworldMapActionFinder.Object;
+		UE_LOG(LogFallenCompassPlayerController, Log, TEXT("Loaded IA_ToggleOverworldMap"));
+	}
+	else
+	{
+		UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("Failed to load IA_ToggleOverworldMap."));
+	}
 }
 
 EFCPlayerCameraMode AFCPlayerController::GetCameraMode() const
@@ -268,6 +280,80 @@ void AFCPlayerController::SetupInputComponent()
 		EnhancedInput->BindAction(OverworldZoomAction, ETriggerEvent::Triggered, this, &AFCPlayerController::HandleOverworldZoom);
 		UE_LOG(LogFallenCompassPlayerController, Log, TEXT("Bound IA_OverworldZoom"));
 	}
+
+	// Week 4: Bind Overworld map toggle
+	if (ToggleOverworldMapAction)
+	{
+		EnhancedInput->BindAction(ToggleOverworldMapAction, ETriggerEvent::Started, this, &AFCPlayerController::HandleToggleOverworldMap);
+		UE_LOG(LogFallenCompassPlayerController, Log, TEXT("Bound IA_ToggleOverworldMap"));
+	}
+	else
+	{
+		UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("ToggleOverworldMapAction not assigned on %s."), *GetName());
+	}
+}
+
+void AFCPlayerController::HandleToggleOverworldMap()
+{
+	UE_LOG(LogFallenCompassPlayerController, Verbose, TEXT("HandleToggleOverworldMap called"));
+
+	// Only meaningful while in Overworld-related camera mode/state, but
+	// allowing it to toggle anywhere is harmless as long as GI/UI are valid.
+
+	// If widget is already open, close it and restore input/cursor
+	if (CurrentOverworldMapWidget)
+	{
+		CurrentOverworldMapWidget->RemoveFromParent();
+		CurrentOverworldMapWidget = nullptr;
+
+		bShowMouseCursor = false;
+		FInputModeGameOnly InputMode;
+		SetInputMode(InputMode);
+
+		UE_LOG(LogFallenCompassPlayerController, Log, TEXT("HandleToggleOverworldMap: Closed Overworld map widget"));
+		return;
+	}
+
+	// Create and show the view-only Overworld map widget
+	UFCGameInstance* GI = GetGameInstance<UFCGameInstance>();
+	if (!GI)
+	{
+		UE_LOG(LogFallenCompassPlayerController, Error, TEXT("HandleToggleOverworldMap: GameInstance is null"));
+		return;
+	}
+
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		UE_LOG(LogFallenCompassPlayerController, Error, TEXT("HandleToggleOverworldMap: World is null"));
+		return;
+	}
+
+	// Use UIManager helper to create/show WBP_OverworldMap (view-only Overworld map HUD)
+	UFCUIManager* UIManager = GI->GetSubsystem<UFCUIManager>();
+	if (!UIManager)
+	{
+		UE_LOG(LogFallenCompassPlayerController, Error, TEXT("HandleToggleOverworldMap: UIManager subsystem is null"));
+		return;
+	}
+
+	UUserWidget* NewWidget = UIManager->ShowOverworldMapHUD(this);
+	if (!NewWidget)
+	{
+		UE_LOG(LogFallenCompassPlayerController, Error, TEXT("HandleToggleOverworldMap: ShowOverworldMapHUD returned null"));
+		return;
+	}
+
+	CurrentOverworldMapWidget = NewWidget;
+
+	// Enable cursor and game+UI input when map is open
+	bShowMouseCursor = true;
+	FInputModeGameAndUI InputMode;
+	InputMode.SetHideCursorDuringCapture(false);
+	InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+	SetInputMode(InputMode);
+
+	UE_LOG(LogFallenCompassPlayerController, Log, TEXT("HandleToggleOverworldMap: Opened Overworld map widget"));
 }
 
 void AFCPlayerController::HandleInteractPressed()
@@ -1035,6 +1121,13 @@ void AFCPlayerController::HandleClick(const FInputActionValue& Value)
 
 void AFCPlayerController::HandleTableObjectClick()
 {
+	// If a blocking table/map widget is open, ignore world/table clicks entirely.
+	if (!CanProcessWorldInteraction())
+	{
+		UE_LOG(LogFallenCompassPlayerController, Verbose, TEXT("HandleTableObjectClick: UI is blocking world interaction"));
+		return;
+	}
+
 	// Perform line trace from cursor position
 	FHitResult HitResult;
 	bool bHit = GetHitResultUnderCursor(ECC_Visibility, false, HitResult);
@@ -1068,6 +1161,32 @@ void AFCPlayerController::HandleTableObjectClick()
 	{
 		UE_LOG(LogFallenCompassPlayerController, Verbose, TEXT("Cursor click - no actor hit"));
 	}
+}
+
+bool AFCPlayerController::CanProcessWorldInteraction() const
+{
+	const UFCGameInstance* GI = GetGameInstance<UFCGameInstance>();
+	if (!GI)
+	{
+		return true; // No game instance; fall back to allowing interaction
+	}
+
+	const UFCUIManager* UIManager = GI->GetSubsystem<UFCUIManager>();
+	if (!UIManager)
+	{
+		return true;
+	}
+
+	// Block world interaction whenever a focused blocking widget is open
+	// (e.g., expedition planning, overworld map). Fallback to legacy
+	// behavior of treating table widgets as blocking if no focused
+	// widget is configured.
+	if (UIManager->IsFocusedWidgetOpen())
+	{
+		return false;
+	}
+
+	return !UIManager->IsTableWidgetOpen();
 }
 
 void AFCPlayerController::OnTableObjectClicked(AActor* TableObject)
@@ -1109,11 +1228,17 @@ void AFCPlayerController::OnTableObjectClicked(AActor* TableObject)
 		{
 			UIManager->ShowTableWidget(TableObject);
 
-			// Set input mode to GameAndUI so player controller can receive ESC key
-			FInputModeGameAndUI InputMode;
-			InputMode.SetHideCursorDuringCapture(false);
-			SetInputMode(InputMode);
-			bShowMouseCursor = true;
+			// Set input mode to focus the currently open table widget so clicks
+			// are captured by the UI instead of hitting world interactables.
+			if (UUserWidget* TableWidget = UIManager->GetCurrentTableWidget())
+			{
+				FInputModeGameAndUI InputMode;
+				InputMode.SetWidgetToFocus(TableWidget->TakeWidget());
+				InputMode.SetHideCursorDuringCapture(false);
+				InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::LockAlways);
+				SetInputMode(InputMode);
+				bShowMouseCursor = true;
+			}
 		}
 	}, 2.0f, false);
 }
@@ -1148,6 +1273,14 @@ void AFCPlayerController::CloseTableWidget()
 
 void AFCPlayerController::HandleOverworldClickMove()
 {
+	// If a blocking UI widget (e.g., overworld map or table) is open,
+	// ignore click-to-move so the map can be interacted with safely.
+	if (!CanProcessWorldInteraction())
+	{
+		UE_LOG(LogFallenCompassPlayerController, Verbose, TEXT("HandleOverworldClickMove: UI is blocking overworld movement"));
+		return;
+	}
+
 	// Get mouse cursor hit result
 	FHitResult HitResult;
 	bool bHit = GetHitResultUnderCursor(ECC_Visibility, false, HitResult);

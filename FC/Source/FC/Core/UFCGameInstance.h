@@ -40,53 +40,6 @@ struct FFCGameStateData
 };
 
 /**
- * FFCExpeditionPlanningState
- *
- * Runtime state for expedition planning (non-DataTable).
- * Stores player's current area and start point selections for the map UI.
- * Persists across UI open/close to support interrupted planning sessions.
- */
-USTRUCT(BlueprintType)
-struct FFCExpeditionPlanningState
-{
-    GENERATED_BODY()
-
-    /** Currently selected area ID */
-    UPROPERTY(BlueprintReadWrite, Category = "Planning")
-    FName SelectedAreaID;
-
-    /** Currently selected start point ID */
-    UPROPERTY(BlueprintReadWrite, Category = "Planning")
-    FName SelectedStartPointID;
-
-    /** True if player ESC'd from planning widget (resume planning on next open) */
-    UPROPERTY(BlueprintReadWrite, Category = "Planning")
-    bool bPlanningInProgress;
-
-    /** Default constructor */
-    FFCExpeditionPlanningState()
-        : SelectedAreaID(NAME_None)
-        , SelectedStartPointID(NAME_None)
-        , bPlanningInProgress(false)
-    {
-    }
-
-    /** Clear all selections */
-    void ClearSelection()
-    {
-        SelectedAreaID = NAME_None;
-        SelectedStartPointID = NAME_None;
-        bPlanningInProgress = false;
-    }
-
-    /** Check if state is valid (both area and start point selected) */
-    bool IsValid() const
-    {
-        return SelectedAreaID != NAME_None && SelectedStartPointID != NAME_None;
-    }
-};
-
-/**
  * UFCGameInstance centralizes long-lived expedition context per GDD §3.1.
  * Fields are placeholders for Week 1; they become real once meta-systems land.
  */
@@ -142,6 +95,10 @@ class FC_API UFCGameInstance : public UGameInstance
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "UI")
     TSubclassOf<UUserWidget> ActionSelectionWidgetClass;
 
+    /** Overworld view-only map HUD widget class (configured in Blueprint, used by UIManager) */
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "UI")
+    TSubclassOf<UUserWidget> OverworldMapHUDWidgetClass;
+
     /** Table widget registry: Maps table object classes to their widget classes */
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "UI")
     TMap<TSubclassOf<AActor>, TSubclassOf<UUserWidget>> TableWidgetMap;
@@ -149,6 +106,54 @@ class FC_API UFCGameInstance : public UGameInstance
     /** Level metadata DataTable (data-driven level configuration) */
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Level")
     TObjectPtr<UDataTable> LevelMetadataTable;
+
+    // ---------------------------------------------------------------------
+    // Expedition Manager Subsystem Configuration (Week 4)
+    // ---------------------------------------------------------------------
+
+    /** Land mask texture for world map (256x256, white=land, black=water) */
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Expedition|WorldMap")
+    TSoftObjectPtr<UTexture2D> WorldMapLandMaskTexture;
+
+    /** Overworld minimum world bounds (for coordinate mapping) */
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Expedition|WorldMap")
+    FVector2D OverworldWorldMin = FVector2D(-50000.f, -50000.f);
+
+    /** Overworld maximum world bounds (for coordinate mapping) */
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Expedition|WorldMap")
+    FVector2D OverworldWorldMax = FVector2D(50000.f, 50000.f);
+
+    /** Office grid cell ID on the 16x16 planning map */
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Expedition|WorldMap")
+    int32 OfficeGridId = 8;
+
+    /** Office sub-cell ID within the grid cell (0-15) */
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Expedition|WorldMap")
+    int32 OfficeSubId = 0;
+
+    /** Milestone: Available start point grid ID (for Week 4 demo) */
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Expedition|WorldMap")
+    int32 AvailableStartGridId = 24;
+
+    /** Milestone: Available start point sub-cell ID (for Week 4 demo) */
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Expedition|WorldMap")
+    int32 AvailableStartSubId = 26;
+
+    /** Milestone: Preview target grid ID (for route preview demo) */
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Expedition|WorldMap")
+    int32 PreviewTargetGridId = 25;
+
+    /** Milestone: Preview target sub-cell ID (for route preview demo) */
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Expedition|WorldMap")
+    int32 PreviewTargetSubId = 0;
+
+    /** GridIds (bottom-left origin) that start revealed on a new game */
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Expedition|WorldMap")
+    TArray<int32> DefaultRevealedWorldMapGridIds;
+
+    // ---------------------------------------------------------------------
+    // Original Properties
+    // ---------------------------------------------------------------------
 
     /** Active expedition identifier; persists across level loads. */
     UPROPERTY(BlueprintReadOnly, Category = "Expedition")
@@ -165,10 +170,6 @@ class FC_API UFCGameInstance : public UGameInstance
     /** Current game state data (Week 2 feature) */
     UPROPERTY(BlueprintReadOnly, Category = "Game State")
     FFCGameStateData GameStateData;
-
-    /** Current expedition planning state (Week 4 feature) */
-    UPROPERTY(BlueprintReadOnly, Category = "Game State")
-    FFCExpeditionPlanningState CurrentPlanningState;
 
     /** Current supplies available for expeditions (Week 2 feature) - DEPRECATED: Use GameStateData.Supplies */
     UPROPERTY(BlueprintReadOnly, Category = "Resources")
@@ -202,6 +203,18 @@ class FC_API UFCGameInstance : public UGameInstance
     UFUNCTION(BlueprintCallable, Category = "Resources")
     int32 ConsumeSupplies(int32 Amount, bool& bSuccess);
 
+    /** Get current money (campaign currency) */
+    UFUNCTION(BlueprintPure, Category = "Resources")
+    int32 GetMoney() const { return GameStateData.Money; }
+
+    /** Add money to the pool (can be negative, clamps at zero) */
+    UFUNCTION(BlueprintCallable, Category = "Resources")
+    void AddMoney(int32 Delta);
+
+    /** Consume money if available; returns true on success, false if insufficient */
+    UFUNCTION(BlueprintCallable, Category = "Resources")
+    bool ConsumeMoney(int32 Amount);
+
     /** Save current game state to specified slot */
     UFUNCTION(BlueprintCallable, Category = "SaveGame")
     bool SaveGame(const FString& SlotName);
@@ -230,22 +243,6 @@ class FC_API UFCGameInstance : public UGameInstance
     /** Check if we're currently restoring from a save game */
     UFUNCTION(BlueprintPure, Category = "SaveGame")
     bool IsRestoringSaveGame() const { return PendingLoadData != nullptr; }
-
-    /** Save current planning state (called by WBP_WorldMap when selections change) */
-    UFUNCTION(BlueprintCallable, Category = "Expedition Planning")
-    void SavePlanningState(FName AreaID, FName StartPointID);
-
-    /** Load current planning state (called by WBP_WorldMap on open) */
-    UFUNCTION(BlueprintPure, Category = "Expedition Planning")
-    FFCExpeditionPlanningState LoadPlanningState() const { return CurrentPlanningState; }
-
-    /** Clear planning state (called after expedition starts) */
-    UFUNCTION(BlueprintCallable, Category = "Expedition Planning")
-    void ClearPlanningState();
-
-    /** Get World Map Manager subsystem (convenience accessor) */
-    UFUNCTION(BlueprintPure, Category = "Expedition Planning")
-    class UFCWorldMapManager* GetWorldMapManager() const;
 
     /** Called when a level finishes loading - triggers fade-in if transition is active */
     void OnPostLoadMapWithWorld(UWorld* LoadedWorld);
