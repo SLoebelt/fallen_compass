@@ -114,16 +114,16 @@ void UFCUIManager::ShowPauseMenu()
 		// Overworld level (L_Overworld): YES engine pause (stops convoy movement and physics)
 		UWorld* World = GetWorld();
 		bool bShouldUseEnginePause = false;
-		
+
 		if (World)
 		{
 			FString CurrentLevelName = World->GetMapName();
 			// Remove PIE prefix if present (e.g., "UEDPIE_0_L_Overworld" -> "L_Overworld")
 			CurrentLevelName.RemoveFromStart(World->StreamingLevelsPrefix);
-			
+
 			// Enable engine pause only for Overworld level
 			bShouldUseEnginePause = CurrentLevelName.Contains(TEXT("L_Overworld"));
-			
+
 			UE_LOG(LogFCUIManager, Log, TEXT("ShowPauseMenu: Current level is %s, engine pause %s"),
 				*CurrentLevelName,
 				bShouldUseEnginePause ? TEXT("ENABLED") : TEXT("DISABLED"));
@@ -140,14 +140,14 @@ void UFCUIManager::ShowPauseMenu()
 				InputMode.SetHideCursorDuringCapture(false);
 				PC->SetInputMode(InputMode);
 				PC->bShowMouseCursor = true;
-				
+
 				// Conditionally pause engine based on level
 				if (bShouldUseEnginePause)
 				{
 					PC->SetPause(true);
 					UE_LOG(LogFCUIManager, Log, TEXT("ShowPauseMenu: Engine paused (L_Overworld level)"));
 				}
-				
+
 				UE_LOG(LogFCUIManager, Log, TEXT("ShowPauseMenu: Input mode set to GameAndUI, pause menu displayed"));
 			}
 		}
@@ -171,16 +171,16 @@ void UFCUIManager::HidePauseMenu()
 		// Check current level to determine if engine pause was used
 		UWorld* World = GetWorld();
 		bool bWasUsingEnginePause = false;
-		
+
 		if (World)
 		{
 			FString CurrentLevelName = World->GetMapName();
 			// Remove PIE prefix if present
 			CurrentLevelName.RemoveFromStart(World->StreamingLevelsPrefix);
-			
+
 			// Engine pause was used if we're in Overworld level
 			bWasUsingEnginePause = CurrentLevelName.Contains(TEXT("L_Overworld"));
-			
+
 			UE_LOG(LogFCUIManager, Log, TEXT("HidePauseMenu: Current level is %s, engine pause %s"),
 				*CurrentLevelName,
 				bWasUsingEnginePause ? TEXT("was ENABLED, unpausing") : TEXT("was DISABLED"));
@@ -198,7 +198,7 @@ void UFCUIManager::HidePauseMenu()
 					PC->SetPause(false);
 					UE_LOG(LogFCUIManager, Log, TEXT("HidePauseMenu: Engine unpaused (L_Overworld level)"));
 				}
-				
+
 				PC->SetInputMode(FInputModeGameOnly());
 				PC->bShowMouseCursor = false;
 				UE_LOG(LogFCUIManager, Log, TEXT("HidePauseMenu: Input mode restored to game only, pause menu hidden"));
@@ -231,7 +231,7 @@ void UFCUIManager::HandleNewLegacyClicked()
 
 	// Transition to gameplay
 	PC->TransitionToGameplay();
-	
+
 	UE_LOG(LogFCUIManager, Log, TEXT("HandleNewLegacyClicked: Transition complete"));
 }
 
@@ -260,7 +260,7 @@ void UFCUIManager::HandleContinueClicked()
 
 	// Load the save
 	GI->LoadGameAsync(SlotName);
-	
+
 	UE_LOG(LogFCUIManager, Log, TEXT("HandleContinueClicked: Loading save '%s'"), *SlotName);
 }
 
@@ -273,14 +273,14 @@ void UFCUIManager::HandleLoadSaveClicked()
 
 	// Show save slot selector
 	ShowSaveSlotSelector();
-	
+
 	UE_LOG(LogFCUIManager, Log, TEXT("HandleLoadSaveClicked: Save slot selector shown"));
 }
 
 void UFCUIManager::HandleOptionsClicked()
 {
 	UE_LOG(LogFCUIManager, Log, TEXT("HandleOptionsClicked: TODO - Options menu not yet implemented"));
-	// TODO: Implement options menu in future task
+	// TODO - Implement options menu in future task
 }
 
 void UFCUIManager::HandleQuitClicked()
@@ -313,7 +313,7 @@ void UFCUIManager::HandleBackFromSaveSelector()
 
 	// Show main menu
 	ShowMainMenu();
-	
+
 	UE_LOG(LogFCUIManager, Log, TEXT("HandleBackFromSaveSelector: Main menu shown"));
 }
 
@@ -334,7 +334,7 @@ void UFCUIManager::HandleSaveSlotSelected(const FString& SlotName)
 
 	// Load the selected save
 	GI->LoadGameAsync(SlotName);
-	
+
 	UE_LOG(LogFCUIManager, Log, TEXT("HandleSaveSlotSelected: Load initiated for '%s'"), *SlotName);
 }
 
@@ -349,7 +349,7 @@ void UFCUIManager::ShowTableWidget(AActor* TableObject)
 	// Get the widget class for this table object type
 	TSubclassOf<AActor> TableClass = TableObject->GetClass();
 	TSubclassOf<UUserWidget>* WidgetClassPtr = TableWidgetMap.Find(TableClass);
-	
+
 	if (!WidgetClassPtr || !(*WidgetClassPtr))
 	{
 		UE_LOG(LogFCUIManager, Error, TEXT("ShowTableWidget: No widget class registered for %s"), *TableClass->GetName());
@@ -443,10 +443,10 @@ UUserWidget* UFCUIManager::ShowPOIActionSelection(const TArray<FFCPOIActionData>
 		{
 			TArray<FFCPOIActionData> InActions;
 		};
-		
+
 		FPopulateActionsParams Params;
 		Params.InActions = Actions;
-		
+
 		CurrentPOIActionSelectionWidget->ProcessEvent(PopulateFunc, &Params);
 		UE_LOG(LogFCUIManager, Log, TEXT("ShowPOIActionSelection: Called PopulateActions with %d actions"), Actions.Num());
 	}

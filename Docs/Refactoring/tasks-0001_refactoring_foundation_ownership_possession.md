@@ -129,27 +129,47 @@ Key Decisions:
 
 #### Step 1.1.1: Make Explorer the possessed pawn in Camp
 **Analysis**
-- Current FC_ExplorerCharacter uses AI possession to keep static camera.
-- New approach: PlayerController possesses Explorer; camera stays static by setting view target to CampCamera actor.
+- Old behavior:
+  - `AFC_ExplorerCharacter` was AI-possessed (`AutoPossessAI`, `AIControllerClass`), and the controller used a “commanded actor” pattern to move it while keeping a static Camp camera.
+  - `AFCPlayerController` contained some camera-discovery logic in `BeginPlay`, and earlier designs assumed calling `SetViewTargetWithBlend` directly in the controller for Camp.
+- New behavior (post-refactor):
+  - `AFC_ExplorerCharacter` is now a standard **player-possessed** pawn in Camp (template-style TopDown character).
+  - `AFCPlayerController` no longer calls `SetViewTargetWithBlend` directly for Camp/POI scenes.
+  - Camp camera behavior is owned by `UFCCameraManager`:
+    - When the game enters `Camp_Local` state, `AFCPlayerController::OnGameStateChanged` calls `CameraManager->BlendToPOISceneCamera(POISceneCameraActor, BlendTime)`.
+    - If `POISceneCameraActor` is `nullptr`, `UFCCameraManager::BlendToPOISceneCamera` auto-resolves a Camp camera by finding an `ACameraActor` tagged `"CampCamera"` (or with a name containing `CampCamera`) and internally calls `SetViewTargetWithBlend` on the controller.
+  - This keeps:
+    - **Possession** logic in GameMode/Explorer,
+    - **Routing** in PlayerController (react to state),
+    - **Camera discovery + blending** in `UFCCameraManager`.
 
 **Implementation**
-- [ ] Decide *one* approach (choose the lowest-risk for your project setup):
-  - **Option A (preferred for prototype):** In Camp level, set placed Explorer actor `Auto Possess Player = Player 0`, and disable AutoPossessAI for that placed instance.
-  - **Option B:** In Camp GameMode (if already exists), set `DefaultPawnClass = AFC_ExplorerCharacter` so it is spawned/possessed normally.
-- [ ] Update `AFC_ExplorerCharacter` defaults if needed:
-  - [ ] Ensure it does not *require* AIController for movement.
-  - [ ] Avoid enabling Tick by default (unless required temporarily for debugging).
-- [ ] Update `AFCPlayerController` Camp init path:
-  - [ ] Find/resolve CampCamera actor (prefer explicit reference; tag fallback OK).
-  - [ ] Call `SetViewTargetWithBlend(CampCameraActor, BlendTime)` once on Camp start.
+- [x] In Camp GameMode, set `DefaultPawnClass = AFC_ExplorerCharacter` so it is spawned/possessed normally.
+- [x] Update `AFC_ExplorerCharacter` defaults:
+  - [x] Ensure it does not *require* AIController for movement (now uses `AutoPossessPlayer = Player0`, `AIControllerClass = nullptr`).
+  - [x] Tick is enabled only for debugging during Week 1 (with TODO to disable once movement/animation are validated).
+- [x] Update `AFCPlayerController` Camp init path:
+  - [x] Remove direct Camp camera discovery from `BeginPlay` (no manual `UGameplayStatics::GetAllActorsOfClass` for `ACameraActor` there).
+  - [x] Rely on `OnGameStateChanged(Camp_Local)` → `CameraManager->BlendToPOISceneCamera(POISceneCameraActor, BlendTime)` to select the Camp camera.
+  - [x] Let `UFCCameraManager::BlendToPOISceneCamera`:
+    - resolve the `CampCamera` actor (by tag/name) when `POISceneCameraActor` is null,
+    - call `SetViewTargetWithBlend` on the owning controller exactly once when entering Camp/POI scenes.
+
+**Notes**
+- The original plan (“call `SetViewTargetWithBlend(CampCameraActor, BlendTime)` once on Camp start from the PlayerController”) was refined:
+  - We **still use `SetViewTargetWithBlend`**, but only **inside `UFCCameraManager`**, not inside `AFCPlayerController`.
+  - This matches the architecture principle: *controller routes state → camera manager; camera manager owns view-target logic*.
 
 **Testing After Step 1.1.1** ✅ CHECKPOINT
-- [ ] Compile (User): ✅
-- [ ] PIE Camp:
-  - [ ] PlayerController `GetPawn()` returns Explorer
-  - [ ] View target is CampCamera actor (static)
-  - [ ] Click/move input causes Explorer to move
-- [ ] Output Log: no errors, no Accessed None
+- [x] Compile (User): ✅
+- [x] PIE Camp:
+  - [x] PlayerController `GetPawn()` returns `AFC_ExplorerCharacter`.
+  - [x] A `CameraActor` with tag `"CampCamera"` exists in the level.
+  - [x] Entering `Camp_Local` causes `UFCCameraManager::BlendToPOISceneCamera` to log that it found/used the Camp camera.
+  - [x] Camera remains static at the Camp camera while Explorer moves.
+- [x] Output Log:
+  - [x] No “Accessed None” errors.
+  - [x] One-time, high-signal logs from camera manager/controller on Camp entry (no spam).
 
 **COMMIT POINT 1.1.1**: `git commit -m "feat(camp): possess explorer and keep static view target"`
 
@@ -161,14 +181,14 @@ Key Decisions:
 - If you used `SimpleMoveToLocation`, it should now target the PlayerController (not AI).
 
 **Implementation**
-- [ ] Confirm the Camp click-to-move handler issues movement through the PlayerController path.
-- [ ] Remove/disable the “commanded actor” glue in Camp if present (e.g., controller commanding an unpossessed pawn AI controller).
-- [ ] Add a one-time log on Camp start:
+- [x] Confirm the Camp click-to-move handler issues movement through the PlayerController path.
+- [x] Remove/disable the “commanded actor” glue in Camp if present (e.g., controller commanding an unpossessed pawn AI controller).
+- [x] Add a one-time log on Camp start:
   - `UE_LOG(LogFCPlayerController, Log, TEXT("Camp init: Pawn=%s ViewTarget=%s"), ...)`
 
 **Testing After Step 1.1.2** ✅ CHECKPOINT
-- [ ] PIE Camp: Explorer moves reliably on click
-- [ ] Output Log: includes one Camp init line; no spam
+- [x] PIE Camp: Explorer moves reliably on click
+- [x] Output Log: includes one Camp init line; no spam
 
 **COMMIT POINT 1.1.2**: `git commit -m "refactor(camp): remove commanded-actor assumption for explorer movement"`
 

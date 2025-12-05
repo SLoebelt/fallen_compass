@@ -1,23 +1,21 @@
 #include "Characters/FC_ExplorerCharacter.h"
 
-#include "AIController.h"
-#include "Components/SkeletalMeshComponent.h"
-#include "Animation/AnimInstance.h"
-#include "GameFramework/CharacterMovementComponent.h"
 #include "Logging/LogMacros.h"
+#include "GameFramework/CharacterMovementComponent.h"
+#include "NavigationSystem.h"
+#include "NavigationPath.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogFCExplorerCharacter, Log, All);
 
 AFC_ExplorerCharacter::AFC_ExplorerCharacter(const FObjectInitializer& ObjectInitializer)
     : Super(ObjectInitializer)
 {
-    // NOTE: Changed from Epic's Top-Down template pattern.
-    // We use an AI controller (like convoy movement) instead of player possession.
-    // This allows SimpleMoveToLocation to work while maintaining static camp camera.
-    AutoPossessAI = EAutoPossessAI::PlacedInWorldOrSpawned;
-    AIControllerClass = AAIController::StaticClass();
+    // Controlled by Player, not AI by default
+    AutoPossessPlayer = EAutoReceiveInput::Player0;
+    AIControllerClass = nullptr; // Use default AIController
 
     // Enable tick for debug logging
+	// TODO - disable in production builds
     PrimaryActorTick.bCanEverTick = true;
     PrimaryActorTick.bStartWithTickEnabled = true;
 
@@ -43,98 +41,110 @@ void AFC_ExplorerCharacter::BeginPlay()
     Super::BeginPlay();
 
     AController* CurrentController = GetController();
-    
+
     UE_LOG(LogFCExplorerCharacter, Log, TEXT("ExplorerCharacter BeginPlay:"));
     UE_LOG(LogFCExplorerCharacter, Log, TEXT("  ExplorerType: %s"), *UEnum::GetValueAsString(ExplorerType));
     UE_LOG(LogFCExplorerCharacter, Log, TEXT("  Controller: %s"), CurrentController ? *CurrentController->GetName() : TEXT("NONE"));
-    UE_LOG(LogFCExplorerCharacter, Log, TEXT("  Note: Using AI controller (like convoy) - commanded by PlayerController"));
-
-    // Initialize animation system
-    InitializeAnimation();
 }
 
-void AFC_ExplorerCharacter::InitializeAnimation()
-{
-    USkeletalMeshComponent* MeshComp = GetMesh();
-    if (!MeshComp)
-    {
-        UE_LOG(LogFCExplorerCharacter, Warning, TEXT("InitializeAnimation: No skeletal mesh component found!"));
-        return;
-    }
-
-    // Ensure animation mode is set to use Animation Blueprint
-    if (MeshComp->GetAnimationMode() != EAnimationMode::AnimationBlueprint)
-    {
-        MeshComp->SetAnimationMode(EAnimationMode::AnimationBlueprint);
-        UE_LOG(LogFCExplorerCharacter, Log, TEXT("InitializeAnimation: Set animation mode to AnimationBlueprint"));
-    }
-
-    // Verify AnimInstance is present
-    UAnimInstance* AnimInst = MeshComp->GetAnimInstance();
-    if (AnimInst)
-    {
-        UE_LOG(LogFCExplorerCharacter, Log, TEXT("InitializeAnimation: AnimInstance active: %s"), 
-            *AnimInst->GetClass()->GetName());
-    }
-    else
-    {
-        UE_LOG(LogFCExplorerCharacter, Warning, 
-            TEXT("InitializeAnimation: No AnimInstance! Ensure Animation Class is set in Blueprint."));
-    }
-}
-
-float AFC_ExplorerCharacter::GetMovementSpeed() const
-{
-    return GetVelocity().Size();
-}
-
-bool AFC_ExplorerCharacter::IsCharacterMoving() const
-{
-    return GetVelocity().SizeSquared() > 1.0f; // Moving if velocity > 1 unit/sec
-}
 
 void AFC_ExplorerCharacter::Tick(float DeltaTime)
 {
     Super::Tick(DeltaTime);
 
-    // Debug: Log velocity and animation state every second
-    static float DebugTimer = 0.0f;
-    DebugTimer += DeltaTime;
-    if (DebugTimer >= 1.0f)
+	// Follow nav path if we have one (Camp/POI movement).
+    if (bIsFollowingPath && PathPoints.Num() > 0 && CurrentPathIndex != INDEX_NONE)
     {
-        DebugTimer = 0.0f;
-        
-        const FVector Velocity = GetVelocity();
-        const float Speed = Velocity.Size();
-        
-        if (Speed > 0.01f)
+        if (CurrentPathIndex >= PathPoints.Num())
         {
-            UCharacterMovementComponent* MoveComp = GetCharacterMovement();
-            if (MoveComp)
-            {
-                const FVector Acceleration = MoveComp->GetCurrentAcceleration();
-                const float AccelSize = Acceleration.Size();
-                
-                UE_LOG(LogFCExplorerCharacter, Log, TEXT("Velocity: %.2f | Acceleration: %.2f"),
-                    Speed, AccelSize);
+            // Reached final point
+            bIsFollowingPath = false;
+            CurrentPathIndex = INDEX_NONE;
+            UE_LOG(LogFCExplorerCharacter, Log, TEXT("Tick: Reached final path point"));
+        }
+        else
+        {
+            FVector CurrentTarget = PathPoints[CurrentPathIndex];
+            FVector ToTarget = CurrentTarget - GetActorLocation();
+            ToTarget.Z = 0.0f; // stay on Camp plane
 
-                // Check ABP ShouldMove variable
-                USkeletalMeshComponent* MeshComp = GetMesh();
-                if (MeshComp)
+            const float Distance = ToTarget.Size();
+            if (Distance <= AcceptRadius)
+            {
+                ++CurrentPathIndex;
+                if (CurrentPathIndex >= PathPoints.Num())
                 {
-                    UAnimInstance* AnimInst = MeshComp->GetAnimInstance();
-                    if (AnimInst)
-                    {
-                        FProperty* ShouldMoveProp = AnimInst->GetClass()->FindPropertyByName(FName("ShouldMove"));
-                        if (ShouldMoveProp && ShouldMoveProp->IsA<FBoolProperty>())
-                        {
-                            bool ShouldMove = *ShouldMoveProp->ContainerPtrToValuePtr<bool>(AnimInst);
-                            UE_LOG(LogFCExplorerCharacter, Log, TEXT("ABP ShouldMove: %s"), 
-                                ShouldMove ? TEXT("TRUE") : TEXT("FALSE"));
-                        }
-                    }
+                    bIsFollowingPath = false;
+                    CurrentPathIndex = INDEX_NONE;
+                    UE_LOG(LogFCExplorerCharacter, Log,
+                        TEXT("Tick: Reached destination at %s"),
+                        *CurrentTarget.ToString());
                 }
+            }
+            else
+            {
+                const FVector Direction = ToTarget.GetSafeNormal();
+                AddMovementInput(Direction, 1.0f);
             }
         }
     }
+}
+
+
+void AFC_ExplorerCharacter::MoveExplorerToLocation(const FVector& TargetLocation)
+{
+    UWorld* World = GetWorld();
+    if (!World)
+    {
+        UE_LOG(LogFCExplorerCharacter, Error, TEXT("MoveExplorerToLocation: World is null"));
+        return;
+    }
+
+    UNavigationSystemV1* NavSys = FNavigationSystem::GetCurrent<UNavigationSystemV1>(World);
+    if (!NavSys)
+    {
+        UE_LOG(LogFCExplorerCharacter, Warning,
+            TEXT("MoveExplorerToLocation: No navigation system available in map %s"),
+            *World->GetMapName());
+        return;
+    }
+
+    const FVector StartLocation = GetActorLocation();
+
+    // Change NavPath variable type here:
+    UNavigationPath* NavPath = NavSys->FindPathToLocationSynchronously(
+        World,
+        StartLocation,
+        TargetLocation,
+        this
+    );
+
+    if (!NavPath || !NavPath->IsValid() || NavPath->PathPoints.Num() == 0)
+    {
+        UE_LOG(LogFCExplorerCharacter, Warning,
+            TEXT("MoveExplorerToLocation: No valid path from %s to %s"),
+            *StartLocation.ToString(),
+            *TargetLocation.ToString());
+        bIsFollowingPath = false;
+        PathPoints.Reset();
+        CurrentPathIndex = INDEX_NONE;
+        return;
+    }
+
+    PathPoints.Reset();
+    PathPoints.Reserve(NavPath->PathPoints.Num());
+
+    for (const FVector& Point : NavPath->PathPoints)
+    {
+        PathPoints.Add(Point);
+    }
+
+    CurrentPathIndex = 0;
+    bIsFollowingPath = true;
+
+    UE_LOG(LogFCExplorerCharacter, Log,
+        TEXT("MoveExplorerToLocation: Path with %d points from %s to %s"),
+        PathPoints.Num(),
+        *StartLocation.ToString(),
+        *TargetLocation.ToString());
 }

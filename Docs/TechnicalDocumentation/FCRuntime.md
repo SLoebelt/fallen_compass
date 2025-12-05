@@ -117,11 +117,12 @@ Details: `Components/FCInteractionComponent.md` → `FCInteractionComponent.h/.c
 
 Details: `Characters/FCFirstPersonCharacter.md` → `FCFirstPersonCharacter.h/.cpp`.
 
-### `AFC_ExplorerCharacter` — "Camp exploration pawn (AI-controlled)"
+### `AFC_ExplorerCharacter` — "Camp exploration pawn (player-controlled)"
 - Top-down camera mode pawn for Camp scenes (POIScene mode).
-- Uses `AAIController` (not possessed by PlayerController) to preserve static camp camera.
-- PlayerController commands movement via `MoveExplorerToLocation()` which delegates to explorer's AI controller.
-- Configured with `AutoPossessAI = PlacedInWorldOrSpawned` and `AIControllerClass = AAIController`.
+- Now possessed by `AFCPlayerController` in Camp (standard pawn possession; no dedicated AIController required for movement).
+- Camp click-to-move is routed from `AFCPlayerController::HandleClick` to `MoveExplorerToLocation`, which delegates to `AFC_ExplorerCharacter::MoveExplorerToLocation`.
+- `AFC_ExplorerCharacter::MoveExplorerToLocation` computes a NavMesh path (via `UNavigationSystemV1::FindPathToLocationSynchronously`) and stores path points; `Tick` then steers along this path using `AddMovementInput` until the destination is reached.
+- Static Camp/POI camera is handled by `UFCCameraManager::BlendToPOISceneCamera`, which ultimately calls `SetViewTargetWithBlend` on the owning controller, targeting a level-placed `ACameraActor` tagged `CampCamera` (or matching that name pattern).
 
 Details: `FC_ExplorerCharacter.h/.cpp`.
 

@@ -8,8 +8,6 @@
  * Prototype explorer character used in Camp and other local scenes.
  * Represents the designated explorer (male or female) and supports
  * simple top-down point-and-click movement.
- * 
- * Uses AI controller for pathfinding and smooth movement (similar to convoy members).
  */
 UENUM(BlueprintType)
 enum class EFCExplorerType : uint8
@@ -30,21 +28,28 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Explorer")
     EFCExplorerType ExplorerType = EFCExplorerType::Male;
 
-    /** Get current movement speed (for Animation Blueprint debugging) */
-    UFUNCTION(BlueprintPure, Category = "Movement")
-    float GetMovementSpeed() const;
-
-    /** Is character currently moving? (for Animation Blueprint debugging) */
-    UFUNCTION(BlueprintPure, Category = "Movement")
-    bool IsCharacterMoving() const;
-
     /** Debug tick to monitor velocity */
     virtual void Tick(float DeltaTime) override;
+
+	/** Starts pathfinding and movement toward the given world-space location (Camp/POI). */
+    void MoveExplorerToLocation(const FVector& TargetLocation);
 
 protected:
     virtual void BeginPlay() override;
 
-private:
-    /** Initialize animation system (ensure AnimBP is active) */
-    void InitializeAnimation();
+	/** Path points obtained from NavMesh for the current move command. */
+    UPROPERTY(VisibleInstanceOnly, Category = "Movement|Debug")
+    TArray<FVector> PathPoints;
+
+    /** Index of the current target point in PathPoints. */
+    UPROPERTY(VisibleInstanceOnly, Category = "Movement|Debug")
+    int32 CurrentPathIndex = INDEX_NONE;
+
+    /** Whether the explorer is currently following a path. */
+    UPROPERTY(VisibleInstanceOnly, Category = "Movement|Debug")
+    bool bIsFollowingPath = false;
+
+    /** Distance threshold to advance to the next path point. */
+    UPROPERTY(EditAnywhere, Category = "Movement")
+    float AcceptRadius = 50.0f;
 };

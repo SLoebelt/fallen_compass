@@ -5,7 +5,6 @@
 * **Header:** `Components/FCCameraManager.h` 
 * **Source:** `Components/FCCameraManager.cpp` 
 
----
 
 ## Responsibilities (what this manager owns)
 
@@ -34,7 +33,6 @@ It owns:
 
    * Locates an “OverworldCamera” actor by name, attaches it to the convoy’s `GetCameraAttachPoint()` (called via reflection), and calls `SetPlayerPawn(APawn*)` on the camera (also via reflection) for distance limiting. 
 
----
 
 ## Public API (Blueprint-facing)
 
@@ -54,7 +52,11 @@ It owns:
 * `BlendToTopDown(float BlendTime = -1.0f)`
 
   * Finds the overworld camera by name containing `"OverworldCamera"`, optionally attaches it to the overworld convoy attach point, then blends to it.
-* `BlendToPOISceneCamera(ACameraActor* POICamera, float BlendTime = -1.0f)`
+ `BlendToPOISceneCamera(ACameraActor* POICamera, float BlendTime)`
+  - Used for POI / camp scenes.
+  - If `POICamera` is non-null, uses it directly as the view target.
+  - If `POICamera` is `nullptr`, searches the current level for an `ACameraActor` tagged `CampCamera` (or with a name containing `CampCamera`) and uses that as the view target.
+  - Calls `SetViewTargetWithBlend` on the owning `APlayerController` and sets the internal camera mode to POIScene, keeping the Camp camera static while the possessed `AFC_ExplorerCharacter` moves.
 * `RestorePreviousViewTarget(float BlendTime = -1.0f)`
 
   * Restores based on `PreviousCameraMode` (FirstPerson or MainMenu; otherwise defaults to FirstPerson).
@@ -66,7 +68,6 @@ It owns:
 
 * `SetMenuCamera(ACameraActor* InMenuCamera)`
 
----
 
 ## Connected systems (“connected managers”) and what/why is delegated
 
@@ -92,7 +93,6 @@ It owns:
 **Delegated:** scheduling cleanup and “transition complete” flag reset after a blend.
 **Why:** blend completion is time-based; timers provide a simple, deterministic lifecycle for transient cameras. 
 
----
 
 ## Where to configure / extend (practical notes)
 

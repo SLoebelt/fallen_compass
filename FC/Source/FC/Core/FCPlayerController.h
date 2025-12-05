@@ -68,6 +68,9 @@ public:
 	virtual void BeginPlay() override;
 	virtual void SetupInputComponent() override;
 
+	// Called when this controller possesses a pawn
+	virtual void OnPossess(APawn* InPawn) override;
+
 	EFCPlayerCameraMode GetCameraMode() const;
 	bool IsPauseMenuDisplayed() const { return bIsPauseMenuDisplayed; }
 	EFCInputMappingMode GetCurrentMappingMode() const;
@@ -154,6 +157,7 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "FC|Convoy")
 	void MoveConvoyToLocation(const FVector& TargetLocation);
 
+	// TODO - Remove after Week 1 - no longer AI-controlled
 	/** Get the commanded explorer character reference (Camp/POI scenes) */
 	UFUNCTION(BlueprintCallable, Category = "FC|Camp")
 	AFC_ExplorerCharacter* GetCommandedExplorer() const { return CommandedExplorer; }
@@ -182,6 +186,7 @@ protected:
 	UPROPERTY()
 	AFCOverworldConvoy* PossessedConvoy;
 
+	// TODO Remove after Week 1 - no longer AI-controlled
 	/** Reference to commanded explorer in Camp/POI scenes (not possessed, AI-controlled) */
 	UPROPERTY()
 	AFC_ExplorerCharacter* CommandedExplorer;

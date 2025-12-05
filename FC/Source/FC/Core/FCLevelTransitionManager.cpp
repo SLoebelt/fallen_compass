@@ -85,7 +85,7 @@ void UFCLevelTransitionManager::StartExpeditionFromOfficeTableView()
 	// Begin fade out (optional loading indicator can be enabled later).
 	TransitionMgr->BeginFadeOut(1.0f, /*bShowLoading=*/false);
 
-	// TODO: Make overworld level configurable from expedition data.
+	// TODO - Make overworld level configurable from expedition data.
 	const FName OverworldLevelName(TEXT("L_Overworld"));
 	LevelMgr->LoadLevel(OverworldLevelName, /*bShowLoadingScreen*/ false);
 

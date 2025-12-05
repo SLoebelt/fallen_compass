@@ -41,13 +41,13 @@ AFCPlayerController::AFCPlayerController()
 {
 	// Create camera manager component
 	CameraManager = CreateDefaultSubobject<UFCCameraManager>(TEXT("CameraManager"));
-	
+
 	// Create input manager component
 	InputManager = CreateDefaultSubobject<UFCInputManager>(TEXT("InputManager"));
-	
+
 	// Create interaction component (handles POI interactions across all scenes)
 	InteractionComponent = CreateDefaultSubobject<UFCInteractionComponent>(TEXT("InteractionComponent"));
-	
+
 	bIsPauseMenuDisplayed = false;
 	bShowMouseCursor = false;
 	CurrentGameState = EFCGameState::MainMenu; // DEPRECATED: Use GameStateManager instead
@@ -173,12 +173,12 @@ void AFCPlayerController::BeginPlay()
 		{
 			StateMgr->OnStateChanged.AddDynamic(this, &AFCPlayerController::OnGameStateChanged);
 			UE_LOG(LogFallenCompassPlayerController, Log, TEXT("BeginPlay: Subscribed to GameStateManager.OnStateChanged"));
-			
+
 			// Log current state to verify subscription timing
 			EFCGameStateID CurrentState = StateMgr->GetCurrentState();
-			UE_LOG(LogFallenCompassPlayerController, Log, TEXT("BeginPlay: Current game state is %s"), 
+			UE_LOG(LogFallenCompassPlayerController, Log, TEXT("BeginPlay: Current game state is %s"),
 				*UEnum::GetValueAsString(CurrentState));
-			
+
 			// If we're already in an in-world state that expects specific
 			// camera/input (e.g. Overworld_Travel, ExpeditionSummary, Camp_Local),
 			// manually trigger the handler so things are set up correctly on load.
@@ -205,7 +205,7 @@ void AFCPlayerController::BeginPlay()
 	// Find convoy in level if we're in Overworld
 	TArray<AActor*> FoundConvoys;
 	UGameplayStatics::GetAllActorsOfClass(GetWorld(), AFCOverworldConvoy::StaticClass(), FoundConvoys);
-	
+
 	if (FoundConvoys.Num() > 0)
 	{
 		PossessedConvoy = Cast<AFCOverworldConvoy>(FoundConvoys[0]);
@@ -219,47 +219,18 @@ void AFCPlayerController::BeginPlay()
 	// Find explorer character in level if we're in Camp/POI scene
 	TArray<AActor*> FoundExplorers;
 	UGameplayStatics::GetAllActorsOfClass(GetWorld(), AFC_ExplorerCharacter::StaticClass(), FoundExplorers);
-	
+
 	if (FoundExplorers.Num() > 0)
 	{
+		// TODO - Remove after Week 1 - no longer AI-controlled
 		CommandedExplorer = Cast<AFC_ExplorerCharacter>(FoundExplorers[0]);
 		UE_LOG(LogFallenCompassPlayerController, Log, TEXT("BeginPlay: Found explorer: %s"), *CommandedExplorer->GetName());
-		
-		// NOTE: We do NOT possess the explorer (unlike Epic's Top-Down template).
-		// Possessing would override our static camp camera with the character's camera.
-		// Instead, we command the explorer like we command the convoy - just send move
-		// commands to its location. SimpleMoveToLocation works without possession.
-		UE_LOG(LogFallenCompassPlayerController, Log, TEXT("BeginPlay: Commanding explorer (not possessing to preserve static camp camera)"));
 	}
 	else
 	{
 		UE_LOG(LogFallenCompassPlayerController, Log, TEXT("BeginPlay: No explorer found in level (expected in Camp/POI scenes)"));
 		UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("BeginPlay: To use Camp scenes, place BP_FC_ExplorerCharacter in the level (not a Player Start)"));
 	}
-
-	// Find Camp camera actor if we're in a Camp/POI scene
-	// Look for ACameraActor with tag "CampCamera" or name containing "CampCamera"
-	TArray<AActor*> FoundCameras;
-	UGameplayStatics::GetAllActorsOfClass(GetWorld(), ACameraActor::StaticClass(), FoundCameras);
-	
-	for (AActor* CameraActor : FoundCameras)
-	{
-		ACameraActor* Cam = Cast<ACameraActor>(CameraActor);
-		if (Cam && (Cam->Tags.Contains(FName("CampCamera")) || Cam->GetName().Contains(TEXT("CampCamera"))))
-		{
-			SetPOISceneCameraActor(Cam);
-			UE_LOG(LogFallenCompassPlayerController, Log, TEXT("BeginPlay: Found and registered Camp camera: %s"), *Cam->GetName());
-			break;
-		}
-	}
-	
-	if (!POISceneCameraActor && CommandedExplorer)
-	{
-		UE_LOG(LogFallenCompassPlayerController, Warning, 
-			TEXT("BeginPlay: Explorer found but no Camp camera detected. Add 'CampCamera' tag to camera actor in L_Camp."));
-	}
-
-	// Note: MenuCamera reference will be set in Blueprint (BP_FC_PlayerController)
 }
 
 void AFCPlayerController::SetupInputComponent()
@@ -327,7 +298,7 @@ void AFCPlayerController::SetupInputComponent()
 		EnhancedInput->BindAction(OverworldPanAction, ETriggerEvent::Triggered, this, &AFCPlayerController::HandleOverworldPan);
 		UE_LOG(LogFallenCompassPlayerController, Log, TEXT("Bound IA_OverworldPan"));
 	}
-	
+
 	if (OverworldZoomAction)
 	{
 		EnhancedInput->BindAction(OverworldZoomAction, ETriggerEvent::Triggered, this, &AFCPlayerController::HandleOverworldZoom);
@@ -344,6 +315,29 @@ void AFCPlayerController::SetupInputComponent()
 	{
 		UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("ToggleOverworldMapAction not assigned on %s."), *GetName());
 	}
+}
+
+void AFCPlayerController::OnPossess(APawn* InPawn)
+{
+	Super::OnPossess(InPawn);
+
+	APawn* PreviousPawn = GetPawn(); // After Super, this is the new pawn; we’ll log old via cached var below
+
+    static int32 PossessCounter = 0;
+    ++PossessCounter;
+
+	if (!InPawn)
+	{
+		UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("OnPossess called with null pawn"));
+		return;
+	}
+
+	UE_LOG(LogFallenCompassPlayerController, Log,
+        TEXT("OnPossess #%d: Controller=%s NewPawn=%s Map=%s"),
+        PossessCounter,
+        *GetName(),
+        InPawn ? *InPawn->GetName() : TEXT("nullptr"),
+        *GetWorld()->GetMapName());
 }
 
 void AFCPlayerController::HandleToggleOverworldMap()
@@ -463,25 +457,25 @@ void AFCPlayerController::HandleInteractPressed()
 	if (CurrentMode == EFCPlayerCameraMode::TopDown)
 	{
 		UE_LOG(LogFallenCompassPlayerController, Log, TEXT("HandleInteractPressed: TopDown mode - checking for POI interaction"));
-		
+
 		// Raycast to check if clicking on POI
 		FHitResult HitResult;
 		bool bHit = GetHitResultUnderCursor(ECC_Visibility, false, HitResult);
-		
+
 		if (bHit && HitResult.GetActor())
 		{
 			AActor* HitActor = HitResult.GetActor();
-			
+
 			// Check if actor implements IFCInteractablePOI interface
 			if (HitActor->GetClass()->ImplementsInterface(UIFCInteractablePOI::StaticClass()))
 			{
 				UE_LOG(LogFallenCompassPlayerController, Log, TEXT("HandleInteractPressed: POI detected - %s"), *HitActor->GetName());
-				
+
 				// Delegate to InteractionComponent for POI handling
 				if (InteractionComponent)
 				{
 					InteractionComponent->HandlePOIClick(HitActor);
-					
+
 					// After action selection, movement will be triggered by HandleClick
 					// This maintains separation: Interact = select action, Click = move to location
 					return;
@@ -492,7 +486,7 @@ void AFCPlayerController::HandleInteractPressed()
 				}
 			}
 		}
-		
+
 		UE_LOG(LogFallenCompassPlayerController, Verbose, TEXT("HandleInteractPressed: No POI under cursor"));
 		return;
 	}
@@ -523,7 +517,7 @@ void AFCPlayerController::HandlePausePressed()
 	if (GetCameraMode() == EFCPlayerCameraMode::TableView)
 	{
 		UE_LOG(LogFallenCompassPlayerController, Log, TEXT("ESC pressed in TableView mode"));
-		
+
 		UFCGameInstance* GI = GetGameInstance<UFCGameInstance>();
 		if (!GI)
 		{
@@ -559,7 +553,7 @@ void AFCPlayerController::HandlePausePressed()
 
 	UFCGameStateManager* StateMgr = GI->GetSubsystem<UFCGameStateManager>();
 	UFCUIManager* UIManager = GI->GetSubsystem<UFCUIManager>();
-	
+
 	if (!StateMgr || !UIManager) return;
 
 	// If we're in ExpeditionSummary, ESC should behave like closing the summary widget
@@ -601,7 +595,7 @@ void AFCPlayerController::HandlePausePressed()
 
 	// Check if we're in a pausable state (Office_Exploration, Office_TableView, or Overworld_Travel)
 	EFCGameStateID CurrentState = StateMgr->GetCurrentState();
-	if (CurrentState == EFCGameStateID::Office_Exploration || 
+	if (CurrentState == EFCGameStateID::Office_Exploration ||
 	    CurrentState == EFCGameStateID::Office_TableView ||
 	    CurrentState == EFCGameStateID::Overworld_Travel)
 	{
@@ -628,7 +622,7 @@ void AFCPlayerController::ShowPauseMenuPlaceholder()
 	UE_LOG(LogFallenCompassPlayerController, Log, TEXT("ShowPauseMenuPlaceholder: Pause menu displayed, game paused."));
 	if (GEngine)
 	{
-		GEngine->AddOnScreenDebugMessage(-1, 4.f, FColor::Magenta, TEXT("Pause Menu Requested (TODO: Instantiate widget)"));
+		GEngine->AddOnScreenDebugMessage(-1, 4.f, FColor::Magenta, TEXT("Pause Menu Requested (TODO - Instantiate widget)"));
 	}
 	LogStateChange(TEXT("Pause menu requested"));
 }
@@ -640,7 +634,7 @@ void AFCPlayerController::HidePauseMenuPlaceholder()
 	UE_LOG(LogFallenCompassPlayerController, Log, TEXT("HidePauseMenuPlaceholder: Pause menu hidden, game unpaused."));
 	if (GEngine)
 	{
-		GEngine->AddOnScreenDebugMessage(-1, 4.f, FColor::Magenta, TEXT("Pause Menu Dismissed (TODO: Remove widget)"));
+		GEngine->AddOnScreenDebugMessage(-1, 4.f, FColor::Magenta, TEXT("Pause Menu Dismissed (TODO - Remove widget)"));
 	}
 	LogStateChange(TEXT("Pause menu dismissed"));
 }
@@ -655,16 +649,16 @@ void AFCPlayerController::ResumeGame()
 		UE_LOG(LogFallenCompassPlayerController, Error, TEXT("ResumeGame: GameInstance is null!"));
 		return;
 	}
-	
+
 	UFCGameStateManager* StateMgr = GI->GetSubsystem<UFCGameStateManager>();
 	UFCUIManager* UIManager = GI->GetSubsystem<UFCUIManager>();
-	
+
 	if (!StateMgr || !UIManager)
 	{
 		UE_LOG(LogFallenCompassPlayerController, Error, TEXT("ResumeGame: StateMgr or UIManager is null!"));
 		return;
 	}
-	
+
 	// Use the same logic as HandlePausePressed: PopState to resume
 	if (StateMgr->GetCurrentState() == EFCGameStateID::Paused)
 	{
@@ -688,7 +682,7 @@ void AFCPlayerController::ResumeGame()
 			}
 		}
 	}
-	
+
 	LogStateChange(TEXT("Game resumed"));
 }
 
@@ -770,22 +764,22 @@ void AFCPlayerController::SetCameraModeLocal(EFCPlayerCameraMode NewMode, float 
 
 		case EFCPlayerCameraMode::FirstPerson:
 			CameraManager->BlendToFirstPerson(BlendTime);
-			
+
 			// Handle table view cleanup (input/cursor state)
 			if (bIsInTableView)
 			{
 				bIsInTableView = false;
-				
+
 				// Disable cursor and mouse events
 				bShowMouseCursor = false;
 				bEnableClickEvents = false;
 				bEnableMouseOverEvents = false;
-				
+
 				// Set input mode back to Game Only
 				FInputModeGameOnly InputMode;
 				SetInputMode(InputMode);
 			}
-			
+
 			// Restore FirstPerson input mapping
 			SetInputMappingMode(EFCInputMappingMode::FirstPerson);
 			break;
@@ -796,7 +790,7 @@ void AFCPlayerController::SetCameraModeLocal(EFCPlayerCameraMode NewMode, float 
 			{
 				TArray<AActor*> FoundDesks;
 				UGameplayStatics::GetAllActorsOfClass(GetWorld(), AActor::StaticClass(), FoundDesks);
-				
+
 				for (AActor* Actor : FoundDesks)
 				{
 					if (Actor->GetName().Contains(TEXT("BP_OfficeDesk")))
@@ -805,7 +799,7 @@ void AFCPlayerController::SetCameraModeLocal(EFCPlayerCameraMode NewMode, float 
 						USceneComponent* CameraTarget = nullptr;
 						TArray<USceneComponent*> Components;
 						Actor->GetComponents<USceneComponent>(Components);
-						
+
 						for (USceneComponent* Component : Components)
 						{
 							if (Component->GetName().Contains(TEXT("CameraTargetPoint")))
@@ -814,53 +808,40 @@ void AFCPlayerController::SetCameraModeLocal(EFCPlayerCameraMode NewMode, float 
 								break;
 							}
 						}
-						
+
 						if (CameraTarget)
 						{
 							// Delegate table object camera to CameraManager
 							CameraManager->BlendToTableObject(Actor, BlendTime);
-							
+
 							bIsInTableView = true;
-							
+
 							// Switch to StaticScene input mapping
 							SetInputMappingMode(EFCInputMappingMode::StaticScene);
-							
+
 							// Enable cursor and click events
 							bShowMouseCursor = true;
 							bEnableClickEvents = true;
 							bEnableMouseOverEvents = true;
-							
+
 							// Set input mode to Game and UI
 							FInputModeGameAndUI InputMode;
 							InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
 							InputMode.SetHideCursorDuringCapture(false);
 							SetInputMode(InputMode);
-							
+
 							LogStateChange(FString::Printf(TEXT("Camera switched to mode %d"), static_cast<int32>(NewMode)));
 							return;
 						}
 					}
 				}
-				
+
 				UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("TableView: Could not find BP_OfficeDesk or CameraTargetPoint"));
 				return;
 			}
 
 		case EFCPlayerCameraMode::TopDown:
 			CameraManager->BlendToTopDown(BlendTime);
-			break;
-
-		case EFCPlayerCameraMode::POIScene:
-			// Option B: Fixed camera for POI/local scenes (e.g. Camp)
-			if (POISceneCameraActor)
-			{
-				SetViewTargetWithBlend(POISceneCameraActor, BlendTime);
-			}
-			else
-			{
-				UE_LOG(LogFallenCompassPlayerController, Warning,
-					TEXT("SetCameraModeLocal: POIScene mode requested but POISceneCameraActor is null"));
-			}
 			break;
 
 		default:
@@ -965,7 +946,7 @@ void AFCPlayerController::TransitionToGameplay()
 	// Spawn player character if not already present
 	if (!GetPawn())
 	{
-		// TODO: Spawn AFCFirstPersonCharacter at designated start location (Task 5.4)
+		// TODO - Spawn AFCFirstPersonCharacter at designated start location (Task 5.4)
 		UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("TransitionToGameplay: No pawn found - need to spawn player"));
 	}
 
@@ -1310,6 +1291,7 @@ void AFCPlayerController::HandleClick(const FInputActionValue& Value)
 			return;
 		}
 
+		// TODO - Remove after Week 1 - no longer AI-controlled
 		if (!CommandedExplorer)
 		{
 			UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("HandleClick(POIScene): No commanded explorer reference"));
@@ -1581,23 +1563,23 @@ void AFCPlayerController::HandleOverworldClickMove()
 		{
 			// Send move command to AI controller
 			AIController->MoveToLocation(NavLocation.Location);
-			UE_LOG(LogFallenCompassPlayerController, Log, TEXT("HandleOverworldClickMove: Moving convoy to %s"), 
+			UE_LOG(LogFallenCompassPlayerController, Log, TEXT("HandleOverworldClickMove: Moving convoy to %s"),
 				*NavLocation.Location.ToString());
 
 			// Visual feedback
 			if (GEngine)
 			{
-				GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Green, 
+				GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Green,
 					FString::Printf(TEXT("Moving to: %s"), *NavLocation.Location.ToString()));
 			}
 		}
 		else
 		{
 			UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("HandleOverworldClickMove: Failed to project to NavMesh"));
-			
+
 			if (GEngine)
 			{
-				GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Yellow, 
+				GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Yellow,
 					TEXT("Cannot move there - no valid path"));
 			}
 		}
@@ -1642,7 +1624,7 @@ void AFCPlayerController::MoveConvoyToLocation(const FVector& TargetLocation)
 		if (bFoundPath)
 		{
 			AIController->MoveToLocation(NavLocation.Location);
-			UE_LOG(LogFallenCompassPlayerController, Log, TEXT("MoveConvoyToLocation: Moving to %s"), 
+			UE_LOG(LogFallenCompassPlayerController, Log, TEXT("MoveConvoyToLocation: Moving to %s"),
 				*NavLocation.Location.ToString());
 		}
 		else
@@ -1652,42 +1634,24 @@ void AFCPlayerController::MoveConvoyToLocation(const FVector& TargetLocation)
 	}
 }
 
-	void AFCPlayerController::MoveExplorerToLocation(const FVector& TargetLocation)
+void AFCPlayerController::MoveExplorerToLocation(const FVector& WorldLocation)
 {
-	if (!CommandedExplorer)
-	{
-		UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("MoveExplorerToLocation: No explorer commanded"));
-		return;
-	}
+    AFC_ExplorerCharacter* Explorer = Cast<AFC_ExplorerCharacter>(GetPawn());
+    if (!Explorer)
+    {
+        UE_LOG(LogFallenCompassPlayerController, Warning,
+            TEXT("MoveExplorerToLocation: Possessed pawn is not Explorer (Got: %s)"),
+            GetPawn() ? *GetPawn()->GetName() : TEXT("nullptr"));
+        return;
+    }
 
-	// Get the explorer's AI controller (like we do with convoy movement)
-	AAIController* ExplorerAI = Cast<AAIController>(CommandedExplorer->GetController());
-	if (!ExplorerAI)
-	{
-		UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("MoveExplorerToLocation: Explorer has no AI controller"));
-		return;
-	}
+    // Delegate actual pathfinding + movement to the Explorer pawn.
+    Explorer->MoveExplorerToLocation(WorldLocation);
 
-	// Use SimpleMoveToLocation on the AI controller (not PlayerController)
-	// This internally uses AddMovementInput which sets acceleration properly
-	UNavigationSystemV1* NavSys = FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld());
-	if (NavSys)
-	{
-		FNavLocation NavLocation;
-		bool bFoundPath = NavSys->ProjectPointToNavigation(TargetLocation, NavLocation);
-
-		if (bFoundPath)
-		{
-			// Command the AI controller to move the explorer (like convoy pattern)
-			UAIBlueprintHelperLibrary::SimpleMoveToLocation(ExplorerAI, NavLocation.Location);
-			UE_LOG(LogFallenCompassPlayerController, Log, TEXT("MoveExplorerToLocation: Moving to %s"), 
-				*NavLocation.Location.ToString());
-		}
-		else
-		{
-			UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("MoveExplorerToLocation: Failed to project to NavMesh"));
-		}
-	}
+    UE_LOG(LogFallenCompassPlayerController, Log,
+        TEXT("MoveExplorerToLocation: Requested move for Explorer %s to %s"),
+        *Explorer->GetName(),
+        *WorldLocation.ToString());
 }
 
 void AFCPlayerController::SetMenuCameraActor(ACameraActor* InMenuCamera)
@@ -1706,6 +1670,8 @@ void AFCPlayerController::SetMenuCameraActor(ACameraActor* InMenuCamera)
 	CameraManager->SetMenuCamera(InMenuCamera);
 }
 
+// If POISceneCameraActor is null, UFCCameraManager will auto-resolve by tag/name.
+// TODO - Consider removing this setter and just setting the camera directly in CameraManager.
 void AFCPlayerController::SetPOISceneCameraActor(ACameraActor* InPOICamera)
 {
 	POISceneCameraActor = InPOICamera;

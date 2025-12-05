@@ -32,7 +32,8 @@ It owns:
 
 4. **Route/pathfinding support**
 
-   * Provides BFS shortest path on the global grid with traversal rules tuned for “expedition preview route” behavior.
+  * Provides BFS shortest path on the global grid with traversal rules tuned for "expedition preview route" behavior.
+  * Serves as a conceptual reference for path-based movement elsewhere (e.g., Explorer Camp movement uses NavMesh paths, not this grid, but follows the same idea of "precompute path, then step through points").
 
 ---
 

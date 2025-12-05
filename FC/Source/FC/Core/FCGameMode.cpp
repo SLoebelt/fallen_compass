@@ -40,7 +40,7 @@ void AFCGameMode::BeginPlay()
         *ControllerName,
         *MapName);
 
-    // TODO: Remove once proper UI system is in place.
+    // TODO - Remove once proper UI system is in place.
     if (GEngine)
 	{
 		const FString DebugLine = FString::Printf(TEXT("AFCGameMode active | Pawn=%s | Controller=%s | Level=%s"), *PawnName, *ControllerName, *MapName);
@@ -67,17 +67,17 @@ APawn* AFCGameMode::SpawnDefaultPawnAtTransform_Implementation(AController* NewP
 		if (UFCLevelManager* LevelMgr = GI->GetSubsystem<UFCLevelManager>())
 		{
 			EFCLevelType LevelType = LevelMgr->GetCurrentLevelType();
-			
+
 			// In Camp/POI levels, check for pre-placed explorers
 			if (LevelType == EFCLevelType::Camp || LevelType == EFCLevelType::POI)
 			{
 				TArray<AActor*> FoundExplorers;
 				UGameplayStatics::GetAllActorsOfClass(GetWorld(), AFC_ExplorerCharacter::StaticClass(), FoundExplorers);
-				
+
 				if (FoundExplorers.Num() > 0)
 				{
 					// Explorer already exists in level, don't spawn another one
-					UE_LOG(LogFallenCompassGameMode, Log, 
+					UE_LOG(LogFallenCompassGameMode, Log,
 						TEXT("SpawnDefaultPawnAtTransform: Skipping spawn - explorer already placed in %s level"),
 						*UEnum::GetValueAsString(LevelType));
 					return nullptr;

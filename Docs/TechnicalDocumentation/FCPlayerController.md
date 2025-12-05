@@ -29,6 +29,8 @@ Key responsibilities:
 
    * Owns "what camera mode should we be in," but delegates the actual blending to `UFCCameraManager`.
    * `SetCameraModeLocal(...)` switches between MainMenu / FirstPerson / TableView / TopDown / POIScene and updates cursor + input mode accordingly. 
+   - For Camp/POI (`EFCGameStateID::Camp_Local`), the controller does **not** search for cameras itself; instead it calls `UFCCameraManager::BlendToPOISceneCamera(POISceneCameraActor, BlendTime)` when the state changes.
+   - If `POISceneCameraActor` is `nullptr`, `UFCCameraManager` auto-resolves an `ACameraActor` tagged `CampCamera` (or named accordingly) and uses `SetViewTargetWithBlend` on the controller to keep the Camp camera static while the player-controlled `AFC_ExplorerCharacter` moves.
 
 4. **Game-flow entry points**
 
@@ -45,9 +47,8 @@ Key responsibilities:
 
 6. **Movement command delegation**
 
-   * `MoveConvoyToLocation(FVector)` → commands Overworld convoy AI controller (TopDown mode).
-   * `MoveExplorerToLocation(FVector)` → commands Camp explorer AI controller (POIScene mode).
-   * Both use NavMesh projection and SimpleMoveToLocation on the respective AI controllers.
+   * `MoveConvoyToLocation(FVector)` → commands Overworld convoy AI controller (TopDown mode, unchanged).
+   * `MoveExplorerToLocation(FVector)` → in Camp/POIScene, routes Camp click-to-move to the **possessed** `AFC_ExplorerCharacter` (no AIController). The controller delegates pathfinding + steering to the pawn instead of driving movement via an AI controller.
 
 7. **Pause / resume behavior**
 
@@ -61,7 +62,6 @@ Key responsibilities:
 
    * Subscribes to `GameStateManager.OnStateChanged` and manually triggers `OnGameStateChanged(...)` on BeginPlay for certain states (Overworld_Travel / ExpeditionSummary / Camp_Local) so camera/input are correct after loading. 
 
----
 
 ## Public API
 
