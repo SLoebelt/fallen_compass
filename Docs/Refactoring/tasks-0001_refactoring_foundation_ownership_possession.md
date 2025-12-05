@@ -274,18 +274,18 @@ Key Decisions:
 - Controller is the orchestration owner; it binds world event sources (convoy/explorer) to interaction.
 
 **Implementation**
-- [ ] In `AFCPlayerController` initialization for Overworld/Camp:
-  - [ ] Resolve ActiveConvoy reference (temporary: by tag or placed actor lookup; prefer explicit ref if available)
-  - [ ] Bind:
+- [x] In `AFCPlayerController` initialization for Overworld/Camp:
+  - [x] Resolve ActiveConvoy reference (temporary: by tag or placed actor lookup; prefer explicit ref if available)
+  - [x] Bind:
     - `ActiveConvoy->OnPOIOverlap.AddDynamic(InteractionComponent, &UFCInteractionComponent::NotifyPOIOverlap);`
-  - [ ] If Camp POIs use overlap for “arrival”, bind explorer-related arrival/overlap similarly.
-- [ ] Rename:
-  - [ ] `PossessedConvoy` → `ActiveConvoy` in controller and any related code.
+  - [x] If Camp POIs use overlap for “arrival”, bind explorer-related arrival/overlap similarly.
+- [x] Rename:
+  - [x] `PossessedConvoy` → `ActiveConvoy` in controller and any related code.
 
 **Testing After Step 1.3.2** ✅ CHECKPOINT
-- [ ] PIE Overworld: POI overlap reaches InteractionComponent handler
-- [ ] Verify via log in InteractionComponent: “NotifyPOIOverlap received from convoy …”
-- [ ] No compile errors after rename
+- [x] PIE Overworld: POI overlap reaches InteractionComponent handler
+- [x] Verify via log in InteractionComponent: “NotifyPOIOverlap received from convoy …”
+- [x] No compile errors after rename
 
 **COMMIT POINT 1.3.2**: `git commit -m "refactor(controller): bind overlap delegates to controller-owned interaction; rename to ActiveConvoy"`
 
@@ -298,16 +298,16 @@ Key Decisions:
 - Hardcoded `/Game/...` paths in C++ are brittle. Use a DataAsset for input references.
 
 **Implementation**
-- [ ] Create C++ class `UFCInputConfig : public UDataAsset`
+- [x] Create C++ class `UFCInputConfig : public UDataAsset`
   - Path: `/Source/FC/Components/FCInputConfig.h/.cpp` (or `/Source/FC/Input/` if that module exists)
   - Fields (UPROPERTY EditDefaultsOnly):
     - `UInputMappingContext*` for each gameplay mode you need now (can start with one)
     - `UInputAction*` for core actions referenced in C++ (Interact, Click, etc.)
   - Keep the MVP minimal: only what is referenced by code today.
-- [ ] Add a dedicated log category if the project uses them for input (optional).
+- [x] Add a dedicated log category if the project uses them for input (optional).
 
 **Testing After Step 1.4.1** ✅ CHECKPOINT
-- [ ] Compile (User): ✅
+- [x] Compile (User): ✅
 
 **COMMIT POINT 1.4.1**: `git commit -m "feat(input): add UFCInputConfig data asset class"`
 
@@ -318,18 +318,18 @@ Key Decisions:
 - DataAsset must exist in Content and be assigned to the runtime system.
 
 **Implementation**
-- [ ] In Content Browser:
-  - [ ] Create `DA_InputConfig_PlayerRuntime` under `/Content/FC/Input/Data/`
-  - [ ] Assign Input Actions (`IA_*`) and Mapping Contexts (`IMC_*`) used by PlayerController/InputManager
-- [ ] In `UFCInputManager` or PlayerController:
-  - [ ] Add property `UPROPERTY(EditDefaultsOnly)` `TObjectPtr<UFCInputConfig> InputConfig;`
-  - [ ] Replace any `ConstructorHelpers::FObjectFinder("/Game/FC/Input/IA_*")` with `InputConfig` access.
-  - [ ] Validate config on BeginPlay; if missing, log one error and disable input setup safely.
+- [x] In Content Browser:
+  - [x] Create `DA_InputConfig_PlayerRuntime` under `/Content/FC/Input/Data/`
+  - [x] Assign Input Actions (`IA_*`) and Mapping Contexts (`IMC_*`) used by PlayerController/InputManager
+- [x] In `UFCInputManager` or PlayerController:
+  - [x] Add property `UPROPERTY(EditDefaultsOnly)` `TObjectPtr<UFCInputConfig> InputConfig;`
+  - [x] Replace any `ConstructorHelpers::FObjectFinder("/Game/FC/Input/IA_*")` with `InputConfig` access.
+  - [x] Validate config on BeginPlay; if missing, log one error and disable input setup safely.
 
 **Testing After Step 1.4.2** ✅ CHECKPOINT
-- [ ] PIE Office: input still works
-- [ ] PIE Overworld/Camp: click/move still works
-- [ ] Output Log: no missing asset crashes
+- [x] PIE Office: input still works
+- [x] PIE Overworld/Camp: click/move still works
+- [x] Output Log: no missing asset crashes
 
 **COMMIT POINT 1.4.2**: `git commit -m "refactor(input): remove hardcoded IA asset paths and use UFCInputConfig"`
 

@@ -34,7 +34,7 @@ Key responsibilities:
 
 4. **POI overlap notification**
 
-   * `NotifyPOIOverlap(AActor*)` triggers when convoy/explorer reaches POI.
+   * `NotifyPOIOverlap(AActor*)` is bound as a handler to world-side POI-overlap delegates (e.g., `AFCOverworldConvoy`), and triggers when convoy/explorer reaches a POI.
    * Executes stored pending action via `IIFCInteractablePOI::Execute_ExecuteAction()`.
    * Broadcasts result via `OnPOIActionCompleted` delegate.
 

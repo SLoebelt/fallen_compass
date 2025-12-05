@@ -51,95 +51,6 @@ AFCPlayerController::AFCPlayerController()
 	bIsPauseMenuDisplayed = false;
 	bShowMouseCursor = false;
 	CurrentGameState = EFCGameState::MainMenu; // DEPRECATED: Use GameStateManager instead
-
-	static ConstructorHelpers::FObjectFinder<UInputAction> InteractActionFinder(TEXT("/Game/FC/Input/IA_Interact"));
-	if (InteractActionFinder.Succeeded())
-	{
-		InteractAction = InteractActionFinder.Object;
-	}
-	else
-	{
-		UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("Failed to load IA_Interact."));
-	}
-
-	static ConstructorHelpers::FObjectFinder<UInputAction> QuickSaveActionFinder(TEXT("/Game/FC/Input/IA_QuickSave"));
-	if (QuickSaveActionFinder.Succeeded())
-	{
-		QuickSaveAction = QuickSaveActionFinder.Object;
-		UE_LOG(LogFallenCompassPlayerController, Log, TEXT("Loaded IA_QuickSave"));
-	}
-	else
-	{
-		UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("Failed to load IA_QuickSave."));
-	}
-
-	static ConstructorHelpers::FObjectFinder<UInputAction> QuickLoadActionFinder(TEXT("/Game/FC/Input/IA_QuickLoad"));
-	if (QuickLoadActionFinder.Succeeded())
-	{
-		QuickLoadAction = QuickLoadActionFinder.Object;
-		UE_LOG(LogFallenCompassPlayerController, Log, TEXT("Loaded IA_QuickLoad"));
-	}
-	else
-	{
-		UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("Failed to load IA_QuickLoad."));
-	}
-
-	static ConstructorHelpers::FObjectFinder<UInputAction> EscapeActionFinder(TEXT("/Game/FC/Input/IA_Escape"));
-	if (EscapeActionFinder.Succeeded())
-	{
-		EscapeAction = EscapeActionFinder.Object;
-		UE_LOG(LogFallenCompassPlayerController, Log, TEXT("Loaded IA_Escape"));
-	}
-	else
-	{
-		UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("Failed to load IA_Escape."));
-	}
-
-	static ConstructorHelpers::FObjectFinder<UInputAction> ClickActionFinder(TEXT("/Game/FC/Input/IA_Click"));
-	if (ClickActionFinder.Succeeded())
-	{
-		ClickAction = ClickActionFinder.Object;
-		UE_LOG(LogFallenCompassPlayerController, Log, TEXT("Loaded IA_Click"));
-	}
-	else
-	{
-		UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("Failed to load IA_Click."));
-	}
-
-	// Week 3: Overworld input actions
-	static ConstructorHelpers::FObjectFinder<UInputAction> OverworldPanActionFinder(TEXT("/Game/FC/Input/IA_OverworldPan"));
-	if (OverworldPanActionFinder.Succeeded())
-	{
-		OverworldPanAction = OverworldPanActionFinder.Object;
-		UE_LOG(LogFallenCompassPlayerController, Log, TEXT("Loaded IA_OverworldPan"));
-	}
-	else
-	{
-		UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("Failed to load IA_OverworldPan."));
-	}
-
-	static ConstructorHelpers::FObjectFinder<UInputAction> OverworldZoomActionFinder(TEXT("/Game/FC/Input/IA_OverworldZoom"));
-	if (OverworldZoomActionFinder.Succeeded())
-	{
-		OverworldZoomAction = OverworldZoomActionFinder.Object;
-		UE_LOG(LogFallenCompassPlayerController, Log, TEXT("Loaded IA_OverworldZoom"));
-	}
-	else
-	{
-		UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("Failed to load IA_OverworldZoom."));
-	}
-
-	// Week 4: Overworld map toggle action (M key)
-	static ConstructorHelpers::FObjectFinder<UInputAction> ToggleOverworldMapActionFinder(TEXT("/Game/FC/Input/IA_ToggleOverworldMap"));
-	if (ToggleOverworldMapActionFinder.Succeeded())
-	{
-		ToggleOverworldMapAction = ToggleOverworldMapActionFinder.Object;
-		UE_LOG(LogFallenCompassPlayerController, Log, TEXT("Loaded IA_ToggleOverworldMap"));
-	}
-	else
-	{
-		UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("Failed to load IA_ToggleOverworldMap."));
-	}
 }
 
 EFCPlayerCameraMode AFCPlayerController::GetCameraMode() const
@@ -202,19 +113,26 @@ void AFCPlayerController::BeginPlay()
 		UE_LOG(LogFallenCompassPlayerController, Error, TEXT("BeginPlay: Failed to get GameInstance"));
 	}
 
-	// Find convoy in level if we're in Overworld
+	// Use delegates called in OnGameStateChanged - TODO - remove after testing
+	/* // Find convoy in level if we're in Overworld
 	TArray<AActor*> FoundConvoys;
 	UGameplayStatics::GetAllActorsOfClass(GetWorld(), AFCOverworldConvoy::StaticClass(), FoundConvoys);
 
 	if (FoundConvoys.Num() > 0)
 	{
-		PossessedConvoy = Cast<AFCOverworldConvoy>(FoundConvoys[0]);
-		UE_LOG(LogFallenCompassPlayerController, Log, TEXT("BeginPlay: Found convoy: %s"), *PossessedConvoy->GetName());
+		ActiveConvoy = Cast<AFCOverworldConvoy>(FoundConvoys[0]);
+		UE_LOG(LogFallenCompassPlayerController, Log, TEXT("BeginPlay: Found convoy: %s"), *ActiveConvoy->GetName());
+
+		ActiveConvoy->OnConvoyPOIOverlap.RemoveAll(InteractionComponent);
+		UE_LOG(LogFallenCompassPlayerController, Log, TEXT("BeginPlay: Cleared existing convoy overlap delegates from InteractionComponent"));
+
+		ActiveConvoy->OnConvoyPOIOverlap.AddDynamic(InteractionComponent, &UFCInteractionComponent::NotifyPOIOverlap);
+		UE_LOG(LogFallenCompassPlayerController, Log, TEXT("Bound convoy overlap delegate -> InteractionComponent"));
 	}
 	else
 	{
-		UE_LOG(LogFallenCompassPlayerController, Log, TEXT("BeginPlay: No convoy found in level (expected in Office)"));
-	}
+		UE_LOG(LogFallenCompassPlayerController, Error, TEXT("No OverworldConvoy found in map %s"), *GetWorld()->GetMapName());
+	} */
 
 	if (CameraManager && CameraManager->GetCameraMode() == EFCPlayerCameraMode::POIScene)
 	{
@@ -240,74 +158,22 @@ void AFCPlayerController::SetupInputComponent()
 		return;
 	}
 
-	if (InteractAction)
-	{
-		EnhancedInput->BindAction(InteractAction, ETriggerEvent::Started, this, &AFCPlayerController::HandleInteractPressed);
-	}
-	else
-	{
-		UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("InteractAction not assigned on %s."), *GetName());
-	}
+	const UFCInputConfig* Config = InputManager ? InputManager->GetInputConfig() : nullptr;
+    if (!Config)
+    {
+        UE_LOG(LogFallenCompassPlayerController, Error, TEXT("InputConfig missing (assign it on the InputManager component in BP_FC_PlayerController)."));
+        return;
+    }
 
-	if (QuickSaveAction)
-	{
-		EnhancedInput->BindAction(QuickSaveAction, ETriggerEvent::Started, this, &AFCPlayerController::HandleQuickSavePressed);
-	}
-	else
-	{
-		UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("QuickSaveAction not assigned on %s."), *GetName());
-	}
+    if (Config->InteractAction) EnhancedInput->BindAction(Config->InteractAction, ETriggerEvent::Started, this, &AFCPlayerController::HandleInteractPressed);
+    if (Config->QuickSaveAction) EnhancedInput->BindAction(Config->QuickSaveAction, ETriggerEvent::Started, this, &AFCPlayerController::HandleQuickSavePressed);
+    if (Config->QuickLoadAction) EnhancedInput->BindAction(Config->QuickLoadAction, ETriggerEvent::Started, this, &AFCPlayerController::HandleQuickLoadPressed);
+    if (Config->EscapeAction) EnhancedInput->BindAction(Config->EscapeAction, ETriggerEvent::Started, this, &AFCPlayerController::HandlePausePressed);
+    if (Config->ClickAction) EnhancedInput->BindAction(Config->ClickAction, ETriggerEvent::Triggered, this, &AFCPlayerController::HandleClick);
 
-	if (QuickLoadAction)
-	{
-		EnhancedInput->BindAction(QuickLoadAction, ETriggerEvent::Started, this, &AFCPlayerController::HandleQuickLoadPressed);
-	}
-	else
-	{
-		UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("QuickLoadAction not assigned on %s."), *GetName());
-	}
-
-	if (EscapeAction)
-	{
-		EnhancedInput->BindAction(EscapeAction, ETriggerEvent::Started, this, &AFCPlayerController::HandlePausePressed);
-	}
-	else
-	{
-		UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("EscapeAction not assigned on %s."), *GetName());
-	}
-
-	if (ClickAction)
-	{
-		EnhancedInput->BindAction(ClickAction, ETriggerEvent::Triggered, this, &AFCPlayerController::HandleClick);
-	}
-	else
-	{
-		UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("ClickAction not assigned on %s."), *GetName());
-	}
-
-	// Week 3: Bind Overworld input actions
-	if (OverworldPanAction)
-	{
-		EnhancedInput->BindAction(OverworldPanAction, ETriggerEvent::Triggered, this, &AFCPlayerController::HandleOverworldPan);
-		UE_LOG(LogFallenCompassPlayerController, Log, TEXT("Bound IA_OverworldPan"));
-	}
-
-	if (OverworldZoomAction)
-	{
-		EnhancedInput->BindAction(OverworldZoomAction, ETriggerEvent::Triggered, this, &AFCPlayerController::HandleOverworldZoom);
-		UE_LOG(LogFallenCompassPlayerController, Log, TEXT("Bound IA_OverworldZoom"));
-	}
-
-	// Week 4: Bind Overworld map toggle
-	if (ToggleOverworldMapAction)
-	{
-		EnhancedInput->BindAction(ToggleOverworldMapAction, ETriggerEvent::Started, this, &AFCPlayerController::HandleToggleOverworldMap);
-		UE_LOG(LogFallenCompassPlayerController, Log, TEXT("Bound IA_ToggleOverworldMap"));
-	}
-	else
-	{
-		UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("ToggleOverworldMapAction not assigned on %s."), *GetName());
-	}
+    if (Config->OverworldPanAction) EnhancedInput->BindAction(Config->OverworldPanAction, ETriggerEvent::Triggered, this, &AFCPlayerController::HandleOverworldPan);
+    if (Config->OverworldZoomAction) EnhancedInput->BindAction(Config->OverworldZoomAction, ETriggerEvent::Triggered, this, &AFCPlayerController::HandleOverworldZoom);
+    if (Config->ToggleOverworldMapAction) EnhancedInput->BindAction(Config->ToggleOverworldMapAction, ETriggerEvent::Started, this, &AFCPlayerController::HandleToggleOverworldMap);
 }
 
 void AFCPlayerController::OnPossess(APawn* InPawn)
@@ -1108,6 +974,10 @@ void AFCPlayerController::OnGameStateChanged(EFCGameStateID OldState, EFCGameSta
 		*UEnum::GetValueAsString(OldState),
 		*UEnum::GetValueAsString(NewState));
 
+	// Unbind delegates when leaving Overworld_Travel state
+	UnbindOverworldConvoyDelegates();
+
+
 	// React to Overworld_Travel state entry
 	if (NewState == EFCGameStateID::Overworld_Travel)
 	{
@@ -1129,8 +999,7 @@ void AFCPlayerController::OnGameStateChanged(EFCGameStateID OldState, EFCGameSta
 			UE_LOG(LogFallenCompassPlayerController, Log, TEXT("OnGameStateChanged: Blending to TopDown camera"));
 		}
 
-		// Note: Convoy pawn is controlled by its AIController, not possessed by PlayerController
-		// PlayerController sends movement commands to the AIController via HandleOverworldClickMove()
+		BindOverworldConvoyDelegates();
 	}
 	// React to entering Camp_Local state (camp/local POI scene)
 	else if (NewState == EFCGameStateID::Camp_Local)
@@ -1523,14 +1392,14 @@ void AFCPlayerController::HandleOverworldClickMove()
 	}
 
 	// Get convoy reference
-	if (!PossessedConvoy)
+	if (!ActiveConvoy)
 	{
 		UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("HandleOverworldClickMove: No convoy reference"));
 		return;
 	}
 
 	// Get leader member from convoy
-	AFCConvoyMember* LeaderMember = PossessedConvoy->GetLeaderMember();
+	AFCConvoyMember* LeaderMember = ActiveConvoy->GetLeaderMember();
 	if (!LeaderMember)
 	{
 		UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("HandleOverworldClickMove: No leader member found"));
@@ -1585,14 +1454,14 @@ void AFCPlayerController::HandleOverworldClickMove()
 
 void AFCPlayerController::MoveConvoyToLocation(const FVector& TargetLocation)
 {
-	if (!PossessedConvoy)
+	if (!ActiveConvoy)
 	{
 		UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("MoveConvoyToLocation: No convoy possessed"));
 		return;
 	}
 
 	// Get convoy leader
-	AFCConvoyMember* LeaderMember = PossessedConvoy->GetLeaderMember();
+	AFCConvoyMember* LeaderMember = ActiveConvoy->GetLeaderMember();
 	if (!LeaderMember)
 	{
 		UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("MoveConvoyToLocation: No leader member found"));
@@ -1679,3 +1548,47 @@ void AFCPlayerController::SetPOISceneCameraActor(ACameraActor* InPOICamera)
 		*POISceneCameraActor->GetName());
 }
 
+void AFCPlayerController::BindOverworldConvoyDelegates()
+{
+    if (!InteractionComponent)
+    {
+        UE_LOG(LogFallenCompassPlayerController, Error,
+            TEXT("BindOverworldConvoyDelegates: InteractionComponent is null on %s"), *GetName());
+        return;
+    }
+
+    // Find convoy in THIS level (Overworld only)
+    TArray<AActor*> FoundConvoys;
+    UGameplayStatics::GetAllActorsOfClass(GetWorld(), AFCOverworldConvoy::StaticClass(), FoundConvoys);
+
+    if (FoundConvoys.Num() == 0)
+    {
+        UE_LOG(LogFallenCompassPlayerController, Error,
+            TEXT("BindOverworldConvoyDelegates: No OverworldConvoy found in map %s"), *GetWorld()->GetMapName());
+        ActiveConvoy = nullptr;
+        return;
+    }
+
+    ActiveConvoy = Cast<AFCOverworldConvoy>(FoundConvoys[0]);
+    UE_LOG(LogFallenCompassPlayerController, Log,
+        TEXT("BindOverworldConvoyDelegates: Found convoy %s"), *GetNameSafe(ActiveConvoy));
+
+    // Avoid double-binding
+    ActiveConvoy->OnConvoyPOIOverlap.RemoveAll(InteractionComponent);
+    ActiveConvoy->OnConvoyPOIOverlap.AddDynamic(InteractionComponent, &UFCInteractionComponent::NotifyPOIOverlap);
+
+    UE_LOG(LogFallenCompassPlayerController, Log,
+        TEXT("BindOverworldConvoyDelegates: Bound OnConvoyPOIOverlap -> InteractionComponent"));
+}
+
+void AFCPlayerController::UnbindOverworldConvoyDelegates()
+{
+    if (ActiveConvoy && InteractionComponent)
+    {
+        ActiveConvoy->OnConvoyPOIOverlap.RemoveAll(InteractionComponent);
+        UE_LOG(LogFallenCompassPlayerController, Log,
+            TEXT("UnbindOverworldConvoyDelegates: Unbound convoy delegates from InteractionComponent"));
+    }
+
+    ActiveConvoy = nullptr;
+}

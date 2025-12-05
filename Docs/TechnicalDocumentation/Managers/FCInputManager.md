@@ -17,15 +17,14 @@ It owns:
 
    * Tracks the currently active mapping mode (`CurrentMappingMode`).
 
-2. **Mode → Mapping Context registry**
+2. **Config reference + mapping lookup (via `UFCInputConfig`)**
 
-   * Holds references to the mapping contexts for:
-
-     * `FirstPerson`, `TopDown`, `Fight`, `StaticScene`, `POIScene`. 
+   * Holds a single reference to a `UFCInputConfig` data asset, which contains all `UInputMappingContext*`s and `UInputAction*`s for this player.
+   * When `SetInputMappingMode` is called, the manager looks up the appropriate `UInputMappingContext` for the requested mode from this config and applies it.
 
 3. **Switching logic**
 
-   * Clears all existing mappings and applies exactly one context for the requested mode, at `DefaultMappingPriority`.
+   * Clears all existing mappings and applies exactly one context for the requested mode, at `DefaultMappingPriority`, using the mapping context pulled from `InputConfig`.
 
 4. **Owner validation + diagnostics**
 
@@ -39,7 +38,7 @@ It owns:
 
 * `SetInputMappingMode(EFCInputMappingMode NewMode)`
 
-  * Looks up the context for the mode, clears current mappings, and applies that context.
+   * Reads the configured `UFCInputConfig`, looks up the context for the mode, clears current mappings, and applies that context.
 * `GetCurrentMappingMode() -> EFCInputMappingMode` 
 
 ### Modes (`EFCInputMappingMode`)
@@ -68,5 +67,6 @@ It owns:
 
 ## Where to configure / extend (practical notes)
 
-* Assign the five `*MappingContext` properties in the component defaults (Blueprint) so `SetInputMappingMode` has valid contexts to apply. Missing assignments will log warnings, and switching into that mode will error out.
+* Configure a single `UFCInputConfig` asset with both `UInputAction*` and `UInputMappingContext*` references and assign it on `UFCInputManager` (component defaults on `BP_FC_PlayerController`). `SetInputMappingMode` will then have valid contexts to apply.
+* There are no longer per-mode `*MappingContext` UPROPERTYs on the component; the config asset is the single source of truth.
 * If you introduce a new gameplay mode, extend `EFCInputMappingMode`, add a new `UInputMappingContext*` property, and add another switch case in `SetInputMappingMode`.

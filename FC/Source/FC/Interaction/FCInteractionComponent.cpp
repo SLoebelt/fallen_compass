@@ -414,6 +414,8 @@ void UFCInteractionComponent::OnPOIActionSelected(EFCPOIAction SelectedAction)
 void UFCInteractionComponent::NotifyPOIOverlap(AActor* POIActor)
 {
 	if (!POIActor) return;
+	UE_LOG(LogFCInteraction, Log, TEXT("NotifyPOIOverlap received: %s"), *GetNameSafe(POIActor));
+
 
 	IIFCInteractablePOI* POIInterface = Cast<IIFCInteractablePOI>(POIActor);
 	if (!POIInterface) return;
@@ -437,7 +439,7 @@ void UFCInteractionComponent::NotifyPOIOverlap(AActor* POIActor)
 		AFCPlayerController* PC = GetOwnerPCCheckedOrNull();
 		if (!PC) { return; }
 
-		AFCOverworldConvoy* Convoy = PC->GetPossessedConvoy();
+		AFCOverworldConvoy* Convoy = PC->GetActiveConvoy();
 		if (Convoy)
 		{
 			Convoy->SetInteractingWithPOI(false);
@@ -466,7 +468,7 @@ void UFCInteractionComponent::NotifyPOIOverlap(AActor* POIActor)
 			AFCPlayerController* PC = GetOwnerPCCheckedOrNull();
 			if (!PC) { return; }
 
-			AFCOverworldConvoy* Convoy = PC->GetPossessedConvoy();
+			AFCOverworldConvoy* Convoy = PC->GetActiveConvoy();
 			if (Convoy)
 			{
 				Convoy->SetInteractingWithPOI(false);

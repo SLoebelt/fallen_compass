@@ -20,10 +20,11 @@ Key responsibilities:
    * Owns `UFCInputManager`, `UFCCameraManager`, and `UFCInteractionComponent` as ActorComponents (created in constructor).
    * These components are available across all scenes and camera modes, making POI interactions consistent.
 
-2. **Input orchestration (Enhanced Input)**
+2. **Input orchestration (Enhanced Input + config asset)**
 
-   * Binds input actions to handlers in `SetupInputComponent()` (Interact, Click, Escape/Pause, QuickSave, QuickLoad, OverworldPan/Zoom, ToggleOverworldMap). 
-   * Loads several input actions via hardcoded asset paths (e.g. `/Game/FC/Input/IA_Click`, `/Game/FC/Input/IA_Escape`, `/Game/FC/Input/IA_OverworldPan`, `/Game/FC/Input/IA_OverworldZoom`, `/Game/FC/Input/IA_ToggleOverworldMap`). 
+   * Binds input actions to handlers in `SetupInputComponent()` (Interact, Click, Escape/Pause, QuickSave, QuickLoad, OverworldPan/Zoom, ToggleOverworldMap).
+   * Does **not** load actions via hardcoded asset paths or per-action `UPROPERTY`s anymore. Instead, it requests the shared `UFCInputConfig` from `UFCInputManager` and binds the `UInputAction*`s exposed by that config if present.
+   * Delegates mapping-context application for each mode to `UFCInputManager::SetInputMappingMode`, which looks up the correct `UInputMappingContext` in the same `UFCInputConfig` data asset.
 
 3. **Camera-mode routing**
 
@@ -67,7 +68,7 @@ Key responsibilities:
 
 ### Input / camera
 
-* `SetInputMappingMode(EFCInputMappingMode NewMode)` → delegates mapping changes to `UFCInputManager`. 
+* `SetInputMappingMode(EFCInputMappingMode NewMode)` → delegates mapping changes to `UFCInputManager`.
 * `SetCameraModeLocal(EFCPlayerCameraMode NewMode, float BlendTime=2.0f)` → camera switching + cursor/input-mode cleanup. 
 * `FadeScreenOut(float Duration=1.0f, bool bShowLoading=false)` / `FadeScreenIn(float Duration=1.0f)` → delegates fades to `UFCTransitionManager`. 
 
@@ -114,6 +115,10 @@ Key responsibilities:
 
 **Delegated:** POI action selection, movement triggering, and overlap handling (`HandlePOIClick`, `OnPOIActionSelected`, `NotifyPOIOverlap`).
 **Why:** centralizes POI interaction logic across Office, Overworld, and Camp; mode-aware movement (convoy vs explorer).
+**How it connects now:**
+- Overworld convoy and (optionally) camp explorer expose POI-overlap delegates.
+- `AFCPlayerController` resolves the active convoy (`ActiveConvoy`) at startup and binds its overlap delegate to `UFCInteractionComponent::NotifyPOIOverlap`.
+- Convoy/explorer remain pure event sources; they never crawl to the controller or interaction component.
 **Note:** Moved from `AFCFirstPersonCharacter` to `AFCPlayerController` to work across all scenes.
 
 ### 4) `UFCGameStateManager` (subsystem) — authoritative state + pause stack

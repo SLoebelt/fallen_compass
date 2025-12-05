@@ -3,6 +3,7 @@
 #include "Components/FCInputManager.h"
 #include "EnhancedInputSubsystems.h"
 #include "GameFramework/PlayerController.h"
+#include "Input/FCInputConfig.h"
 
 DEFINE_LOG_CATEGORY(LogFCInputManager);
 
@@ -26,23 +27,23 @@ void UFCInputManager::BeginPlay()
 	}
 
 	// Validate all input mapping contexts are assigned
-	if (!FirstPersonMappingContext)
+	if (!InputConfig->FirstPersonMappingContext)
 	{
 		UE_LOG(LogFCInputManager, Warning, TEXT("FirstPersonMappingContext not assigned on %s"), *GetName());
 	}
-	if (!TopDownMappingContext)
+	if (!InputConfig->TopDownMappingContext)
 	{
 		UE_LOG(LogFCInputManager, Warning, TEXT("TopDownMappingContext not assigned on %s"), *GetName());
 	}
-	if (!FightMappingContext)
+	if (!InputConfig->FightMappingContext)
 	{
 		UE_LOG(LogFCInputManager, Warning, TEXT("FightMappingContext not assigned on %s"), *GetName());
 	}
-	if (!StaticSceneMappingContext)
+	if (!InputConfig->StaticSceneMappingContext)
 	{
 		UE_LOG(LogFCInputManager, Warning, TEXT("StaticSceneMappingContext not assigned on %s"), *GetName());
 	}
-	if (!POISceneMappingContext)
+	if (!InputConfig->POISceneMappingContext)
 	{
 		UE_LOG(LogFCInputManager, Warning, TEXT("POISceneMappingContext not assigned on %s"), *GetName());
 	}
@@ -90,23 +91,23 @@ void UFCInputManager::SetInputMappingMode(EFCInputMappingMode NewMode)
 	switch (NewMode)
 	{
 		case EFCInputMappingMode::FirstPerson:
-			ContextToApply = FirstPersonMappingContext;
+			ContextToApply = InputConfig->FirstPersonMappingContext;
 			ModeName = TEXT("FirstPerson");
 			break;
 		case EFCInputMappingMode::TopDown:
-			ContextToApply = TopDownMappingContext;
+			ContextToApply = InputConfig->TopDownMappingContext;
 			ModeName = TEXT("TopDown");
 			break;
 		case EFCInputMappingMode::Fight:
-			ContextToApply = FightMappingContext;
+			ContextToApply = InputConfig->FightMappingContext;
 			ModeName = TEXT("Fight");
 			break;
 		case EFCInputMappingMode::StaticScene:
-			ContextToApply = StaticSceneMappingContext;
+			ContextToApply = InputConfig->StaticSceneMappingContext;
 			ModeName = TEXT("StaticScene");
 			break;
 		case EFCInputMappingMode::POIScene:
-			ContextToApply = POISceneMappingContext;
+			ContextToApply = InputConfig->POISceneMappingContext;
 			ModeName = TEXT("POIScene");
 			break;
 	}

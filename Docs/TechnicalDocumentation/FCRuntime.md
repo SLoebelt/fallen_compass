@@ -89,11 +89,12 @@ Details: `FCGameMode.md` → `FCGameMode.h/.cpp`.
 - Commands movement across scenes: `MoveConvoyToLocation()` for Overworld, `MoveExplorerToLocation()` for Camp.
 - Reacts to game state changes (camera + input mapping + cursor rules).
 - Triggers UIManager flows (main menu, pause, table widgets, overworld HUD) and blocks "world interaction" when UI is active.
+- Treats the overworld convoy and camp explorer as **event sources**: binds their POI-overlap delegates to the controller-owned `UFCInteractionComponent` (no pawn crawling or global controller lookups).
 
 Details: `FCPlayerController.md` → `FCPlayerController.h/.cpp`.
 
 ### `UFCInputManager` (ActorComponent) — “Mapping contexts by mode”
-Switches Enhanced Input mapping contexts (FirstPerson/TopDown/POIScene/etc.).  
+Switches Enhanced Input mapping contexts (FirstPerson/TopDown/Fight/StaticScene/POIScene) using data from a shared `UFCInputConfig` asset.  
 Details: `Managers/FCInputManager.md` → `Components/FCInputManager.h/.cpp`.
 
 ### `UFCCameraManager` (ActorComponent) — “View-target blending by mode”

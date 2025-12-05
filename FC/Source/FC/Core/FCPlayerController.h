@@ -6,7 +6,9 @@
 #include "GameFramework/PlayerController.h"
 #include "Components/FCInputManager.h"
 #include "Interaction/IFCInteractablePOI.h"
+#include "Input/FCInputConfig.h"
 #include "FCPlayerController.generated.h"
+
 
 class UInputAction;
 class UInputMappingContext;
@@ -151,7 +153,7 @@ public:
 
 	/** Get the possessed convoy reference */
 	UFUNCTION(BlueprintCallable, Category = "FC|Convoy")
-	AFCOverworldConvoy* GetPossessedConvoy() const { return PossessedConvoy; }
+	AFCOverworldConvoy* GetActiveConvoy() const { return ActiveConvoy; }
 
 	/** Move convoy to target location (called by InteractionComponent for POI navigation) */
 	UFUNCTION(BlueprintCallable, Category = "FC|Convoy")
@@ -184,7 +186,7 @@ protected:
 
 	/** Reference to possessed convoy in Overworld */
 	UPROPERTY()
-	AFCOverworldConvoy* PossessedConvoy;
+	AFCOverworldConvoy* ActiveConvoy;
 
 	// TODO Remove after Week 1 - no longer AI-controlled
 	/** Reference to commanded explorer in Camp/POI scenes (not possessed, AI-controlled) */
@@ -210,38 +212,6 @@ protected:
 	/** Fixed camera actor for POI/local scenes such as Camp */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Camera")
 	TObjectPtr<ACameraActor> POISceneCameraActor;
-
-	/** Input action for interaction (E key) */
-	UPROPERTY(EditDefaultsOnly, Category = "FC|Input|Actions")
-	TObjectPtr<UInputAction> InteractAction;
-
-	/** Input action for table object click */
-	UPROPERTY(EditDefaultsOnly, Category = "FC|Input|Actions")
-	TObjectPtr<UInputAction> ClickAction;
-
-	/** Input action for pause/escape (ESC key) */
-	UPROPERTY(EditDefaultsOnly, Category = "FC|Input|Actions")
-	TObjectPtr<UInputAction> EscapeAction;
-
-	/** Input action for quick save (F5 key) */
-	UPROPERTY(EditDefaultsOnly, Category = "FC|Input|Actions")
-	TObjectPtr<UInputAction> QuickSaveAction;
-
-	/** Input action for quick load (F9 key) */
-	UPROPERTY(EditDefaultsOnly, Category = "FC|Input|Actions")
-	TObjectPtr<UInputAction> QuickLoadAction;
-
-	/** Input action for Overworld camera pan (WASD) - Week 3 */
-	UPROPERTY(EditDefaultsOnly, Category = "FC|Input|Actions")
-	TObjectPtr<UInputAction> OverworldPanAction;
-
-	/** Input action for Overworld camera zoom (Mouse Wheel) - Week 3 */
-	UPROPERTY(EditDefaultsOnly, Category = "FC|Input|Actions")
-	TObjectPtr<UInputAction> OverworldZoomAction;
-
-	/** Input action for toggling the Overworld map (M key) - Week 4 */
-	UPROPERTY(EditDefaultsOnly, Category = "FC|Input|Actions")
-	TObjectPtr<UInputAction> ToggleOverworldMapAction;
 
 	/** View-only Overworld map widget currently open (if any) */
 	UPROPERTY()
@@ -274,6 +244,9 @@ protected:
 
 private:
 	void LogStateChange(const FString& Context) const;
+
+	void BindOverworldConvoyDelegates();
+	void UnbindOverworldConvoyDelegates();
 };
 
 
