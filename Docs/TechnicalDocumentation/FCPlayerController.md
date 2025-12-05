@@ -88,8 +88,8 @@ Key responsibilities:
 
 ### Movement commands (Overworld + Camp)
 
-* `GetPossessedConvoy()` / `MoveConvoyToLocation(const FVector&)` → Overworld click-to-move sends commands to the convoy leader's `AAIController` (projected onto NavMesh). 
-* `GetCommandedExplorer()` / `MoveExplorerToLocation(const FVector&)` → Camp click-to-move sends commands to the explorer's `AAIController` (projected onto NavMesh).
+* `GetPossessedConvoy()` / `MoveConvoyToLocation(const FVector&)` → Overworld click-to-move sends commands to the convoy leader's `AAIController` (projected onto NavMesh).
+* `MoveExplorerToLocation(const FVector&)` → in Camp/POIScene, routes Camp click-to-move to the **possessed** `AFC_ExplorerCharacter` (no AIController). The controller delegates NavMesh pathfinding and steering to the pawn via `AFC_ExplorerCharacter::MoveExplorerToLocation` (which computes a NavMesh path and follows it in `Tick` using `AddMovementInput`).
 * `SetMenuCameraActor(ACameraActor*)`, `SetPOISceneCameraActor(ACameraActor*)` → assign cameras used by the camera manager / POI scenes. 
 
 ### Save/load

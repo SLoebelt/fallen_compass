@@ -26,6 +26,7 @@ public:
 
 protected:
 	virtual void BeginPlay() override;
+	virtual void OnRegister() override;
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 
 public:
@@ -102,5 +103,28 @@ private:
 
 	EFCPOIAction PendingInteractionAction;
 	bool bHasPendingPOIInteraction = false;
+
 	bool bConvoyAlreadyAtPOI = false; // True when convoy reached POI before action selection (left-click)
+
+	// Cached because Owner is the PlayerController (GetInstigatorController() can be null here)
+	TWeakObjectPtr<class AFCPlayerController> OwnerPC;
+
+	// Prevent log spam
+	mutable bool bLoggedMissingOwnerPC = false;
+
+	/** Returns cached owner PC, logs once if missing */
+	AFCPlayerController* GetOwnerPCCheckedOrNull() const;
+
+    /** Whether FirstPerson focus tracing / prompts are currently enabled. */
+    bool bFirstPersonFocusEnabled = false;
+
+    /** Clears current focus target and hides the prompt widget, if any. */
+    void ClearFocusAndHidePrompt();
+
+    /** TEMP: derive the focus gate from the current camera mode until a coordinator exists. */
+    void UpdateFirstPersonFocusGateFromCameraMode();
+
+public:
+    /** Enables or disables FirstPerson focus tracing + prompts (used by mode system/coordinator). */
+    void SetFirstPersonFocusEnabled(bool bEnabled);
 };

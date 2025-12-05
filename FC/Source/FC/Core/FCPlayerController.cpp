@@ -216,20 +216,13 @@ void AFCPlayerController::BeginPlay()
 		UE_LOG(LogFallenCompassPlayerController, Log, TEXT("BeginPlay: No convoy found in level (expected in Office)"));
 	}
 
-	// Find explorer character in level if we're in Camp/POI scene
-	TArray<AActor*> FoundExplorers;
-	UGameplayStatics::GetAllActorsOfClass(GetWorld(), AFC_ExplorerCharacter::StaticClass(), FoundExplorers);
-
-	if (FoundExplorers.Num() > 0)
+	if (CameraManager && CameraManager->GetCameraMode() == EFCPlayerCameraMode::POIScene)
 	{
-		// TODO - Remove after Week 1 - no longer AI-controlled
-		CommandedExplorer = Cast<AFC_ExplorerCharacter>(FoundExplorers[0]);
-		UE_LOG(LogFallenCompassPlayerController, Log, TEXT("BeginPlay: Found explorer: %s"), *CommandedExplorer->GetName());
-	}
-	else
-	{
-		UE_LOG(LogFallenCompassPlayerController, Log, TEXT("BeginPlay: No explorer found in level (expected in Camp/POI scenes)"));
-		UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("BeginPlay: To use Camp scenes, place BP_FC_ExplorerCharacter in the level (not a Player Start)"));
+		if (!Cast<AFC_ExplorerCharacter>(GetPawn()))
+		{
+			UE_LOG(LogFallenCompassPlayerController, Error,
+				TEXT("Camp/POI mode but controller is not possessing AFC_ExplorerCharacter. Check Camp GameMode / pawn placement."));
+		}
 	}
 }
 
@@ -1291,10 +1284,10 @@ void AFCPlayerController::HandleClick(const FInputActionValue& Value)
 			return;
 		}
 
-		// TODO - Remove after Week 1 - no longer AI-controlled
-		if (!CommandedExplorer)
+		if (!Cast<AFC_ExplorerCharacter>(GetPawn()))
 		{
-			UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("HandleClick(POIScene): No commanded explorer reference"));
+			UE_LOG(LogFallenCompassPlayerController, Warning,
+				TEXT("HandleClick(POIScene): Not possessing Explorer pawn; cannot move."));
 			return;
 		}
 
@@ -1313,7 +1306,7 @@ void AFCPlayerController::HandleClick(const FInputActionValue& Value)
 			return; // Don't also move if we clicked a POI
 		}
 
-		// Command explorer's AI controller to move (same as convoy pattern)
+		// Move explorer to clicked location
 		MoveExplorerToLocation(HitResult.Location);
 		return;
 	}

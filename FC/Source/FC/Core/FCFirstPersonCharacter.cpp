@@ -40,9 +40,6 @@ AFCFirstPersonCharacter::AFCFirstPersonCharacter()
     FirstPersonCamera->SetRelativeLocation(FVector(25.0f, 0.0f, 66.0f)); // Eye height
     FirstPersonCamera->bUsePawnControlRotation = true; // Camera follows controller rotation
 
-    // Create interaction component
-    InteractionComponent = CreateDefaultSubobject<UFCInteractionComponent>(TEXT("InteractionComponent"));
-
     // Configure mesh to use Manny simple
     USkeletalMeshComponent* MeshComp = GetMesh();
     if (MeshComp)

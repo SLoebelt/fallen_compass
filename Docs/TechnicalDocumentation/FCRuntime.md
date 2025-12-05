@@ -106,6 +106,8 @@ Details: `Managers/FCCameraManager.md` → `Components/FCCameraManager.h/.cpp`.
 - Orchestrates POI click/overlap flows (Overworld + Camp): determine available actions → optionally open action selection UI (via `UFCUIManager`) → move convoy/explorer (via `AFCPlayerController`) → execute POI action on arrival.
 - Mode-aware movement: calls `MoveConvoyToLocation()` in Overworld (TopDown), `MoveExplorerToLocation()` in Camp (POIScene).
 - Shows/hides/updates an interaction prompt widget (requires a widget contract function like `SetInteractionPrompt`).
+- Caches its owning `AFCPlayerController` in `OnRegister`/`BeginPlay` and uses `GetOwnerPCCheckedOrNull()` for all controller access (no `GetInstigatorController` / `GetFirstPlayerController`); logs a single high-signal error if mis-owned.
+- Gates FirstPerson focus tracing and prompts via a boolean flag (`bFirstPersonFocusEnabled`) that is currently derived from `UFCCameraManager::GetCameraMode()`; when disabled it clears focus, hides the prompt, and early-outs from its trace/prompt update path so Overworld/Camp do not run FP traces.
 
 Details: `Components/FCInteractionComponent.md` → `FCInteractionComponent.h/.cpp`.
 

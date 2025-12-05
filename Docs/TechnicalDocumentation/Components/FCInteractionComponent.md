@@ -24,7 +24,7 @@ Key responsibilities:
    * Detects current camera mode (via `UFCCameraManager`) to choose appropriate movement command:
      * **TopDown (Overworld):** calls `AFCPlayerController::MoveConvoyToLocation()`
      * **POIScene (Camp):** calls `AFCPlayerController::MoveExplorerToLocation()`
-   * Uses NavMesh projection and SimpleMoveToLocation on respective AI controllers.
+   * Uses NavMesh-based movement via the controller's movement commands (no AIController owned by this component).
 
 3. **Action selection callback**
 
@@ -101,6 +101,8 @@ Key responsibilities:
 - Single POI interaction system works consistently across Overworld and Camp.
 - No need to duplicate POI logic on different pawn types.
 - Mode-aware design allows same component to handle different movement patterns.
+- Internally caches its `AFCPlayerController` owner in `OnRegister`/`BeginPlay` and uses that cached pointer everywhere (no `GetInstigatorController`/`GetFirstPlayerController`), logging a clear error once if mis-owned.
+- Gates FirstPerson focus tracing and prompts behind a boolean (`bFirstPersonFocusEnabled`) that is currently derived from `UFCCameraManager::GetCameraMode()`. When disabled, it clears the current focus, hides the prompt widget, and early-outs from its trace/prompt update path so Overworld/Camp do not run FP traces.
 
 ### Movement pattern difference
 
@@ -110,9 +112,9 @@ Key responsibilities:
 - InteractionComponent calls `MoveConvoyToLocation()` → delegates to convoy AI.
 
 **Camp (POIScene):**
-- PlayerController does NOT possess `AFC_ExplorerCharacter` pawn (to preserve static camera).
-- Explorer has AI controller (`AutoPossessAI = PlacedInWorldOrSpawned`).
-- InteractionComponent calls `MoveExplorerToLocation()` → delegates to explorer AI.
+- PlayerController possesses `AFC_ExplorerCharacter` pawn (standard pawn possession; camera remains static via `UFCCameraManager`).
+- `AFC_ExplorerCharacter` owns its own NavMesh path + steering logic; movement is pawn-driven, not via a dedicated AIController.
+- InteractionComponent calls `MoveExplorerToLocation()` → delegates to controller, which forwards to the possessed explorer pawn.
 
 **Office (FirstPerson):**
 - PlayerController possesses `AFCFirstPersonCharacter` pawn.

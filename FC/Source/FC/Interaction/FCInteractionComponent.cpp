@@ -17,37 +17,54 @@
 
 DEFINE_LOG_CATEGORY(LogFCInteraction);
 
+AFCPlayerController* UFCInteractionComponent::GetOwnerPCCheckedOrNull() const
+{
+	AFCPlayerController* PC = OwnerPC.Get();
+	if (!PC && !bLoggedMissingOwnerPC)
+	{
+		bLoggedMissingOwnerPC = true;
+		UE_LOG(LogFCInteraction, Error,
+			TEXT("UFCInteractionComponent owner is not AFCPlayerController (Owner=%s). Interaction prompts/traces will not work."),
+			*GetNameSafe(GetOwner()));
+	}
+	return PC;
+}
+
 UFCInteractionComponent::UFCInteractionComponent()
 {
 	PrimaryComponentTick.bCanEverTick = true;
 	PrimaryComponentTick.TickInterval = 0.0f; // Tick every frame for responsive detection
 }
 
+void UFCInteractionComponent::OnRegister()
+{
+	Super::OnRegister();
+	OwnerPC = Cast<AFCPlayerController>(GetOwner());
+}
+
 void UFCInteractionComponent::BeginPlay()
 {
 	Super::BeginPlay();
 
+	OwnerPC = Cast<AFCPlayerController>(GetOwner());
+	GetOwnerPCCheckedOrNull(); // triggers one-time error if wrong owner
+
 	// Create the interaction prompt widget if a class is specified
 	if (InteractionPromptWidgetClass)
 	{
-		APlayerController* PC = Cast<APlayerController>(GetOwner()->GetInstigatorController());
-		if (PC)
+		AFCPlayerController* PC = GetOwnerPCCheckedOrNull();
+		if (!PC) { return; }
+
+		InteractionPromptWidget = CreateWidget<UUserWidget>(PC, InteractionPromptWidgetClass);
+		if (InteractionPromptWidget)
 		{
-			InteractionPromptWidget = CreateWidget<UUserWidget>(PC, InteractionPromptWidgetClass);
-			if (InteractionPromptWidget)
-			{
-				InteractionPromptWidget->SetVisibility(ESlateVisibility::Hidden);
-				InteractionPromptWidget->AddToViewport();
-				UE_LOG(LogFCInteraction, Log, TEXT("Interaction prompt widget created and added to viewport"));
-			}
-			else
-			{
-				UE_LOG(LogFCInteraction, Error, TEXT("Failed to create interaction prompt widget"));
-			}
+			InteractionPromptWidget->SetVisibility(ESlateVisibility::Hidden);
+			InteractionPromptWidget->AddToViewport();
+			UE_LOG(LogFCInteraction, Log, TEXT("Interaction prompt widget created and added to viewport"));
 		}
 		else
 		{
-			UE_LOG(LogFCInteraction, Warning, TEXT("No PlayerController found for widget creation"));
+			UE_LOG(LogFCInteraction, Error, TEXT("Failed to create interaction prompt widget"));
 		}
 	}
 	else
@@ -59,6 +76,19 @@ void UFCInteractionComponent::BeginPlay()
 void UFCInteractionComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
+
+	if (!GetOwnerPCCheckedOrNull())
+	{
+		return;
+	}
+
+	UpdateFirstPersonFocusGateFromCameraMode();
+
+    if (!bFirstPersonFocusEnabled)
+    {
+        // Setter already cleared focus when disabled; no trace or prompt updates in non-FP modes.
+        return;
+    }
 
 	// Rate-limit interaction checks for performance
 	InteractionCheckTimer += DeltaTime;
@@ -79,7 +109,8 @@ void UFCInteractionComponent::DetectInteractables()
 		return;
 	}
 
-	APlayerController* PC = Cast<APlayerController>(OwnerActor->GetInstigatorController());
+	AFCPlayerController* PC = GetOwnerPCCheckedOrNull();
+
 	if (!PC)
 	{
 		CurrentInteractable = nullptr;
@@ -197,15 +228,14 @@ void UFCInteractionComponent::UpdatePromptWidget()
 		}
 
 		// Position the widget at the interactable's screen position
-		APlayerController* PC = Cast<APlayerController>(GetOwner()->GetInstigatorController());
-		if (PC)
+		AFCPlayerController* PC = GetOwnerPCCheckedOrNull();
+		if (!PC) { return; }
+
+		FVector WorldPos = CurrentInteractable->GetActorLocation();
+		FVector2D ScreenPos;
+		if (PC->ProjectWorldLocationToScreen(WorldPos, ScreenPos))
 		{
-			FVector WorldPos = CurrentInteractable->GetActorLocation();
-			FVector2D ScreenPos;
-			if (PC->ProjectWorldLocationToScreen(WorldPos, ScreenPos))
-			{
-				InteractionPromptWidget->SetPositionInViewport(ScreenPos);
-			}
+			InteractionPromptWidget->SetPositionInViewport(ScreenPos);
 		}
 
 		InteractionPromptWidget->SetVisibility(ESlateVisibility::Visible);
@@ -269,15 +299,17 @@ void UFCInteractionComponent::HandlePOIClick(AActor* POIActor)
 		PendingInteractionAction = AvailableActions[0].ActionType;
 		bHasPendingPOIInteraction = true;
 
-		UE_LOG(LogFCInteraction, Log, TEXT("Auto-selected action '%s' for POI '%s'"), 
+		UE_LOG(LogFCInteraction, Log, TEXT("Auto-selected action '%s' for POI '%s'"),
 			*UEnum::GetValueAsString(PendingInteractionAction), *POIName);
 
 		// Trigger movement to POI (mode-aware: convoy in Overworld, explorer in Camp)
-		AFCPlayerController* PC = Cast<AFCPlayerController>(GetWorld()->GetFirstPlayerController());
-		if (PC && PendingInteractionPOI)
+		AFCPlayerController* PC = GetOwnerPCCheckedOrNull();
+		if (!PC) { return; }
+
+		if (PendingInteractionPOI)
 		{
 			FVector POILocation = PendingInteractionPOI->GetActorLocation();
-			
+
 			// Check camera mode to determine which movement function to call
 			UFCCameraManager* CameraManager = PC->FindComponentByClass<UFCCameraManager>();
 			if (CameraManager && CameraManager->GetCameraMode() == EFCPlayerCameraMode::POIScene)
@@ -340,7 +372,7 @@ void UFCInteractionComponent::OnPOIActionSelected(EFCPOIAction SelectedAction)
 	if (POIInterface)
 	{
 		FString POIName = POIInterface->Execute_GetPOIName(PendingInteractionPOI);
-		UE_LOG(LogFCInteraction, Log, TEXT("Selected action '%s' for POI '%s'"), 
+		UE_LOG(LogFCInteraction, Log, TEXT("Selected action '%s' for POI '%s'"),
 			*UEnum::GetValueAsString(SelectedAction), *POIName);
 	}
 
@@ -348,11 +380,12 @@ void UFCInteractionComponent::OnPOIActionSelected(EFCPOIAction SelectedAction)
 	if (!bConvoyAlreadyAtPOI)
 	{
 		// Right-click multiple-action scenario: move to POI (mode-aware)
-		AFCPlayerController* PC = Cast<AFCPlayerController>(GetWorld()->GetFirstPlayerController());
-		if (PC && PendingInteractionPOI)
+		AFCPlayerController* PC = GetOwnerPCCheckedOrNull();
+		if (!PC) { return; }
+		if (PendingInteractionPOI)
 		{
 			FVector POILocation = PendingInteractionPOI->GetActorLocation();
-			
+
 			// Check camera mode to determine which movement function to call
 			UFCCameraManager* CameraManager = PC->FindComponentByClass<UFCCameraManager>();
 			if (CameraManager && CameraManager->GetCameraMode() == EFCPlayerCameraMode::POIScene)
@@ -391,7 +424,7 @@ void UFCInteractionComponent::NotifyPOIOverlap(AActor* POIActor)
 	if (bHasPendingPOIInteraction && PendingInteractionPOI == POIActor)
 	{
 		// Execute pending action
-		UE_LOG(LogFCInteraction, Log, TEXT("Executing pending action '%s' on POI '%s'"), 
+		UE_LOG(LogFCInteraction, Log, TEXT("Executing pending action '%s' on POI '%s'"),
 			*UEnum::GetValueAsString(PendingInteractionAction), *POIName);
 
 		POIInterface->Execute_ExecuteAction(POIActor, PendingInteractionAction, GetOwner());
@@ -401,15 +434,14 @@ void UFCInteractionComponent::NotifyPOIOverlap(AActor* POIActor)
 		PendingInteractionPOI = nullptr;
 
 		// Clear convoy interaction flag
-		AFCPlayerController* PC = Cast<AFCPlayerController>(GetWorld()->GetFirstPlayerController());
-		if (PC)
+		AFCPlayerController* PC = GetOwnerPCCheckedOrNull();
+		if (!PC) { return; }
+
+		AFCOverworldConvoy* Convoy = PC->GetPossessedConvoy();
+		if (Convoy)
 		{
-			AFCOverworldConvoy* Convoy = PC->GetPossessedConvoy();
-			if (Convoy)
-			{
-				Convoy->SetInteractingWithPOI(false);
-				UE_LOG(LogFCInteraction, Log, TEXT("Cleared convoy interaction flag"));
-			}
+			Convoy->SetInteractingWithPOI(false);
+			UE_LOG(LogFCInteraction, Log, TEXT("Cleared convoy interaction flag"));
 		}
 	}
 	else
@@ -425,21 +457,20 @@ void UFCInteractionComponent::NotifyPOIOverlap(AActor* POIActor)
 		else if (AvailableActions.Num() == 1)
 		{
 			// Single action - auto-execute
-			UE_LOG(LogFCInteraction, Log, TEXT("Unintentional overlap: auto-executing '%s' on POI '%s'"), 
+			UE_LOG(LogFCInteraction, Log, TEXT("Unintentional overlap: auto-executing '%s' on POI '%s'"),
 				*UEnum::GetValueAsString(AvailableActions[0].ActionType), *POIName);
 
 			POIInterface->Execute_ExecuteAction(POIActor, AvailableActions[0].ActionType, GetOwner());
 
 			// Clear convoy interaction flag
-			AFCPlayerController* PC = Cast<AFCPlayerController>(GetWorld()->GetFirstPlayerController());
-			if (PC)
+			AFCPlayerController* PC = GetOwnerPCCheckedOrNull();
+			if (!PC) { return; }
+
+			AFCOverworldConvoy* Convoy = PC->GetPossessedConvoy();
+			if (Convoy)
 			{
-				AFCOverworldConvoy* Convoy = PC->GetPossessedConvoy();
-				if (Convoy)
-				{
-					Convoy->SetInteractingWithPOI(false);
-					UE_LOG(LogFCInteraction, Log, TEXT("Cleared convoy interaction flag after auto-execute"));
-				}
+				Convoy->SetInteractingWithPOI(false);
+				UE_LOG(LogFCInteraction, Log, TEXT("Cleared convoy interaction flag after auto-execute"));
 			}
 		}
 		else
@@ -474,3 +505,50 @@ void UFCInteractionComponent::NotifyPOIOverlap(AActor* POIActor)
 	}
 }
 
+void UFCInteractionComponent::SetFirstPersonFocusEnabled(bool bEnabled)
+{
+    if (bFirstPersonFocusEnabled == bEnabled)
+    {
+        return;
+    }
+
+    bFirstPersonFocusEnabled = bEnabled;
+
+    if (!bFirstPersonFocusEnabled)
+    {
+        ClearFocusAndHidePrompt();
+    }
+}
+
+void UFCInteractionComponent::ClearFocusAndHidePrompt()
+{
+    // Use your actual member names for current focus + prompt widget.
+    CurrentInteractable = nullptr;
+
+    if (InteractionPromptWidget)
+    {
+        InteractionPromptWidget->SetVisibility(ESlateVisibility::Hidden);
+    }
+}
+
+void UFCInteractionComponent::UpdateFirstPersonFocusGateFromCameraMode()
+{
+    AFCPlayerController* PC = GetOwnerPCCheckedOrNull();
+    if (!PC)
+    {
+        SetFirstPersonFocusEnabled(false);
+        return;
+    }
+
+    UFCCameraManager* CameraManager = PC->FindComponentByClass<UFCCameraManager>();
+    if (!CameraManager)
+    {
+        SetFirstPersonFocusEnabled(false);
+        return;
+    }
+
+    const bool bShouldEnable =
+        (CameraManager->GetCameraMode() == EFCPlayerCameraMode::FirstPerson);
+
+    SetFirstPersonFocusEnabled(bShouldEnable);
+}

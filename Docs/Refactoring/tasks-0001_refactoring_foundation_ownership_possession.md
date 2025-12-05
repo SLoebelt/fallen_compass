@@ -202,22 +202,22 @@ Key Decisions:
 - Fix: cache `AFCPlayerController*` from `GetOwner()`.
 
 **Implementation**
-- [ ] In `/Source/FC/Components/FCInteractionComponent.h`:
-  - [ ] Add private member:
+- [x] In `/Source/FC/Components/FCInteractionComponent.h`:
+  - [x] Add private member:
     - `TWeakObjectPtr<class AFCPlayerController> OwnerPC;`
-  - [ ] Add private helper:
+  - [x] Add private helper:
     - `AFCPlayerController* GetOwnerPCCheckedOrNull() const;`
-- [ ] In `BeginPlay()` or `OnRegister()`:
-  - [ ] `OwnerPC = Cast<AFCPlayerController>(GetOwner());`
-  - [ ] If null, log high-signal error once (not in Tick).
-- [ ] Replace all `GetOwner()->GetInstigatorController()` usage with `OwnerPC.Get()`.
+- [x] In `BeginPlay()` or `OnRegister()`:
+  - [x] `OwnerPC = Cast<AFCPlayerController>(GetOwner());`
+  - [x] If null, log high-signal error once (not in Tick).
+- [x] Replace all `GetOwner()->GetInstigatorController()` usage with `OwnerPC.Get()`.
 
 **Testing After Step 1.2.1** ✅ CHECKPOINT
-- [ ] Compile (User): ✅
-- [ ] PIE Office + Camp + Overworld:
-  - [ ] No “controller is null” errors
-  - [ ] Prompt widget creation does not crash if class missing
-- [ ] Output Log: no Accessed None
+- [x] Compile (User): ✅
+- [x] PIE Office + Camp + Overworld:
+  - [x] No “controller is null” errors
+  - [x] Prompt widget creation does not crash if class missing
+- [x] Output Log: no Accessed None
 
 **COMMIT POINT 1.2.1**: `git commit -m "fix(interaction): cache owner player controller and remove instigator lookup"`
 
@@ -228,16 +228,16 @@ Key Decisions:
 - Focus trace/prompt should only run in FirstPerson mode.
 
 **Implementation**
-- [ ] Add a mode check at the start of InteractionComponent tick/update function:
+- [x] Add a mode check at the start of InteractionComponent tick/update function:
   - If not FirstPerson:
-    - [ ] Clear focus target/prompt state if needed.
-    - [ ] Return early (no trace, no prompt updates).
-- [ ] Ensure this logic is event-driven where possible:
+    - [x] Clear focus target/prompt state if needed.
+    - [x] Return early (no trace, no prompt updates).
+- [x] Ensure this logic is event-driven where possible:
   - Prefer reacting to mode change events over ticking constantly (prototype can keep minimal tick if needed).
 
 **Testing After Step 1.2.2** ✅ CHECKPOINT
-- [ ] PIE Overworld/Camp: no interaction prompt updates or FP traces run
-- [ ] PIE Office: FP trace works as before
+- [x] PIE Overworld/Camp: no interaction prompt updates or FP traces run
+- [x] PIE Office: FP trace works as before
 
 **COMMIT POINT 1.2.2**: `git commit -m "refactor(interaction): gate focus tracing and prompts to first-person mode"`
 
@@ -250,20 +250,20 @@ Key Decisions:
 - Current convoy overlap code crawls: World → PC → Pawn → InteractionComponent. This breaks when Pawn isn’t the FP pawn.
 
 **Implementation**
-- [ ] In `AFCOverworldConvoy`:
-  - [ ] Add multicast delegate (if missing):
+- [x] In `AFCOverworldConvoy`:
+  - [x] Add multicast delegate (if missing):
     - `DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnPOIOverlap, AActor*, POIActor);`
     - `UPROPERTY(BlueprintAssignable)` `FOnPOIOverlap OnPOIOverlap;`
-  - [ ] In overlap handler:
-    - [ ] Validate POI actor
-    - [ ] Broadcast `OnPOIOverlap.Broadcast(POIActor);`
-  - [ ] Remove any `GetFirstPlayerController()` calls and any casting to FP pawn for interaction delegation.
-- [ ] Ensure this does not spam (one broadcast per overlap entry, not per tick).
+  - [x] In overlap handler:
+    - [x] Validate POI actor
+    - [x] Broadcast `OnPOIOverlap.Broadcast(POIActor);`
+  - [x] Remove any `GetFirstPlayerController()` calls and any casting to FP pawn for interaction delegation.
+- [x] Ensure this does not spam (one broadcast per overlap entry, not per tick).
 
 **Testing After Step 1.3.1** ✅ CHECKPOINT
-- [ ] Compile (User): ✅
-- [ ] PIE Overworld: entering POI overlap triggers exactly one broadcast (log it once)
-- [ ] No reliance on FP pawn
+- [x] Compile (User): ✅
+- [x] PIE Overworld: entering POI overlap triggers exactly one broadcast (log it once)
+- [x] No reliance on FP pawn
 
 **COMMIT POINT 1.3.1**: `git commit -m "refactor(overworld): convoy broadcasts POI overlap via delegate (no pawn crawling)"`
 
