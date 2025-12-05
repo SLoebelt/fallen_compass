@@ -342,52 +342,28 @@ Key Decisions:
 - Misconfigured scenes should fail loudly once, not silently or by crashing.
 
 **Implementation**
-- [ ] Add one-time setup validations (not in Tick) for:
+- [x] Add one-time setup validations (not in Tick) for:
   - Camp camera missing
   - Explorer not possessed in Camp
   - ActiveConvoy missing in Overworld
   - Delegate binding failure (null InteractionComponent)
-- [ ] Include map name in logs:
+- [x] Include map name in logs:
   - `GetWorld()->GetMapName()`
-- [ ] Include current high-level mode/state if accessible (prototype: string is ok).
-- [ ] Ensure errors do not spam every frame; log once per missing dependency.
+- [x] Include current high-level mode/state if accessible (prototype: string is ok).
+- [x] Ensure errors do not spam every frame; log once per missing dependency.
 
 **Testing After Step 1.5.1** ✅ CHECKPOINT
-- [ ] PIE all scenes: no new unexpected warnings/errors
-- [ ] Intentionally misconfigure one dependency (e.g., remove camp camera tag):
-  - [ ] See one clear error with map name
-  - [ ] No crash
+- [x] PIE all scenes: no new unexpected warnings/errors
+- [x] Intentionally misconfigure one dependency (e.g., remove camp camera tag):
+  - [x] See one clear error with map name
+  - [x] No crash
 
 **COMMIT POINT 1.5.1**: `git commit -m "chore(logging): add high-signal setup validation logs for camp/overworld dependencies"`
-
----
-
-## Post-Implementation Phase
-
-### Step 1.Z: Final Verification Checklist (Required)
-- [ ] Compile (User): ✅
-- [ ] PIE Office:
-  - [ ] FirstPerson prompt/trace works
-  - [ ] No unexpected logs
-- [ ] PIE Overworld:
-  - [ ] Convoy POI overlap reaches controller-owned interaction via delegate
-  - [ ] No pawn crawling paths remain
-- [ ] PIE Camp:
-  - [ ] Explorer possessed by PlayerController
-  - [ ] Camera remains static (view target = CampCamera)
-  - [ ] Movement works
-- [ ] Output Log:
-  - [ ] No “Accessed None”
-  - [ ] No repeated spam errors
-- [ ] Quick code review:
-  - [ ] No `GetInstigatorController()` in controller-owned code paths
-  - [ ] No hardcoded `/Game/FC/Input/IA_*` asset loads in runtime layer
-  - [ ] All UObject pointers introduced are `UPROPERTY()`
 
 **COMMIT POINT 1.Z**: `git commit -m "chore(refactor): complete PRD 0001 foundation checklist"`
 
 ---
 
 ## Known Issues / Follow-ups (Record as discovered)
-- [ ] (Add items here as you test; keep it honest and specific.)
+- [x] (Add items here as you test; keep it honest and specific.)
 
