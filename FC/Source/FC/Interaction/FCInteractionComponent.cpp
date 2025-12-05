@@ -12,7 +12,7 @@
 #include "Core/UFCGameInstance.h"
 #include "Core/FCUIManager.h"
 #include "Core/FCPlayerController.h"
-#include "Characters/Convoy/FCOverworldConvoy.h"
+#include "Components/FCCameraManager.h"
 #include "Characters/Convoy/FCOverworldConvoy.h"
 
 DEFINE_LOG_CATEGORY(LogFCInteraction);
@@ -272,13 +272,26 @@ void UFCInteractionComponent::HandlePOIClick(AActor* POIActor)
 		UE_LOG(LogFCInteraction, Log, TEXT("Auto-selected action '%s' for POI '%s'"), 
 			*UEnum::GetValueAsString(PendingInteractionAction), *POIName);
 
-		// Trigger convoy movement to POI
+		// Trigger movement to POI (mode-aware: convoy in Overworld, explorer in Camp)
 		AFCPlayerController* PC = Cast<AFCPlayerController>(GetWorld()->GetFirstPlayerController());
 		if (PC && PendingInteractionPOI)
 		{
 			FVector POILocation = PendingInteractionPOI->GetActorLocation();
-			PC->MoveConvoyToLocation(POILocation);
-			UE_LOG(LogFCInteraction, Log, TEXT("Triggered convoy movement to POI at %s (single action)"), *POILocation.ToString());
+			
+			// Check camera mode to determine which movement function to call
+			UFCCameraManager* CameraManager = PC->FindComponentByClass<UFCCameraManager>();
+			if (CameraManager && CameraManager->GetCameraMode() == EFCPlayerCameraMode::POIScene)
+			{
+				// Camp mode - move explorer
+				PC->MoveExplorerToLocation(POILocation);
+				UE_LOG(LogFCInteraction, Log, TEXT("Triggered explorer movement to POI at %s (single action)"), *POILocation.ToString());
+			}
+			else
+			{
+				// Overworld mode - move convoy
+				PC->MoveConvoyToLocation(POILocation);
+				UE_LOG(LogFCInteraction, Log, TEXT("Triggered convoy movement to POI at %s (single action)"), *POILocation.ToString());
+			}
 		}
 	}
 	else
@@ -331,22 +344,35 @@ void UFCInteractionComponent::OnPOIActionSelected(EFCPOIAction SelectedAction)
 			*UEnum::GetValueAsString(SelectedAction), *POIName);
 	}
 
-	// Only trigger movement if convoy not already at POI
+	// Only trigger movement if not already at POI
 	if (!bConvoyAlreadyAtPOI)
 	{
-		// Right-click multiple-action scenario: move convoy to POI
+		// Right-click multiple-action scenario: move to POI (mode-aware)
 		AFCPlayerController* PC = Cast<AFCPlayerController>(GetWorld()->GetFirstPlayerController());
 		if (PC && PendingInteractionPOI)
 		{
 			FVector POILocation = PendingInteractionPOI->GetActorLocation();
-			PC->MoveConvoyToLocation(POILocation);
-			UE_LOG(LogFCInteraction, Log, TEXT("Triggered convoy movement to POI at %s (right-click multiple)"), *POILocation.ToString());
+			
+			// Check camera mode to determine which movement function to call
+			UFCCameraManager* CameraManager = PC->FindComponentByClass<UFCCameraManager>();
+			if (CameraManager && CameraManager->GetCameraMode() == EFCPlayerCameraMode::POIScene)
+			{
+				// Camp mode - move explorer
+				PC->MoveExplorerToLocation(POILocation);
+				UE_LOG(LogFCInteraction, Log, TEXT("Triggered explorer movement to POI at %s (right-click multiple)"), *POILocation.ToString());
+			}
+			else
+			{
+				// Overworld mode - move convoy
+				PC->MoveConvoyToLocation(POILocation);
+				UE_LOG(LogFCInteraction, Log, TEXT("Triggered convoy movement to POI at %s (right-click multiple)"), *POILocation.ToString());
+			}
 		}
 	}
 	else
 	{
-		// Left-click scenario: convoy already at POI, execute immediately
-		UE_LOG(LogFCInteraction, Log, TEXT("Convoy already at POI, executing action immediately"));
+		// Left-click scenario: already at POI, execute immediately
+		UE_LOG(LogFCInteraction, Log, TEXT("Already at POI, executing action immediately"));
 		bConvoyAlreadyAtPOI = false; // Reset flag
 		NotifyPOIOverlap(PendingInteractionPOI);
 	}

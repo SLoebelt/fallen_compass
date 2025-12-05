@@ -92,6 +92,13 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Camera")
 	void RestorePreviousTableCamera(float BlendTime = -1.0f);
 
+	/**
+	 * Blend camera to a fixed POI/local-scene camera (e.g. Camp).
+	 * Controller is responsible for providing the target camera actor.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Camera")
+	void BlendToPOISceneCamera(ACameraActor* POICamera, float BlendTime = -1.0f);
+
 	// --- Configuration ---
 
 	/** Set main menu camera reference */

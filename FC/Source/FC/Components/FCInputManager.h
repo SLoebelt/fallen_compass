@@ -28,7 +28,13 @@ enum class EFCInputMappingMode : uint8
 	Fight,
 	
 	/** Static scenes (cutscenes, dialogue) with minimal interaction */
-	StaticScene
+	StaticScene,
+
+	/**
+	 * Point-of-interest/local scene (e.g. Camp) with click-to-move explorer
+	 * and UI interaction, but without free camera pan/zoom.
+	 */
+	POIScene
 };
 
 /**
@@ -113,4 +119,8 @@ protected:
 	/** Input mapping context for static scenes (cutscenes, dialogue) */
 	UPROPERTY(EditDefaultsOnly, Category = "FC|Input|Contexts")
 	TObjectPtr<UInputMappingContext> StaticSceneMappingContext;
+
+	/** Input mapping context for POI/local scenes (e.g. Camp, story POIs) */
+	UPROPERTY(EditDefaultsOnly, Category = "FC|Input|Contexts")
+	TObjectPtr<UInputMappingContext> POISceneMappingContext;
 };

@@ -215,51 +215,68 @@ void UFCLevelTransitionManager::InitializeLevelTransitionOnLevelStart()
 	// Normalize current level name via LevelManager so PIE prefixes are handled.
 	const FName CurrentLevelName = LevelMgr->GetCurrentLevelName();
 	UE_LOG(LogFCLevelTransitionManager, Log, TEXT("InitializeLevelTransitionOnLevelStart: LevelManager reports current level '%s'"), *CurrentLevelName.ToString());
-	if (!CurrentLevelName.IsEqual(FName(TEXT("L_Office"))))
-	{
-		return;
-	}
 
-	// For now we only care about ExpeditionSummary as a pending target.
+	// Determine the pending target state for this Loading transition.
 	const EFCGameStateID LoadingTarget = StateMgr->GetLoadingTargetState();
-	if (LoadingTarget != EFCGameStateID::ExpeditionSummary)
-	{
-		UE_LOG(LogFCLevelTransitionManager, Verbose, TEXT("InitializeLevelTransitionOnLevelStart: Loading target is %s, not ExpeditionSummary"),
-			*UEnum::GetValueAsString(LoadingTarget));
-		return;
-	}
 
-	// Transition into ExpeditionSummary.
-	if (!StateMgr->TransitionTo(EFCGameStateID::ExpeditionSummary))
+	// Case A: Office + ExpeditionSummary (existing Week 4 flow).
+	if (CurrentLevelName.IsEqual(FName(TEXT("L_Office"))) &&
+		LoadingTarget == EFCGameStateID::ExpeditionSummary)
 	{
-		UE_LOG(LogFCLevelTransitionManager, Error, TEXT("InitializeLevelTransitionOnLevelStart: Failed to transition to ExpeditionSummary after loading Office"));
-		return;
-	}
-
-	// Ask UIManager to show the expedition summary widget if available.
-	if (UIManager)
-	{
-		APlayerController* PC = World->GetFirstPlayerController();
-		if (PC)
+		// Transition into ExpeditionSummary.
+		if (!StateMgr->TransitionTo(EFCGameStateID::ExpeditionSummary))
 		{
-			// Helper will be implemented on UIManager side.
-			UFunction* ShowSummaryFunc = UIManager->FindFunction(FName(TEXT("ShowExpeditionSummary")));
-			if (ShowSummaryFunc)
+			UE_LOG(LogFCLevelTransitionManager, Error, TEXT("InitializeLevelTransitionOnLevelStart: Failed to transition to ExpeditionSummary after loading Office"));
+			return;
+		}
+
+		// Ask UIManager to show the expedition summary widget if available.
+		if (UIManager)
+		{
+			APlayerController* PC = World->GetFirstPlayerController();
+			if (PC)
 			{
-				struct FShowSummaryParams
+				// Helper will be implemented on UIManager side.
+				UFunction* ShowSummaryFunc = UIManager->FindFunction(FName(TEXT("ShowExpeditionSummary")));
+				if (ShowSummaryFunc)
 				{
-					APlayerController* OwningPlayer;
-				};
-				FShowSummaryParams Params;
-				Params.OwningPlayer = PC;
-				UIManager->ProcessEvent(ShowSummaryFunc, &Params);
-			}
-			else
-			{
-				UE_LOG(LogFCLevelTransitionManager, Warning, TEXT("InitializeLevelTransitionOnLevelStart: UFCUIManager::ShowExpeditionSummary not found (function missing)"));
+					struct FShowSummaryParams
+					{
+						APlayerController* OwningPlayer;
+					};
+					FShowSummaryParams Params;
+					Params.OwningPlayer = PC;
+					UIManager->ProcessEvent(ShowSummaryFunc, &Params);
+				}
+				else
+				{
+					UE_LOG(LogFCLevelTransitionManager, Warning, TEXT("InitializeLevelTransitionOnLevelStart: UFCUIManager::ShowExpeditionSummary not found (function missing)"));
+				}
 			}
 		}
+
+		return;
 	}
+
+	// Case B: Camp + Camp_Local (Week 5 Camp flow).
+	if (CurrentLevelName.IsEqual(FName(TEXT("L_Camp"))) &&
+		LoadingTarget == EFCGameStateID::Camp_Local)
+	{
+		if (!StateMgr->TransitionTo(EFCGameStateID::Camp_Local))
+		{
+			UE_LOG(LogFCLevelTransitionManager, Error, TEXT("InitializeLevelTransitionOnLevelStart: Failed to transition to Camp_Local after loading L_Camp"));
+			return;
+		}
+
+		UE_LOG(LogFCLevelTransitionManager, Log,
+			TEXT("InitializeLevelTransitionOnLevelStart: Completed Loading->Camp_Local after loading L_Camp"));
+		return;
+	}
+
+	UE_LOG(LogFCLevelTransitionManager, Verbose,
+		TEXT("InitializeLevelTransitionOnLevelStart: No matching Loading-target handler for Level='%s', Target=%s"),
+		*CurrentLevelName.ToString(),
+		*UEnum::GetValueAsString(LoadingTarget));
 }
 
 void UFCLevelTransitionManager::InitializeOnLevelStart()
@@ -355,6 +372,87 @@ void UFCLevelTransitionManager::CloseExpeditionSummaryAndReturnToOffice()
 	// Transition back to Office_TableView so the camera/input are aligned
 	// with the office desk/tableview setup.
 	StateMgr->TransitionTo(EFCGameStateID::Office_TableView);
+}
+
+void UFCLevelTransitionManager::EnterCampFromGameplay()
+{
+	UFCGameStateManager* StateMgr = GetGameStateManager();
+	UFCTransitionManager* TransitionMgr = GetTransitionManager();
+	UFCLevelManager* LevelMgr = GetLevelManager();
+
+	if (!StateMgr || !TransitionMgr || !LevelMgr)
+	{
+		UE_LOG(LogFCLevelTransitionManager, Error,
+			TEXT("EnterCampFromGameplay: Missing required subsystem (StateMgr=%p, TransitionMgr=%p, LevelMgr=%p)"),
+			StateMgr, TransitionMgr, LevelMgr);
+		return;
+	}
+
+	// Request a loading-based transition into Camp_Local. We keep caller-side
+	// validation about when "Set Up Camp" is allowed.
+	if (!StateMgr->TransitionViaLoading(EFCGameStateID::Camp_Local))
+	{
+		UE_LOG(LogFCLevelTransitionManager, Error,
+			TEXT("EnterCampFromGameplay: Failed to transition via Loading to Camp_Local"));
+		return;
+	}
+
+	// Begin fade out and load the Camp level. Once L_Camp has loaded,
+	// InitializeOnLevelStart / InitializeLevelTransitionOnLevelStart will
+	// complete the transition into Camp_Local so AFCPlayerController can
+	// configure POI/Camp camera & input.
+	TransitionMgr->BeginFadeOut(1.0f, /*bShowLoading=*/true);
+
+	const FName CampLevelName(TEXT("L_Camp"));
+	LevelMgr->LoadLevel(CampLevelName, /*bShowLoadingScreen*/ true);
+
+	UE_LOG(LogFCLevelTransitionManager, Log,
+		TEXT("EnterCampFromGameplay: Loading camp level %s (target state Camp_Local via Loading)"),
+		*CampLevelName.ToString());
+}
+
+void UFCLevelTransitionManager::ExitCampToOverworld()
+{
+	UFCGameStateManager* StateMgr = GetGameStateManager();
+	UFCTransitionManager* TransitionMgr = GetTransitionManager();
+	UFCLevelManager* LevelMgr = GetLevelManager();
+	UFCExpeditionManager* ExpeditionMgr = GetExpeditionManager();
+
+	if (!StateMgr || !TransitionMgr || !LevelMgr)
+	{
+		UE_LOG(LogFCLevelTransitionManager, Error,
+			TEXT("ExitCampToOverworld: Missing required subsystem (StateMgr=%p, TransitionMgr=%p, LevelMgr=%p)"),
+			StateMgr, TransitionMgr, LevelMgr);
+		return;
+	}
+
+	// Ensure we're currently in Camp_Local state
+	if (StateMgr->GetCurrentState() != EFCGameStateID::Camp_Local)
+	{
+		UE_LOG(LogFCLevelTransitionManager, Warning,
+			TEXT("ExitCampToOverworld: Called from non-Camp_Local state %s"),
+			*UEnum::GetValueAsString(StateMgr->GetCurrentState()));
+	}
+
+	// Request a loading-based transition back to Overworld_Travel
+	if (!StateMgr->TransitionViaLoading(EFCGameStateID::Overworld_Travel))
+	{
+		UE_LOG(LogFCLevelTransitionManager, Error,
+			TEXT("ExitCampToOverworld: Failed to transition via Loading to Overworld_Travel"));
+		return;
+	}
+
+	// Begin fade out and load the Overworld level. Convoy position will be
+	// restored automatically by AFCPlayerController::OnGameStateChanged when
+	// it detects Overworld_Travel state and queries UFCExpeditionManager.
+	TransitionMgr->BeginFadeOut(1.0f, /*bShowLoading=*/true);
+
+	const FName OverworldLevelName(TEXT("L_Overworld"));
+	LevelMgr->LoadLevel(OverworldLevelName, /*bShowLoadingScreen*/ true);
+
+	UE_LOG(LogFCLevelTransitionManager, Log,
+		TEXT("ExitCampToOverworld: Breaking camp, loading overworld level %s (target state Overworld_Travel via Loading)"),
+		*OverworldLevelName.ToString());
 }
 
 void UFCLevelTransitionManager::RequestTransition(EFCGameStateID TargetState, FName TargetLevelName, bool bUseFade)

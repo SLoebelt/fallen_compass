@@ -14,6 +14,7 @@ class ACameraActor;
 class UUserWidget;
 class UFCCameraManager;
 class UFCInputManager;
+class UFCInteractionComponent;
 class AFCOverworldConvoy;
 class AFCConvoyMember;
 struct FInputActionValue;
@@ -27,7 +28,10 @@ enum class EFCPlayerCameraMode : uint8
 	TableView,
 	MainMenu,
 	SaveSlotView,
-	TopDown  // Week 3: Overworld camera mode
+	TopDown,  // Week 3: Overworld camera mode
+
+	/** Fixed top-down camera for POI/local scenes such as Camp */
+	POIScene
 };
 
 UENUM(BlueprintType)
@@ -150,9 +154,21 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "FC|Convoy")
 	void MoveConvoyToLocation(const FVector& TargetLocation);
 
+	/** Get the commanded explorer character reference (Camp/POI scenes) */
+	UFUNCTION(BlueprintCallable, Category = "FC|Camp")
+	AFC_ExplorerCharacter* GetCommandedExplorer() const { return CommandedExplorer; }
+
+	/** Command explorer to move to target location (Camp/POI click-to-move) */
+	UFUNCTION(BlueprintCallable, Category = "FC|Camp")
+	void MoveExplorerToLocation(const FVector& TargetLocation);
+
 	/** Set the menu camera actor used by the camera manager for main menu view. */
 	UFUNCTION(BlueprintCallable, Category = "Camera")
 	void SetMenuCameraActor(ACameraActor* InMenuCamera);
+
+	/** Set the fixed camera actor used for POI/local scenes (e.g. Camp). */
+	UFUNCTION(BlueprintCallable, Category = "Camera")
+	void SetPOISceneCameraActor(ACameraActor* InPOICamera);
 
 protected:
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "State")
@@ -166,6 +182,10 @@ protected:
 	UPROPERTY()
 	AFCOverworldConvoy* PossessedConvoy;
 
+	/** Reference to commanded explorer in Camp/POI scenes (not possessed, AI-controlled) */
+	UPROPERTY()
+	AFC_ExplorerCharacter* CommandedExplorer;
+
 	/** Current game state (MainMenu, Gameplay, etc.) */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "State")
 	EFCGameState CurrentGameState;
@@ -177,6 +197,14 @@ protected:
 	/** Input management component */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<UFCInputManager> InputManager;
+
+	/** Interaction management component (handles POI interactions across all scenes) */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	TObjectPtr<UFCInteractionComponent> InteractionComponent;
+
+	/** Fixed camera actor for POI/local scenes such as Camp */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Camera")
+	TObjectPtr<ACameraActor> POISceneCameraActor;
 
 	/** Input action for interaction (E key) */
 	UPROPERTY(EditDefaultsOnly, Category = "FC|Input|Actions")

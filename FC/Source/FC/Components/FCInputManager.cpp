@@ -42,6 +42,10 @@ void UFCInputManager::BeginPlay()
 	{
 		UE_LOG(LogFCInputManager, Warning, TEXT("StaticSceneMappingContext not assigned on %s"), *GetName());
 	}
+	if (!POISceneMappingContext)
+	{
+		UE_LOG(LogFCInputManager, Warning, TEXT("POISceneMappingContext not assigned on %s"), *GetName());
+	}
 
 	UE_LOG(LogFCInputManager, Log, TEXT("UFCInputManager initialized on %s"), *GetNameSafe(OwnerPC));
 }
@@ -100,6 +104,10 @@ void UFCInputManager::SetInputMappingMode(EFCInputMappingMode NewMode)
 		case EFCInputMappingMode::StaticScene:
 			ContextToApply = StaticSceneMappingContext;
 			ModeName = TEXT("StaticScene");
+			break;
+		case EFCInputMappingMode::POIScene:
+			ContextToApply = POISceneMappingContext;
+			ModeName = TEXT("POIScene");
 			break;
 	}
 

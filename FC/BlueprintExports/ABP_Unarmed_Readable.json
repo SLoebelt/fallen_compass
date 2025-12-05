@@ -1,0 +1,144 @@
+{
+	"name": "ABP_Unarmed",
+	"nodes": [
+		{
+			"title": "Event Blueprint Update Animation",
+			"inputs":
+			{
+			},
+			"children": [
+				{
+					"pin": "then",
+					"title": "Get",
+					"inputs":
+					{
+					},
+					"children": [
+						{
+							"pin": "then",
+							"title": "Sequence",
+							"inputs":
+							{
+							},
+							"children": [
+								{
+									"pin": "then_0",
+									"title": "Reroute Node",
+									"inputs":
+									{
+									},
+									"children": [
+										{
+											"pin": "OutputPin",
+											"title": "Set Velocity  (Velocity = Get Velocity)",
+											"inputs":
+											{
+												"Velocity": "Get Velocity"
+											},
+											"children": [
+												{
+													"pin": "then",
+													"title": "Set GroundSpeed  (GroundSpeed = Vector Length XY)",
+													"inputs":
+													{
+														"GroundSpeed": "Vector Length XY"
+													},
+													"children": [
+														{
+															"pin": "then",
+															"title": "Set Direction  (Direction = Select)",
+															"inputs":
+															{
+																"Direction": "Select"
+															},
+															"children": []
+														}
+													]
+												}
+											]
+										}
+									]
+								},
+								{
+									"pin": "then_1",
+									"title": "Reroute Node",
+									"inputs":
+									{
+									},
+									"children": [
+										{
+											"pin": "OutputPin",
+											"title": "Set ShouldMove  (ShouldMove = AND Boolean)",
+											"inputs":
+											{
+												"ShouldMove": "AND Boolean"
+											},
+											"children": []
+										}
+									]
+								},
+								{
+									"pin": "then_2",
+									"title": "Reroute Node",
+									"inputs":
+									{
+									},
+									"children": [
+										{
+											"pin": "OutputPin",
+											"title": "Set IsFalling  (IsFalling = Is Falling\nTarget is Nav Movement Component)",
+											"inputs":
+											{
+												"IsFalling": "Is Falling\nTarget is Nav Movement Component"
+											},
+											"children": []
+										}
+									]
+								}
+							]
+						}
+					]
+				}
+			]
+		},
+		{
+			"title": "Event Blueprint Initialize Animation",
+			"inputs":
+			{
+			},
+			"children": [
+				{
+					"pin": "then",
+					"title": "Cast To Character  (Object = Get Owning Actor\nTarget is Anim Instance)",
+					"inputs":
+					{
+						"Object": "Get Owning Actor\nTarget is Anim Instance"
+					},
+					"children": [
+						{
+							"pin": "then",
+							"title": "Set Character",
+							"inputs":
+							{
+							},
+							"children": [
+								{
+									"pin": "then",
+									"title": "Set MovementComponent  (MovementComponent = Get CharacterMovement)",
+									"inputs":
+									{
+										"MovementComponent": "Get CharacterMovement"
+									},
+									"children": []
+								}
+							]
+						}
+					]
+				}
+			]
+		},
+		{
+			"function_name": "AnimGraph"
+		}
+	]
+}

@@ -24,6 +24,8 @@ enum class EFCGameStateID : uint8
 	Office_TableView  UMETA(DisplayName = "Office Table View"),
 	ExpeditionSummary UMETA(DisplayName = "Expedition Summary"),
 	Overworld_Travel  UMETA(DisplayName = "Overworld Travel"),
+	/** Local camp/POI scene with fixed camera and explorer control */
+	Camp_Local      UMETA(DisplayName = "Camp Local Scene"),
 	Combat_PlayerTurn UMETA(DisplayName = "Combat - Player Turn"),
 	Combat_EnemyTurn  UMETA(DisplayName = "Combat - Enemy Turn"),
 	Paused            UMETA(DisplayName = "Paused"),

@@ -41,7 +41,7 @@
 
 ---
 
-### Week 4 – Expedition Loop & Bug Fixing
+### Week 4 – Expedition Loop & Bug Fixing - (23.11.25 - 03.12.25)
 
 **Focus**: Closing the loop between Office and Overworld, and fixing critical state bugs.
 **Estimated Time**: 18-22 Hours
@@ -61,55 +61,87 @@
   - _Est: 6h_
 
 - **Bug Fixes (Critical & Polish)**
-  - **Fix Issue #1 (High)**: Office State Reset on Return. Ensure `InitializeMainMenu` respects existing gameplay state.
-  - **Fix Issue #4 (Medium)**: ESC Key Toggle in Overworld. Implement `OnKeyDown` override in Pause Menu.
-  - **Fix Issue #2 (Low)**: Abort Button Visibility. Hide button when in Office.
+  - **Fix Issue #1 (High)**: Office State Reset on Return. Ensure `InitializeMainMenu` respects existing gameplay state. - FIXED
+  - **Fix Issue #4 (Medium)**: ESC Key Toggle in Overworld. Implement `OnKeyDown` override in Pause Menu (`WBP_PauseMenu`). - OPEN
+  - **Fix Issue #2 (Low)**: Abort Button Visibility. Hide button when in Office (Abort only visible on `L_Overworld`). - OPEN
   - _Est: 6-8h_
 
+**Implementation Summary**
+4.0 Analysis & Discovery: Audited game state, UI, map, and interaction code to understand why Office/Overworld transitions and pause behavior were breaking, and produced a concrete implementation plan aligned with code conventions.
+
+4.2 World Map & Expedition Planning System: Built the new WBP_WorldMap planning UI with fog-of-war and route overlays driven by UFCExpeditionManager, configured a CPU-readable land-mask texture and GameInstance-backed world-map settings, and wired the convoy to feed live exploration data into a persistent fog-of-war grid.
+
+4.2.P1 Core Loop & Data Consistency: Centralized world-map configuration in UFCExpeditionManager::Initialize, mapped convoy world positions into 16×16 exploration cells, and extended expedition data so planned routes, costs, and risk are consistently tracked and autosaved between C++ and UMG.
+
+4.2.P2 Resources & Start-Expedition Flow: Added a small money API to UFCGameInstance, surfaced Money/Supplies in the planning UI, validated route affordability, and implemented a C++ “Start Expedition” flow that consumes funds, marks the expedition in progress, and jumps into the Overworld via the state/level managers.
+
+4.2.P3 Overworld View Map & UX Polish: Created a lightweight WBP_OverworldMap HUD wrapper for a view-only world map, bound it to the M key while traveling, and differentiated planning vs. view modes plus improved on-screen feedback and logging for failed expedition actions.
+
+4.3 Expedition Return Flow: Introduced an Overworld extraction point and an UFCExpeditionSummaryWidget-based summary screen, added an ExpeditionSummary game state and loading hop, and wired ESC/close to cleanly return players from summary back into Office exploration.
+
+4.6 Centralize Level & State Transitions: Implemented UFCLevelTransitionManager as the orchestration hub for “state + level + fade + UI” flows (start expedition, return to main menu, return from Overworld with summary), moved key transitions out of widgets/controller, and added an Office-level startup hook that resolves loading hops like “return with summary” into the correct UI.
+
+4.7 Align Core Managers & Transition Pattern: Documented clear responsibilities across GameState/Level/Transition/UI/LevelTransition managers and the player controller, sketched a reusable transition API and table-view state flow, and planned a unified InitializeOnLevelStart plus migration checklist so future refactors can route all complex transitions through UFCLevelTransitionManager instead of ad-hoc calls.
+
 ---
 
-### Week 5 – Local Camp Scene & Fog-of-War
+### Week 5 – Local Camp Scene & Fog-of-War (Mechanics Stub) - (03.12.25 - 10.12.25)
 
-**Focus**: The third gameplay perspective (Camp) and map visibility.
+**Focus**: The third gameplay perspective (Camp) and a first playable fog-of-war stub; keep scope to one junior week by postponing biomes, advanced minimap generation, and save/load internals to Week 6.
 **Estimated Time**: 16-20 Hours
 
-- **Feature: Local Scene: Camp – Part 1**
+- **Feature: Local Scene: Camp – Part 1 (Basic Scene & Controls)**
 
-  - Create `L_Camp` level (small terrain, campfire prop).
-  - Implement **Point & Click** movement for a single leader pawn (distinct from Convoy controller).
+  - Create a base `L_Camp` level (small terrain, campfire prop, simple props) that serves as the **generic camp layout** for all biomes.
+  - Implement a dedicated **Camp leader pawn** (always the designated explorer character, not “first convoy member”) with **Point & Click** movement, mirroring Overworld input: **LMB = move**, **RMB = interact**, and **LMB directly on interactable = queued interaction on overlap**, reusing the existing Overworld input logic.
   - _Est: 8h_
 
-- **Feature: Scene Transitions – Part 1**
+- **Feature: Scene Transitions – Part 1 (Set Up / Break Camp Hooks)**
 
-  - Add "Enter Camp" interaction to Overworld POI.
-  - Add "Break Camp" (Return to Overworld) interaction in Camp level.
-  - Ensure player position is preserved in Overworld upon return.
+  - Implement a **"Set Up Camp"** action callable from **HUD and a keyboard shortcut** while on **Overworld** (no POI interaction requirement) that routes through the existing level/state transition managers and loads `L_Camp`.
+  - Implement a **"Break Camp"** interaction in `L_Camp` via an interactable exit area near the **bottom-right** of the camp, plus matching HUD/shortcut option, that transitions back to Overworld and restores convoy position/state via the transition managers.
   - _Est: 4h_
 
-- **Feature: Fog-of-War – Stub (Moved from Week 4)**
-  - Implement simple "reveal radius" around convoy in Overworld.
-  - Mask out unseen areas on the Minimap/World Map.
-  - Basic session persistence (remember revealed areas until game restart).
+- **Feature: Fog-of-War – Stub (Overworld Reveal Radius)**
+  - Implement simple reveal of the **16×16 subgrid cells (~125m×125m each)** around the convoy while moving in Overworld, using the existing exploration grid.
+  - Mask out unseen areas on the existing World Map/Minimap using the exploration mask; initially use a **single prototype minimap** for the active Overworld level (full per-level minimaps are deferred to Week 6).
+  - Provide **basic in-memory session persistence** (revealed areas survive simple Overworld reloads during the session; full save/load is deferred).
   - _Est: 4-6h_
 
+- **Bug Fixes (Critical & Polish)**
+  - **Fix Issue #4 (Medium)**: ESC Key Toggle in Overworld. Revisit input handling so ESC toggles pause reliably; move implementation from widget `OnKeyDown` into the Enhanced Input / PlayerController + `UFCGameStateManager` pattern. - OPEN
+  - **Fix Issue #2 (Low)**: Abort Button Visibility. Hide/disable Abort in Office and Camp; ensure it is only visible/active on `L_Overworld` as per design. - OPEN
+  
 ---
 
-### Week 6 – Combat Framework Integration (Start)
+### Week 6 – Camp Biomes, Overworld Minimap & Saves
 
-**Focus**: Integrating the Advanced Turn-Based Tile Toolkit (ATBT). **High Risk Week.**
-**Estimated Time**: 20 Hours
+**Focus**: Make camp scenes reflect Overworld biomes, generate per-level minimaps, refine camera-based fog-of-war reveal, and introduce first quick-save hooks for key transitions.
+**Estimated Time**: 18-22 Hours
 
-- **Feature: Combat Framework – Part 1 (Setup)**
+- **Feature: Camp Biome Variants & Landscape Reflection**
 
-  - Import ATBT Toolkit.
-  - Create a custom `FC_GridManager` extending toolkit functionality.
-  - Set up a basic combat map (`L_Combat_Test`).
-  - _Est: 8h_
+  - Extend the base `L_Camp` into a set of **biome variants** (e.g. woods, mountains, plains) or a **parametrized camp scene** that visually reflects the Overworld landscape where camp was started (woods camp if camping in woods, mountain camp if camping in mountains, etc.).
+  - Implement the data and transition plumbing so the **"Set Up Camp"** action receives information about the current Overworld biome/region and selects or configures the matching camp variant on load.
+  - _Est: 6-8h_
 
-- **Feature: Basic Encounter**
-  - Configure Player Unit and Enemy Unit (Placeholder meshes).
-  - Implement basic turn order: Player Move/Attack -> Enemy Move/Attack.
-  - _Est: 12h_
+- **Feature: Overworld Minimap – Level-Based Rendering**
+
+  - Decide on a strategy for **per-Overworld-level minimaps** (each of the 256 grid cells ~2km×2km):
+    - either an **automated capture workflow** (editor-only render pass or capture blueprint) that renders minimaps based on actual level landscape,
+    - or a **convention for authoring static textures** where automation is not feasible.
+  - Implement the chosen workflow and hook **per-level minimap textures** into the existing Overworld Map/Minimap widgets.
+  - _Est: 6-8h_
+
+- **Feature: Fog-of-War – Camera-Based Reveal Refinement (Stub Extension)**
+  - Extend the Week 5 reveal logic so that **everything currently visible in the Overworld camera viewport** (based on camera pan/zoom on `AFCPlayerController` / camera manager) is revealed, effectively tying reveal radius to sight/camera settings.
+  - Ensure the reveal grid (16×16×16×16) still maps correctly to ~125m×125m world cells and that camera zoom changes adjust the reveal footprint coherently.
+  - _Est: 4-6h_
+
+- **Feature: Quick-Save Hooks for Transitions (Initial Save System)**
+  - Add a **lightweight quick-save call** on key level transitions and actions, starting with **"Set Up Camp"**, **"Break Camp"**, and the existing Office↔Overworld transitions (through `UFCTransitionManager` / `UFCGameInstance`).
+  - Introduce a **minimal SaveGame format** (building on `FCSaveGame` / `UFCGameInstance`) that can reliably capture at least: expedition state, Overworld convoy position, and current exploration mask.
+  - _Est: 4-6h_
 
 ---
 
@@ -178,6 +210,7 @@
 
 - **Feature**: Numeric Risk Score calculation based on route.
 - **UI**: Tooltips explaining risk factors.
+- **Task**: Wire `PlannedRiskCost` into a minimal negative-event hook (e.g. on arrival/return) without full event content.
 - _Est: 15h_
 
 ### Week 11 – Resource System Expansion
@@ -214,6 +247,7 @@
 
 - **Feature**: Event trigger system based on Risk Score.
 - **UI**: Event presentation widget (Text + Image + Options).
+- **Task**: Elevate the `PlannedRiskCost`-based hook from Week 10 into a reusable encounter system (resource loss, injuries, delays) that runs during or after expeditions.
 - _Est: 18h_
 
 ### Week 17 – Combat Abilities

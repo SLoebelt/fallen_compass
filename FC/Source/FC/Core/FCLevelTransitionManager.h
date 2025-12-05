@@ -46,6 +46,37 @@ public:
 	void CloseExpeditionSummaryAndReturnToOffice();
 
 	/**
+	 * Enter the Camp level from gameplay (e.g., Overworld) via Loading.
+	 *
+	 * This helper:
+	 * - Requests a TransitionViaLoading to Camp_Local on the GameStateManager
+	 * - Starts a fade-out via TransitionManager
+	 * - Asks LevelManager to load L_Camp
+	 *
+	 * Once L_Camp has been loaded, InitializeOnLevelStart /
+	 * InitializeLevelTransitionOnLevelStart will see Loading with
+	 * target Camp_Local + level L_Camp and finalize the transition into
+	 * Camp_Local so AFCPlayerController can reconfigure camera/input.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "FC|Transition")
+	void EnterCampFromGameplay();
+
+	/**
+	 * Exit Camp and return to Overworld via Loading.
+	 *
+	 * This helper ("Break Camp"):
+	 * - Requests a TransitionViaLoading to Overworld_Travel
+	 * - Starts a fade-out via TransitionManager
+	 * - Asks LevelManager to load L_Overworld
+	 *
+	 * Once L_Overworld has loaded, the convoy position will be restored
+	 * from UFCExpeditionManager. AFCPlayerController will reconfigure
+	 * camera/input back to TopDown Overworld mode.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "FC|Transition")
+	void ExitCampToOverworld();
+
+	/**
 	 * Called on level start (e.g., Office BeginPlay) to complete any transitions
 	 * that used TransitionViaLoading() before the level load. For example,
 	 * if we entered Loading -> ExpeditionSummary and the Office level was loaded,

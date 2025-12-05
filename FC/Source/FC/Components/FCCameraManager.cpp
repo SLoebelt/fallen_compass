@@ -383,6 +383,53 @@ void UFCCameraManager::SetMenuCamera(ACameraActor* InMenuCamera)
 	UE_LOG(LogFCCameraManager, Log, TEXT("MenuCamera set to %s"), *GetNameSafe(MenuCamera));
 }
 
+void UFCCameraManager::BlendToPOISceneCamera(ACameraActor* POICamera, float BlendTime)
+{
+	// If POICamera is provided, use it directly
+	ACameraActor* CameraToUse = POICamera;
+	
+	// If no camera provided, search for it in the level (similar to BlendToTopDown)
+	if (!CameraToUse)
+	{
+		UWorld* World = GetWorld();
+		if (!World)
+		{
+			UE_LOG(LogFCCameraManager, Error, TEXT("BlendToPOISceneCamera: World is null!"));
+			return;
+		}
+
+		TArray<AActor*> FoundCameras;
+		UGameplayStatics::GetAllActorsOfClass(World, ACameraActor::StaticClass(), FoundCameras);
+
+		// Look for camera with tag "CampCamera" or name containing "CampCamera"
+		for (AActor* Actor : FoundCameras)
+		{
+			ACameraActor* Cam = Cast<ACameraActor>(Actor);
+			if (Cam && (Cam->Tags.Contains(FName("CampCamera")) || Cam->GetName().Contains(TEXT("CampCamera"))))
+			{
+				CameraToUse = Cam;
+				UE_LOG(LogFCCameraManager, Log, TEXT("BlendToPOISceneCamera: Found Camp camera in level: %s"), 
+					*CameraToUse->GetName());
+				break;
+			}
+		}
+
+		if (!CameraToUse)
+		{
+			UE_LOG(LogFCCameraManager, Error, 
+				TEXT("BlendToPOISceneCamera: No POI/Camp camera provided or found in level! Tag a camera with 'CampCamera' or name it with 'CampCamera'."));
+			return;
+		}
+	}
+
+	const float EffectiveBlendTime = GetEffectiveBlendTime(BlendTime);
+	UE_LOG(LogFCCameraManager, Log, TEXT("Blending to POIScene camera %s (%.2fs)"),
+		*GetNameSafe(CameraToUse), EffectiveBlendTime);
+
+	BlendToTarget(CameraToUse, EffectiveBlendTime, DefaultBlendFunction);
+	SetCameraMode(EFCPlayerCameraMode::POIScene);
+}
+
 // --- Internal Helpers ---
 
 float UFCCameraManager::GetEffectiveBlendTime(float BlendTime) const

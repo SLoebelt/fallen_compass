@@ -17,8 +17,10 @@ To guide an AI assistant in creating a detailed, step-by-step task list in Markd
 3.  **Assess Current State:** Review the existing codebase to understand existing infrastructre, architectural patterns and conventions. Also, identify any existing components or features that already exist and could be relevant to the PRD requirements. Then, identify existing related files, components, and utilities that can be leveraged or need modification.
 4.  Read `/Prompts/task-template-schema` and always use it for tas kcreation
 5.  **Phase 1: Generate Parent Tasks:** Based on the PRD analysis and current state assessment, create the file and generate the main, high-level tasks required to implement the feature. Use your judgement on how many high-level tasks to use. Choose the tasks in a way, that the development can always be done on a iteration scope of one week for a single junior developer working in unreal engine. Present these tasks to the user in the specified format (without sub-tasks yet). Inform the user: "I have generated the high-level tasks based on the PRD. Ready to generate the sub-tasks? Respond with 'Go' to proceed." The first step should always be a new feature branch based on the master branch. If yiu still have questions, ask them before generating the subtasks.
-6.  **Wait for Confirmation or questions answered:** Pause and wait for the user to respond with "Go" or answers.
-7.  **Phase 2: Generate Sub-Tasks:** Once the user confirms, break down each parent task into smaller, actionable sub-tasks necessary to complete the parent task. Ensure sub-tasks logically follow from the parent task, cover the implementation details implied by the PRD and consider existing codebase patterns where relevant without being constrained by them. Remember to add any kind of testing where neccessary and possible. And again, remember the iteration scope of one week each sprint. Define acceptance creteria after each tasks block. **ALWAYS** follow `/Prompts/task-template-schema`.
+6.  **Wait for Confirmation or questions answered:** Pause and wait for the user to respond with "Go" or answers/change requests.
+7.  **Phase 2: Generate Sub-Tasks:** Once the user confirms, break down each parent task into smaller sub-tasks that let the human better understand the architecture you chose for the intended implementation. This step includes tasks until level X.Y based on the `/Prompts/task-template-schema`.
+6.  **Wait for Confirmation or questions answered:** Pause and wait for the user to respond with "Go" or answers/change requests.
+7.  **Phase 3: Generate Sub-Tasks:** Once the user confirms, break down each parent task into smaller, actionable sub-tasks necessary to complete the parent task. Ensure sub-tasks logically follow from the parent task, cover the implementation details implied by the PRD and consider existing codebase patterns where relevant without being constrained by them. Remember to add any kind of testing where neccessary and possible. And again, remember the iteration scope of one week each sprint. Define acceptance creteria after each tasks block. **ALWAYS** follow `/Prompts/task-template-schema`.
 8.  **Identify Relevant Files:** Based on the tasks and PRD, identify potential files that will need to be created or modified. List these under the `Relevant Files` section, including corresponding test files if applicable.
 9.  **Generate Final Output:** Combine the parent tasks, sub-tasks, relevant files, and notes into the final Markdown structure.
 10. **Save Task List:** Save the generated document in the `/tasks/` directory with the filename `tasks-[prd-file-name].md`, where `[prd-file-name]` matches the base name of the input PRD file (e.g., if the input was `0001-prd-user-profile-editing.md`, the output is `tasks-0001-prd-user-profile-editing.md`).
@@ -33,7 +35,7 @@ The generated task list _must_ follow this structure:
 - `/Docs/UE_NamingConventions.md` - This is a Unreal Engine specific naming convention document that also contain desired folder structure
 - `/Docs/UE_CodeConventions.md` - This is a Unreal Engine specific coding convention document
 - `/Docs/Fallen_Compass_GDD_v0.2.md` - Game Design Document
-- `/Docs/Fallen_Compass_DRM.md` - Development Roadmap
+- `/Docs/DRM_Draft.md` - Development Roadmap
 
 ## Interaction Model
 

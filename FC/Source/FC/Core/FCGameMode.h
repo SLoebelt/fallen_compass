@@ -23,4 +23,10 @@ public:
     AFCGameMode();
 
     virtual void BeginPlay() override;
+
+	/**
+	 * Override pawn spawning to handle special cases like Camp where explorers
+	 * are pre-placed in the level and should not be spawned by GameMode.
+	 */
+	virtual APawn* SpawnDefaultPawnAtTransform_Implementation(AController* NewPlayer, const FTransform& SpawnTransform) override;
 };

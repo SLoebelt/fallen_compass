@@ -56,6 +56,14 @@ void UFCGameStateManager::InitializeValidTransitions()
 		EFCGameStateID::ExpeditionSummary
 	});
 
+	// Camp_Local transitions (local camp/POI scene)
+	ValidTransitions.Add(EFCGameStateID::Camp_Local, {
+		EFCGameStateID::Office_Exploration,
+		EFCGameStateID::Overworld_Travel,
+		EFCGameStateID::Paused,
+		EFCGameStateID::Loading
+	});
+
 	// ExpeditionSummary transitions (summary screen shown in Office)
 	ValidTransitions.Add(EFCGameStateID::ExpeditionSummary, {
 		EFCGameStateID::Office_Exploration,
@@ -93,6 +101,7 @@ void UFCGameStateManager::InitializeValidTransitions()
 		EFCGameStateID::MainMenu,
 		EFCGameStateID::Office_Exploration,
 		EFCGameStateID::Overworld_Travel,
+		EFCGameStateID::Camp_Local,
 		EFCGameStateID::Combat_PlayerTurn,
 		EFCGameStateID::ExpeditionSummary
 	});
@@ -102,6 +111,7 @@ void UFCGameStateManager::InitializeValidTransitions()
 		EFCGameStateID::MainMenu,
 		EFCGameStateID::Office_Exploration,
 		EFCGameStateID::Overworld_Travel,
+		EFCGameStateID::Camp_Local,
 		EFCGameStateID::Loading
 	});
 

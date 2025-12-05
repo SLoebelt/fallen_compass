@@ -30,7 +30,9 @@
 #include "World/FCOverworldCamera.h"
 #include "Characters/Convoy/FCOverworldConvoy.h"
 #include "Characters/Convoy/FCConvoyMember.h"
+#include "Characters/FC_ExplorerCharacter.h"
 #include "AIController.h"
+#include "Blueprint/AIBlueprintHelperLibrary.h"
 #include "NavigationSystem.h"
 
 DEFINE_LOG_CATEGORY(LogFallenCompassPlayerController);
@@ -42,6 +44,9 @@ AFCPlayerController::AFCPlayerController()
 	
 	// Create input manager component
 	InputManager = CreateDefaultSubobject<UFCInputManager>(TEXT("InputManager"));
+	
+	// Create interaction component (handles POI interactions across all scenes)
+	InteractionComponent = CreateDefaultSubobject<UFCInteractionComponent>(TEXT("InteractionComponent"));
 	
 	bIsPauseMenuDisplayed = false;
 	bShowMouseCursor = false;
@@ -174,10 +179,12 @@ void AFCPlayerController::BeginPlay()
 			UE_LOG(LogFallenCompassPlayerController, Log, TEXT("BeginPlay: Current game state is %s"), 
 				*UEnum::GetValueAsString(CurrentState));
 			
-			// If we're already in Overworld_Travel or ExpeditionSummary state, manually
-			// trigger the handler so camera/input are set up correctly on load.
+			// If we're already in an in-world state that expects specific
+			// camera/input (e.g. Overworld_Travel, ExpeditionSummary, Camp_Local),
+			// manually trigger the handler so things are set up correctly on load.
 			if (CurrentState == EFCGameStateID::Overworld_Travel ||
-				CurrentState == EFCGameStateID::ExpeditionSummary)
+				CurrentState == EFCGameStateID::ExpeditionSummary ||
+				CurrentState == EFCGameStateID::Camp_Local)
 			{
 				UE_LOG(LogFallenCompassPlayerController, Warning,
 					TEXT("BeginPlay: Already in state %s, manually triggering camera/input switch"),
@@ -207,6 +214,49 @@ void AFCPlayerController::BeginPlay()
 	else
 	{
 		UE_LOG(LogFallenCompassPlayerController, Log, TEXT("BeginPlay: No convoy found in level (expected in Office)"));
+	}
+
+	// Find explorer character in level if we're in Camp/POI scene
+	TArray<AActor*> FoundExplorers;
+	UGameplayStatics::GetAllActorsOfClass(GetWorld(), AFC_ExplorerCharacter::StaticClass(), FoundExplorers);
+	
+	if (FoundExplorers.Num() > 0)
+	{
+		CommandedExplorer = Cast<AFC_ExplorerCharacter>(FoundExplorers[0]);
+		UE_LOG(LogFallenCompassPlayerController, Log, TEXT("BeginPlay: Found explorer: %s"), *CommandedExplorer->GetName());
+		
+		// NOTE: We do NOT possess the explorer (unlike Epic's Top-Down template).
+		// Possessing would override our static camp camera with the character's camera.
+		// Instead, we command the explorer like we command the convoy - just send move
+		// commands to its location. SimpleMoveToLocation works without possession.
+		UE_LOG(LogFallenCompassPlayerController, Log, TEXT("BeginPlay: Commanding explorer (not possessing to preserve static camp camera)"));
+	}
+	else
+	{
+		UE_LOG(LogFallenCompassPlayerController, Log, TEXT("BeginPlay: No explorer found in level (expected in Camp/POI scenes)"));
+		UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("BeginPlay: To use Camp scenes, place BP_FC_ExplorerCharacter in the level (not a Player Start)"));
+	}
+
+	// Find Camp camera actor if we're in a Camp/POI scene
+	// Look for ACameraActor with tag "CampCamera" or name containing "CampCamera"
+	TArray<AActor*> FoundCameras;
+	UGameplayStatics::GetAllActorsOfClass(GetWorld(), ACameraActor::StaticClass(), FoundCameras);
+	
+	for (AActor* CameraActor : FoundCameras)
+	{
+		ACameraActor* Cam = Cast<ACameraActor>(CameraActor);
+		if (Cam && (Cam->Tags.Contains(FName("CampCamera")) || Cam->GetName().Contains(TEXT("CampCamera"))))
+		{
+			SetPOISceneCameraActor(Cam);
+			UE_LOG(LogFallenCompassPlayerController, Log, TEXT("BeginPlay: Found and registered Camp camera: %s"), *Cam->GetName());
+			break;
+		}
+	}
+	
+	if (!POISceneCameraActor && CommandedExplorer)
+	{
+		UE_LOG(LogFallenCompassPlayerController, Warning, 
+			TEXT("BeginPlay: Explorer found but no Camp camera detected. Add 'CampCamera' tag to camera actor in L_Camp."));
 	}
 
 	// Note: MenuCamera reference will be set in Blueprint (BP_FC_PlayerController)
@@ -364,6 +414,51 @@ void AFCPlayerController::HandleInteractPressed()
 	EFCPlayerCameraMode CurrentMode = CameraManager ? CameraManager->GetCameraMode() : EFCPlayerCameraMode::FirstPerson;
 	UE_LOG(LogFallenCompassPlayerController, Verbose, TEXT("HandleInteractPressed | Camera=%s"), *StaticEnum<EFCPlayerCameraMode>()->GetNameStringByValue(static_cast<int64>(CurrentMode)));
 
+	// Camp / POI local scenes: reuse Overworld POI interaction pattern but
+	// treat it as a Camp-only interact. This avoids falling back into the
+	// Office table/FirstPerson interaction flow while in Camp.
+	if (CurrentMode == EFCPlayerCameraMode::POIScene)
+	{
+		UE_LOG(LogFallenCompassPlayerController, Log, TEXT("HandleInteractPressed: POIScene mode - Camp/local interact"));
+
+		// Mirror the Overworld TopDown POI handling: raycast under cursor,
+		// look for IFCInteractablePOI, and show action selection or auto-trigger.
+		FHitResult HitResult;
+		const bool bHit = GetHitResultUnderCursor(ECC_Visibility, false, HitResult);
+		if (bHit && HitResult.GetActor())
+		{
+			AActor* HitActor = HitResult.GetActor();
+			if (HitActor->GetClass()->ImplementsInterface(UIFCInteractablePOI::StaticClass()))
+			{
+				UE_LOG(LogFallenCompassPlayerController, Log, TEXT("HandleInteractPressed(POIScene): POI detected - %s"), *HitActor->GetName());
+
+				// Delegate to InteractionComponent (same as Overworld)
+				if (InteractionComponent)
+				{
+					InteractionComponent->HandlePOIClick(HitActor);
+					return;
+				}
+				else
+				{
+					UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("HandleInteractPressed(POIScene): No InteractionComponent on controller"));
+				}
+			}
+			else
+			{
+				UE_LOG(LogFallenCompassPlayerController, Verbose,
+					TEXT("HandleInteractPressed(POIScene): Hit actor is not IFCInteractablePOI: %s"),
+					*HitActor->GetName());
+			}
+		}
+		else
+		{
+			UE_LOG(LogFallenCompassPlayerController, Verbose, TEXT("HandleInteractPressed(POIScene): No actor under cursor"));
+		}
+
+		// No valid POI/interact found in Camp; treat as benign no-op.
+		return;
+	}
+
 	// Week 3: Route to Overworld POI interaction if in TopDown mode
 	if (CurrentMode == EFCPlayerCameraMode::TopDown)
 	{
@@ -382,24 +477,18 @@ void AFCPlayerController::HandleInteractPressed()
 			{
 				UE_LOG(LogFallenCompassPlayerController, Log, TEXT("HandleInteractPressed: POI detected - %s"), *HitActor->GetName());
 				
-				// Get InteractionComponent from FirstPersonCharacter
-				AFCFirstPersonCharacter* FPCharacter = Cast<AFCFirstPersonCharacter>(GetPawn());
-				if (FPCharacter)
+				// Delegate to InteractionComponent for POI handling
+				if (InteractionComponent)
 				{
-					UFCInteractionComponent* InteractionComp = FPCharacter->GetInteractionComponent();
-					if (InteractionComp)
-					{
-						// Delegate to InteractionComponent for POI handling
-						InteractionComp->HandlePOIClick(HitActor);
-						
-						// After action selection, movement will be triggered by HandleClick
-						// This maintains separation: Interact = select action, Click = move to location
-						return;
-					}
-					else
-					{
-						UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("HandleInteractPressed: No InteractionComponent on character"));
-					}
+					InteractionComponent->HandlePOIClick(HitActor);
+					
+					// After action selection, movement will be triggered by HandleClick
+					// This maintains separation: Interact = select action, Click = move to location
+					return;
+				}
+				else
+				{
+					UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("HandleInteractPressed: No InteractionComponent on controller"));
 				}
 			}
 		}
@@ -410,24 +499,15 @@ void AFCPlayerController::HandleInteractPressed()
 
 	if (CurrentMode == EFCPlayerCameraMode::FirstPerson)
 	{
-		// Use the interaction component on the character
-		AFCFirstPersonCharacter* FPCharacter = Cast<AFCFirstPersonCharacter>(GetPawn());
-		if (FPCharacter)
+		// Use the interaction component on the controller
+		if (InteractionComponent)
 		{
-			UFCInteractionComponent* InteractionComp = FPCharacter->GetInteractionComponent();
-			if (InteractionComp)
-			{
-				// Let the InteractionComponent handle interaction (desk BP OnInteract, etc.).
-				InteractionComp->Interact();
-			}
-			else
-			{
-				UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("HandleInteractPressed: No InteractionComponent on character"));
-			}
+			// Let the InteractionComponent handle interaction (desk BP OnInteract, etc.).
+			InteractionComponent->Interact();
 		}
 		else
 		{
-			UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("HandleInteractPressed: No pawn or not a FCFirstPersonCharacter"));
+			UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("HandleInteractPressed: No InteractionComponent on controller"));
 		}
 	}
 	else
@@ -770,6 +850,19 @@ void AFCPlayerController::SetCameraModeLocal(EFCPlayerCameraMode NewMode, float 
 			CameraManager->BlendToTopDown(BlendTime);
 			break;
 
+		case EFCPlayerCameraMode::POIScene:
+			// Option B: Fixed camera for POI/local scenes (e.g. Camp)
+			if (POISceneCameraActor)
+			{
+				SetViewTargetWithBlend(POISceneCameraActor, BlendTime);
+			}
+			else
+			{
+				UE_LOG(LogFallenCompassPlayerController, Warning,
+					TEXT("SetCameraModeLocal: POIScene mode requested but POISceneCameraActor is null"));
+			}
+			break;
+
 		default:
 			UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("SetCameraModeLocal: Unknown camera mode %d"), static_cast<int32>(NewMode));
 			return;
@@ -1065,6 +1158,36 @@ void AFCPlayerController::OnGameStateChanged(EFCGameStateID OldState, EFCGameSta
 		// Note: Convoy pawn is controlled by its AIController, not possessed by PlayerController
 		// PlayerController sends movement commands to the AIController via HandleOverworldClickMove()
 	}
+	// React to entering Camp_Local state (camp/local POI scene)
+	else if (NewState == EFCGameStateID::Camp_Local)
+	{
+		UE_LOG(LogFallenCompassPlayerController, Log,
+			TEXT("OnGameStateChanged: Entering Camp_Local, configuring POIScene camera/input"));
+
+		// Enable cursor for click-to-move and UI interaction
+		bShowMouseCursor = true;
+
+		// Switch to POI scene input mode (no camera pan/zoom, click-to-move explorer)
+		if (InputManager)
+		{
+			InputManager->SetInputMappingMode(EFCInputMappingMode::POIScene);
+			UE_LOG(LogFallenCompassPlayerController, Log, TEXT("OnGameStateChanged: Switched to POIScene input mode for Camp_Local"));
+		}
+
+		// Blend to fixed camp/POI camera (CameraManager will search for it if POISceneCameraActor is null)
+		if (CameraManager)
+		{
+			// Always call BlendToPOISceneCamera - it now searches for camera by tag/name if parameter is null
+			CameraManager->BlendToPOISceneCamera(POISceneCameraActor, 2.0f);
+			UE_LOG(LogFallenCompassPlayerController, Log, TEXT("OnGameStateChanged: Blending to POIScene camera for Camp_Local via CameraManager"));
+		}
+
+		// Use Game+UI input mode with free cursor
+		FInputModeGameAndUI InputMode;
+		InputMode.SetHideCursorDuringCapture(false);
+		InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+		SetInputMode(InputMode);
+	}
 	// React to entering ExpeditionSummary state (summary shown in Office)
 	else if (NewState == EFCGameStateID::ExpeditionSummary)
 	{
@@ -1096,7 +1219,7 @@ void AFCPlayerController::OnGameStateChanged(EFCGameStateID OldState, EFCGameSta
 			UE_LOG(LogFallenCompassPlayerController, Log, TEXT("OnGameStateChanged: Returned to FirstPerson mode from Overworld"));
 		}
 	}
-	// Generic entry into Office_Exploration from any non-Overworld state
+	// Generic entry into Office_Exploration from any non-Overworld/non-Camp state
 	else if (NewState == EFCGameStateID::Office_Exploration)
 	{
 		if (InputManager)
@@ -1169,6 +1292,49 @@ void AFCPlayerController::HandleClick(const FInputActionValue& Value)
 	}
 
 	EFCPlayerCameraMode CurrentMode = CameraManager->GetCameraMode();
+
+	// POI/local scene (e.g. Camp): command AI-controlled explorer to move (same pattern as convoy)
+	if (CurrentMode == EFCPlayerCameraMode::POIScene)
+	{
+		if (!CanProcessWorldInteraction())
+		{
+			UE_LOG(LogFallenCompassPlayerController, Verbose, TEXT("HandleClick(POIScene): UI is blocking world interaction"));
+			return;
+		}
+
+		FHitResult HitResult;
+		const bool bHit = GetHitResultUnderCursor(ECC_Visibility, false, HitResult);
+		if (!bHit)
+		{
+			UE_LOG(LogFallenCompassPlayerController, Verbose, TEXT("HandleClick(POIScene): No hit under cursor"));
+			return;
+		}
+
+		if (!CommandedExplorer)
+		{
+			UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("HandleClick(POIScene): No commanded explorer reference"));
+			return;
+		}
+
+		AActor* HitActor = HitResult.GetActor();
+		if (HitActor && HitActor->GetClass()->ImplementsInterface(UIFCInteractablePOI::StaticClass()))
+		{
+			UE_LOG(LogFallenCompassPlayerController, Log,
+				TEXT("HandleClick(POIScene): Clicked on IFCInteractablePOI - %s (queuing interaction)"),
+				*HitActor->GetName());
+
+			// Delegate to InteractionComponent (same as Overworld)
+			if (InteractionComponent)
+			{
+				InteractionComponent->HandlePOIClick(HitActor);
+			}
+			return; // Don't also move if we clicked a POI
+		}
+
+		// Command explorer's AI controller to move (same as convoy pattern)
+		MoveExplorerToLocation(HitResult.Location);
+		return;
+	}
 
 	// TopDown mode: Click-to-move convoy (POI interaction is handled by HandleInteractPressed)
 	if (CurrentMode == EFCPlayerCameraMode::TopDown)
@@ -1486,6 +1652,44 @@ void AFCPlayerController::MoveConvoyToLocation(const FVector& TargetLocation)
 	}
 }
 
+	void AFCPlayerController::MoveExplorerToLocation(const FVector& TargetLocation)
+{
+	if (!CommandedExplorer)
+	{
+		UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("MoveExplorerToLocation: No explorer commanded"));
+		return;
+	}
+
+	// Get the explorer's AI controller (like we do with convoy movement)
+	AAIController* ExplorerAI = Cast<AAIController>(CommandedExplorer->GetController());
+	if (!ExplorerAI)
+	{
+		UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("MoveExplorerToLocation: Explorer has no AI controller"));
+		return;
+	}
+
+	// Use SimpleMoveToLocation on the AI controller (not PlayerController)
+	// This internally uses AddMovementInput which sets acceleration properly
+	UNavigationSystemV1* NavSys = FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld());
+	if (NavSys)
+	{
+		FNavLocation NavLocation;
+		bool bFoundPath = NavSys->ProjectPointToNavigation(TargetLocation, NavLocation);
+
+		if (bFoundPath)
+		{
+			// Command the AI controller to move the explorer (like convoy pattern)
+			UAIBlueprintHelperLibrary::SimpleMoveToLocation(ExplorerAI, NavLocation.Location);
+			UE_LOG(LogFallenCompassPlayerController, Log, TEXT("MoveExplorerToLocation: Moving to %s"), 
+				*NavLocation.Location.ToString());
+		}
+		else
+		{
+			UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("MoveExplorerToLocation: Failed to project to NavMesh"));
+		}
+	}
+}
+
 void AFCPlayerController::SetMenuCameraActor(ACameraActor* InMenuCamera)
 {
 	if (!CameraManager)
@@ -1500,5 +1704,19 @@ void AFCPlayerController::SetMenuCameraActor(ACameraActor* InMenuCamera)
 	}
 
 	CameraManager->SetMenuCamera(InMenuCamera);
+}
+
+void AFCPlayerController::SetPOISceneCameraActor(ACameraActor* InPOICamera)
+{
+	POISceneCameraActor = InPOICamera;
+
+	if (!POISceneCameraActor)
+	{
+		UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("SetPOISceneCameraActor: InPOICamera is null"));
+		return;
+	}
+
+	UE_LOG(LogFallenCompassPlayerController, Log, TEXT("SetPOISceneCameraActor: Registered POI scene camera %s"),
+		*POISceneCameraActor->GetName());
 }
 
