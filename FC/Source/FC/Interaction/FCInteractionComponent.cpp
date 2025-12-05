@@ -162,10 +162,6 @@ void UFCInteractionComponent::DetectInteractables()
 	{
 		AActor* HitActor = HitResult.GetActor();
 
-		UE_LOG(LogFCInteraction, Log, TEXT("Hit actor: %s (Implements interface: %d)"),
-			*HitActor->GetName(),
-			HitActor->GetClass()->ImplementsInterface(UIFCInteractable::StaticClass()) ? 1 : 0);
-
 		// Check if the actor implements the interactable interface
 		if (HitActor->GetClass()->ImplementsInterface(UIFCInteractable::StaticClass()))
 		{
@@ -173,14 +169,10 @@ void UFCInteractionComponent::DetectInteractables()
 			float InteractionRange = IIFCInteractable::Execute_GetInteractionRange(HitActor);
 			float Distance = FVector::Dist(CameraLocation, HitResult.ImpactPoint);
 
-			UE_LOG(LogFCInteraction, Log, TEXT("Hit interactable: %s at distance %.2f (range: %.2f)"), *HitActor->GetName(), Distance, InteractionRange);
-
 			if (Distance <= InteractionRange)
 			{
 				// Check if we can interact with this object
 				bool bCanInteract = IIFCInteractable::Execute_CanInteract(HitActor, OwnerActor);
-
-				UE_LOG(LogFCInteraction, Log, TEXT("Can interact: %d"), bCanInteract ? 1 : 0);
 
 				if (bCanInteract)
 				{

@@ -265,15 +265,12 @@ void AFCPlayerController::HandleToggleOverworldMap()
 void AFCPlayerController::HandleInteractPressed()
 {
 	EFCPlayerCameraMode CurrentMode = CameraManager ? CameraManager->GetCameraMode() : EFCPlayerCameraMode::FirstPerson;
-	UE_LOG(LogFallenCompassPlayerController, Verbose, TEXT("HandleInteractPressed | Camera=%s"), *StaticEnum<EFCPlayerCameraMode>()->GetNameStringByValue(static_cast<int64>(CurrentMode)));
 
 	// Camp / POI local scenes: reuse Overworld POI interaction pattern but
 	// treat it as a Camp-only interact. This avoids falling back into the
 	// Office table/FirstPerson interaction flow while in Camp.
 	if (CurrentMode == EFCPlayerCameraMode::POIScene)
 	{
-		UE_LOG(LogFallenCompassPlayerController, Log, TEXT("HandleInteractPressed: POIScene mode - Camp/local interact"));
-
 		// Mirror the Overworld TopDown POI handling: raycast under cursor,
 		// look for IFCInteractablePOI, and show action selection or auto-trigger.
 		FHitResult HitResult;
@@ -315,8 +312,6 @@ void AFCPlayerController::HandleInteractPressed()
 	// Week 3: Route to Overworld POI interaction if in TopDown mode
 	if (CurrentMode == EFCPlayerCameraMode::TopDown)
 	{
-		UE_LOG(LogFallenCompassPlayerController, Log, TEXT("HandleInteractPressed: TopDown mode - checking for POI interaction"));
-
 		// Raycast to check if clicking on POI
 		FHitResult HitResult;
 		bool bHit = GetHitResultUnderCursor(ECC_Visibility, false, HitResult);
@@ -346,7 +341,7 @@ void AFCPlayerController::HandleInteractPressed()
 			}
 		}
 
-		UE_LOG(LogFallenCompassPlayerController, Verbose, TEXT("HandleInteractPressed: No POI under cursor"));
+		// No POI under cursor; benign no-op in TopDown.
 		return;
 	}
 
@@ -1141,7 +1136,6 @@ void AFCPlayerController::HandleClick(const FInputActionValue& Value)
 	{
 		if (!CanProcessWorldInteraction())
 		{
-			UE_LOG(LogFallenCompassPlayerController, Verbose, TEXT("HandleClick(POIScene): UI is blocking world interaction"));
 			return;
 		}
 
@@ -1149,7 +1143,6 @@ void AFCPlayerController::HandleClick(const FInputActionValue& Value)
 		const bool bHit = GetHitResultUnderCursor(ECC_Visibility, false, HitResult);
 		if (!bHit)
 		{
-			UE_LOG(LogFallenCompassPlayerController, Verbose, TEXT("HandleClick(POIScene): No hit under cursor"));
 			return;
 		}
 
@@ -1197,7 +1190,6 @@ void AFCPlayerController::HandleTableObjectClick()
 	// If a blocking table/map widget is open, ignore world/table clicks entirely.
 	if (!CanProcessWorldInteraction())
 	{
-		UE_LOG(LogFallenCompassPlayerController, Verbose, TEXT("HandleTableObjectClick: UI is blocking world interaction"));
 		return;
 	}
 
@@ -1232,7 +1224,7 @@ void AFCPlayerController::HandleTableObjectClick()
 	}
 	else
 	{
-		UE_LOG(LogFallenCompassPlayerController, Verbose, TEXT("Cursor click - no actor hit"));
+		// No actor hit under cursor; benign no-op.
 	}
 }
 
