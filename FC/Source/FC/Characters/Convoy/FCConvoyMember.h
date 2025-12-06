@@ -1,4 +1,4 @@
-// Copyright Epic Games, Inc. All Rights Reserved.
+// Copyright Slomotion Games. All Rights Reserved.
 
 #pragma once
 
@@ -10,7 +10,7 @@ class AFCOverworldConvoy;
 
 /**
  * AFCConvoyMember - Base class for convoy member characters
- * 
+ *
  * Handles capsule collision, POI overlap detection, and parent convoy communication.
  * Blueprint children configure mesh, materials, and CharacterMovement parameters.
  */

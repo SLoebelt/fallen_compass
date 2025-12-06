@@ -1,4 +1,4 @@
-// Copyright Epic Games, Inc. All Rights Reserved.
+// Copyright Slomotion Games. All Rights Reserved.
 
 
 #include "StrategyPlayerController.h"
@@ -229,7 +229,7 @@ void AStrategyPlayerController::InteractHoldStarted(const FInputActionValue& Val
 void AStrategyPlayerController::InteractHoldTriggered(const FInputActionValue& Value)
 {
 
-	// do a drag scroll 
+	// do a drag scroll
 	DoDragScrollCommand();
 }
 
@@ -453,7 +453,7 @@ void AStrategyPlayerController::DoSelectAllOnScreenCommand()
 					CurrentUnit->UnitSelected();
 				}
 			}
-		}		
+		}
 	}
 
 }
@@ -481,7 +481,7 @@ void AStrategyPlayerController::DoDragScrollCommand()
 
 	// choose the cursor position based on the input mode
 	FVector2D WorkingPosition;
-	
+
 	if (InputMode == EStrategyInputMode::SIM_Mouse)
 	{
 
@@ -577,7 +577,7 @@ void AStrategyPlayerController::OnMoveCompleted(AStrategyUnit* MovedUnit)
 	{
 		// unsubscribe from the delegate
 		MovedUnit->OnMoveCompleted.RemoveDynamic(this, &AStrategyPlayerController::OnMoveCompleted);
-		
+
 		// skip if interactions are locked
 		if (!bAllowInteraction)
 		{
@@ -599,7 +599,7 @@ void AStrategyPlayerController::OnMoveCompleted(AStrategyUnit* MovedUnit)
 
 			FCollisionObjectQueryParams ObjectParams;
 			ObjectParams.AddObjectTypesToQuery(ECC_WorldDynamic);
-			
+
 			FCollisionQueryParams QueryParams;
 
 			QueryParams.AddIgnoredActor(MovedUnit);
@@ -657,7 +657,7 @@ AStrategyUnit* AStrategyPlayerController::GetClosestSelectedUnitToLocation(FVect
 				Closest = FVector::DistSquared2D(TargetLocation, CurrentUnit->GetActorLocation());
 			}
 		}
-		
+
 	}
 
 	// return the selected unit

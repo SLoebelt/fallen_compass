@@ -1,4 +1,4 @@
-// Copyright Epic Games, Inc. All Rights Reserved.
+// Copyright Slomotion Games. All Rights Reserved.
 
 #pragma once
 
@@ -8,7 +8,7 @@
 
 class AFCFirstPersonCharacter;
 
-DECLARE_LOG_CATEGORY_EXTERN(LogFallenCompassGameMode, Log, All);
+DECLARE_LOG_CATEGORY_EXTERN(LogFallenCompassOldGameMode, Log, All);
 
 /**
  * Simple GameMode stub for early prototypes.

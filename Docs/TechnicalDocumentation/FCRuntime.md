@@ -12,10 +12,10 @@ This document is a **map**: what each manager/class is for, how they connect, an
    `UFCGameInstance` is the **composition root**: it configures key subsystems (Level metadata table, UI widget classes + TableWidgetMap) and owns save/load + persistent expedition context.
 
 2. **Level loads → GameMode BeginPlay (per-level)**  
-   `AFCGameMode` is the level’s lightweight bootstrapper: sets default pawn/controller classes and kicks **LevelTransition finalization** on level start (`InitializeLevelTransitionOnLevelStart`) so “Loading → TargetState” flows complete reliably.
+   `AFCBaseGameMode` is the shared level bootstrap: it logs level start and kicks **LevelTransition finalization** on level start via `UFCLevelTransitionManager::InitializeOnLevelStart()` so “Loading → TargetState” and other flows complete reliably. Thin per-level GameModes (Office/Camp/Overworld) derive from this base and provide scene-specific defaults.
 
 3. **PlayerController runtime (per player)**  
-   `AFCPlayerController` is the glue for “how the player can interact right now”: input routing, camera mode switching (via CameraManager/InputManager), UI gating, and reacting to `UFCGameStateManager` state changes.
+  `AFCPlayerController` is the glue for “how the player can interact right now”: input routing, camera mode switching (via CameraManager/InputManager), UI gating, and reacting to `UFCGameStateManager` state changes. `UFCPlayerModeCoordinator` (a controller-owned component) subscribes to `UFCGameStateManager::OnStateChanged`, maps game state → player mode, and asks the controller to apply the corresponding presentation.
 
 ### Architecture layers
 
@@ -70,14 +70,19 @@ Details: `Managers/FCExpeditionManager.md` → `Expedition/FCExpeditionManager.h
 
 ---
 
-## 4) Per-level “bootstrap” class
+## 4) Per-level “bootstrap” classes
 
-### `AFCGameMode` — "Level-start kick + defaults"
-- Sets default pawn `AFCFirstPersonCharacter` and controller `AFCPlayerController`.
-- On BeginPlay, triggers `UFCLevelTransitionManager::InitializeLevelTransitionOnLevelStart()` to finalize Loading flows.
-- **SpawnDefaultPawnAtTransform override:** Prevents duplicate pawn spawning in Camp/POI levels where explorer is already placed in the level (checks for existing `AFC_ExplorerCharacter` and returns nullptr).
+### `AFCBaseGameMode` + thin per-level GameModes — "Level-start kick + per-scene defaults"
+- `AFCBaseGameMode` (in `Core/FCBaseGameMode.h/.cpp`) owns the global level-start hook:
+  - Calls `Super::BeginPlay()`.
+  - Logs the active map and GameMode class.
+  - Retrieves `UFCLevelTransitionManager` from the GameInstance and calls `InitializeOnLevelStart()`.
+- Thin per-level GameModes derive from this base and define scene contracts:
+  - `AFCOfficeGameMode` (in `GameModes/FCOfficeGameMode.h/.cpp`) sets Office defaults (pawn `AFCFirstPersonCharacter`, controller `AFCPlayerController` and optional Office-specific actors/cameras).
+  - `AFCCampGameMode` (in `GameModes/FCCampGameMode.h/.cpp`) configures Camp defaults and owns the “pre-placed explorer” pattern via a `SpawnDefaultPawnAtTransform` override that skips spawning if an `AFC_ExplorerCharacter` already exists; it also exposes an editor-visible `CampCameraActor` reference.
+  - `AFCOverworldGameMode` (in `GameModes/FCOverworldGameMode.h/.cpp`) wires Overworld expectations, exposing an editor-visible `DefaultConvoy` (`AFCOverworldConvoy*`) and optional `OverworldCameraActor`, and hands the selected convoy to `AFCPlayerController` via a dedicated API instead of scanning globally.
 
-Details: `FCGameMode.md` → `FCGameMode.h/.cpp`.
+Details: `FCGameMode.md` — documents the legacy monolithic `AFCGameMode` and points at the new `FCBaseGameMode` + thin GameModes under `Core/` and `GameModes/`.
 
 ---
 
@@ -85,9 +90,9 @@ Details: `FCGameMode.md` → `FCGameMode.h/.cpp`.
 
 ### `AFCPlayerController` — "Input router + camera mode driver + UI gating"
 - Routes input (Enhanced Input) and chooses behavior by camera mode (FirstPerson/TableView/TopDown/POIScene).
-- Owns `UFCInputManager`, `UFCCameraManager`, and `UFCInteractionComponent` as ActorComponents.
+- Owns `UFCInputManager`, `UFCCameraManager`, `UFCInteractionComponent`, and `UFCPlayerModeCoordinator` as ActorComponents.
 - Commands movement across scenes: `MoveConvoyToLocation()` for Overworld, `MoveExplorerToLocation()` for Camp.
-- Reacts to game state changes (camera + input mapping + cursor rules).
+- Applies camera/input/cursor "presentation" for each game state via helper functions (e.g., Overworld_Travel, Camp_Local, ExpeditionSummary, Office_Exploration) that are invoked by `UFCPlayerModeCoordinator`.
 - Triggers UIManager flows (main menu, pause, table widgets, overworld HUD) and blocks "world interaction" when UI is active.
 - Treats the overworld convoy and camp explorer as **event sources**: binds their POI-overlap delegates to the controller-owned `UFCInteractionComponent` (no pawn crawling or global controller lookups).
 
@@ -111,6 +116,14 @@ Details: `Managers/FCCameraManager.md` → `Components/FCCameraManager.h/.cpp`.
 - Gates FirstPerson focus tracing and prompts via a boolean flag (`bFirstPersonFocusEnabled`) that is currently derived from `UFCCameraManager::GetCameraMode()`; when disabled it clears focus, hides the prompt, and early-outs from its trace/prompt update path so Overworld/Camp do not run FP traces.
 
 Details: `Components/FCInteractionComponent.md` → `FCInteractionComponent.h/.cpp`.
+
+### `UFCPlayerModeCoordinator` (ActorComponent) — "Game state → player mode → presentation router"
+- Lives on `AFCPlayerController` as a non-ticking component.
+- Subscribes to `UFCGameStateManager::OnStateChanged` and logs OldState → NewState transitions.
+- Maps `EFCGameStateID` values to a higher-level `EFCPlayerMode` enum (Office / Overworld / Camp / Static) and tracks the current player mode.
+- In the current phase, delegates presentation changes back to the controller via `AFCPlayerController::ApplyPresentationForGameState(OldState, NewState)`, preserving existing camera/input/cursor behavior while centralizing the subscription.
+
+Details: `FCPlayerModeCoordinator.md` → `Components/FCPlayerModeCoordinator.h/.cpp` (plus `Core/FCPlayerModeTypes.h`).
 
 ### `AFCFirstPersonCharacter` — "Office exploration pawn"
 - First-person camera + movement tuning + look pitch clamping.
@@ -142,7 +155,7 @@ Details: `Managers/FCWorldMapExploration.md` → `WorldMap/FCWorldMapExploration
 ## 7) Key cross-system contracts (how things connect)
 
 ### A) State → player experience
-`UFCGameStateManager.OnStateChanged` → `AFCPlayerController` reacts (camera mode + input mapping + cursor/input mode) and calls `UFCUIManager` where needed.
+`UFCGameStateManager.OnStateChanged` → `UFCPlayerModeCoordinator` (on the player controller) reacts, logs the transition, maps to `EFCPlayerMode`, and asks `AFCPlayerController` to apply the appropriate presentation (camera mode + input mapping + cursor/input mode) and call `UFCUIManager` where needed.
 
 ### B) Level travel orchestration (fade + load + finalize)
 `UFCLevelTransitionManager` sequences:  
@@ -155,14 +168,14 @@ Details: `Managers/FCWorldMapExploration.md` → `WorldMap/FCWorldMapExploration
 `UFCExpeditionManager` updates reveal/fog + route preview + autosaves; delegates grid math/pathfinding to `FFCWorldMapExploration`.
 
 ### E) Level start finalization safety net
-On every level BeginPlay, `AFCGameMode` triggers `InitializeLevelTransitionOnLevelStart()` to complete pending Loading transitions.
+On every level BeginPlay, `AFCBaseGameMode` (base of all per-scene GameModes) triggers `UFCLevelTransitionManager::InitializeOnLevelStart()` to complete any pending transitions.
 
 ---
 
 ## 8) “Look up details here” (single-hop pointers)
 
 - `UFCGameInstance`: `UFCGameInstance.md`
-- `AFCGameMode`: `FCGameMode.md`
+- `AFCBaseGameMode` + thin GameModes: `FCGameMode.md`
 - `AFCPlayerController`: `FCPlayerController.md`
 
 - Managers:  

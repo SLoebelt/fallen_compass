@@ -1,4 +1,4 @@
-// Copyright Epic Games, Inc. All Rights Reserved.
+// Copyright Slomotion Games. All Rights Reserved.
 
 #include "Components/FCCameraManager.h"
 #include "Core/FCPlayerController.h"
@@ -37,8 +37,8 @@ void UFCCameraManager::BeginPlay()
 			// Fallback to current view target if no pawn yet
 			OriginalViewTarget = PC->GetViewTarget();
 		}
-		
-		UE_LOG(LogFCCameraManager, Log, TEXT("BeginPlay: Original view target set to %s"), 
+
+		UE_LOG(LogFCCameraManager, Log, TEXT("BeginPlay: Original view target set to %s"),
 			*GetNameSafe(OriginalViewTarget));
 	}
 	else
@@ -73,9 +73,9 @@ void UFCCameraManager::BlendToMenuCamera(float BlendTime)
 	}
 
 	float EffectiveBlendTime = GetEffectiveBlendTime(BlendTime);
-	
+
 	UE_LOG(LogFCCameraManager, Log, TEXT("Blending to menu camera (%.2fs)"), EffectiveBlendTime);
-	
+
 	BlendToTarget(MenuCamera, EffectiveBlendTime, DefaultBlendFunction);
 	SetCameraMode(EFCPlayerCameraMode::MainMenu);
 }
@@ -93,7 +93,7 @@ void UFCCameraManager::BlendToFirstPerson(float BlendTime)
 	if (!OriginalViewTarget || !OriginalViewTarget->IsA<APawn>())
 	{
 		OriginalViewTarget = PC->GetPawn();
-		UE_LOG(LogFCCameraManager, Warning, TEXT("BlendToFirstPerson: Updated OriginalViewTarget to pawn %s"), 
+		UE_LOG(LogFCCameraManager, Warning, TEXT("BlendToFirstPerson: Updated OriginalViewTarget to pawn %s"),
 			*GetNameSafe(OriginalViewTarget));
 	}
 
@@ -104,12 +104,12 @@ void UFCCameraManager::BlendToFirstPerson(float BlendTime)
 	}
 
 	float EffectiveBlendTime = GetEffectiveBlendTime(BlendTime);
-	
-	UE_LOG(LogFCCameraManager, Log, TEXT("Blending to first person (%.2fs) - Target: %s, Current ViewTarget: %s"), 
-		EffectiveBlendTime, 
+
+	UE_LOG(LogFCCameraManager, Log, TEXT("Blending to first person (%.2fs) - Target: %s, Current ViewTarget: %s"),
+		EffectiveBlendTime,
 		*GetNameSafe(OriginalViewTarget),
 		*GetNameSafe(PC->GetViewTarget()));
-	
+
 	BlendToTarget(OriginalViewTarget, EffectiveBlendTime, DefaultBlendFunction);
 	SetCameraMode(EFCPlayerCameraMode::FirstPerson);
 
@@ -121,7 +121,7 @@ void UFCCameraManager::BlendToFirstPerson(float BlendTime)
 		{
 			FTimerDelegate CleanupDelegate = FTimerDelegate::CreateUObject(
 				this, &UFCCameraManager::CleanupTableViewCamera);
-			
+
 			World->GetTimerManager().SetTimer(
 				CameraCleanupTimerHandle,
 				CleanupDelegate,
@@ -148,7 +148,7 @@ void UFCCameraManager::BlendToTableObject(AActor* TableObject, float BlendTime)
 	if (PC && !OriginalViewTarget)
 	{
 		OriginalViewTarget = PC->GetViewTarget();
-		UE_LOG(LogFCCameraManager, Log, TEXT("BlendToTableObject: Saved OriginalViewTarget: %s"), 
+		UE_LOG(LogFCCameraManager, Log, TEXT("BlendToTableObject: Saved OriginalViewTarget: %s"),
 			*GetNameSafe(OriginalViewTarget));
 	}
 
@@ -170,7 +170,7 @@ void UFCCameraManager::BlendToTableObject(AActor* TableObject, float BlendTime)
 
 	if (!CameraTargetPoint)
 	{
-		UE_LOG(LogFCCameraManager, Warning, 
+		UE_LOG(LogFCCameraManager, Warning,
 			TEXT("BlendToTableObject: No CameraTargetPoint found on %s, using root component"),
 			*GetNameSafe(TableObject));
 		CameraTargetPoint = TableObject->GetRootComponent();
@@ -220,7 +220,7 @@ void UFCCameraManager::BlendToTableObject(AActor* TableObject, float BlendTime)
 		return;
 	}
 
-	UE_LOG(LogFCCameraManager, Log, TEXT("Blending to table object %s (%.2fs)"), 
+	UE_LOG(LogFCCameraManager, Log, TEXT("Blending to table object %s (%.2fs)"),
 		*GetNameSafe(TableObject), EffectiveBlendTime);
 
 	BlendToTarget(TableViewCamera, EffectiveBlendTime, DefaultBlendFunction);
@@ -259,7 +259,7 @@ void UFCCameraManager::BlendToTopDown(float BlendTime)
 	// Attach camera to convoy's CameraAttachPoint (Task 5.6.1)
 	TArray<AActor*> FoundConvoys;
 	UGameplayStatics::GetAllActorsOfClass(World, AActor::StaticClass(), FoundConvoys);
-	
+
 	AActor* Convoy = nullptr;
 	for (AActor* Actor : FoundConvoys)
 	{
@@ -283,7 +283,7 @@ void UFCCameraManager::BlendToTopDown(float BlendTime)
 			FGetCameraAttachPointParams Params;
 			Params.ReturnValue = nullptr;
 			Convoy->ProcessEvent(GetAttachPointFunc, &Params);
-			
+
 			if (Params.ReturnValue)
 			{
 				// Attach camera to CameraAttachPoint
@@ -343,7 +343,7 @@ void UFCCameraManager::RestorePreviousViewTarget(float BlendTime)
 		BlendToMenuCamera(BlendTime);
 		break;
 	default:
-		UE_LOG(LogFCCameraManager, Warning, 
+		UE_LOG(LogFCCameraManager, Warning,
 			TEXT("RestorePreviousViewTarget: Cannot restore to mode %s, defaulting to FirstPerson"),
 			*UEnum::GetValueAsString(PreviousCameraMode));
 		BlendToFirstPerson(BlendTime);
@@ -361,13 +361,13 @@ void UFCCameraManager::RestorePreviousTableCamera(float BlendTime)
 	}
 
 	float EffectiveBlendTime = GetEffectiveBlendTime(BlendTime);
-	
+
 	UE_LOG(LogFCCameraManager, Log, TEXT("Restoring previous table camera (%.2fs)"), EffectiveBlendTime);
-	
+
 	// Blend back to previous table camera
 	BlendToTarget(PreviousTableViewCamera, EffectiveBlendTime, DefaultBlendFunction);
 	SetCameraMode(EFCPlayerCameraMode::TableView);
-	
+
 	// Swap cameras: previous becomes current, current is destroyed
 	if (TableViewCamera)
 	{
@@ -387,7 +387,7 @@ void UFCCameraManager::BlendToPOISceneCamera(ACameraActor* POICamera, float Blen
 {
 	// If POICamera is provided, use it directly
 	ACameraActor* CameraToUse = POICamera;
-	
+
 	// If no camera provided, search for it in the level (similar to BlendToTopDown)
 	if (!CameraToUse)
 	{
@@ -408,7 +408,7 @@ void UFCCameraManager::BlendToPOISceneCamera(ACameraActor* POICamera, float Blen
 			if (Cam && (Cam->Tags.Contains(FName("CampCamera")) || Cam->GetName().Contains(TEXT("CampCamera"))))
 			{
 				CameraToUse = Cam;
-				UE_LOG(LogFCCameraManager, Log, TEXT("BlendToPOISceneCamera: Found Camp camera in level: %s"), 
+				UE_LOG(LogFCCameraManager, Log, TEXT("BlendToPOISceneCamera: Found Camp camera in level: %s"),
 					*CameraToUse->GetName());
 				break;
 			}
@@ -416,7 +416,7 @@ void UFCCameraManager::BlendToPOISceneCamera(ACameraActor* POICamera, float Blen
 
 		if (!CameraToUse)
 		{
-			UE_LOG(LogFCCameraManager, Error, 
+			UE_LOG(LogFCCameraManager, Error,
 				TEXT("BlendToPOISceneCamera: No POI/Camp camera provided or found in level! Tag a camera with 'CampCamera' or name it with 'CampCamera'."));
 			return;
 		}

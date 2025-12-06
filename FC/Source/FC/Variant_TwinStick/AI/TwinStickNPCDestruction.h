@@ -1,4 +1,4 @@
-// Copyright Epic Games, Inc. All Rights Reserved.
+// Copyright Slomotion Games. All Rights Reserved.
 
 #pragma once
 
@@ -9,13 +9,13 @@
 /**
  *  A NPC destruction proxy for a Twin Stick Shooter game
  *  Replaces the NPC when it is destroyed,
- *  allowing it to play effects without affecting gameplay 
+ *  allowing it to play effects without affecting gameplay
  */
 UCLASS(abstract)
 class ATwinStickNPCDestruction : public AActor
 {
 	GENERATED_BODY()
-	
+
 public:
 
 	/** Constructor */

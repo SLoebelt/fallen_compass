@@ -1,4 +1,4 @@
-// Copyright Epic Games, Inc. All Rights Reserved.
+// Copyright Slomotion Games. All Rights Reserved.
 
 #pragma once
 
@@ -16,13 +16,13 @@ UCLASS(abstract)
 class ATwinStickSpawner : public AActor
 {
 	GENERATED_BODY()
-	
+
 protected:
 
 	/** Type of NPC to spawn */
 	UPROPERTY(EditAnywhere, Category="NPC Spawner")
 	TSubclassOf<ATwinStickNPC> NPCClass;
-	
+
 	/** Time delay between enemy group spawns */
 	UPROPERTY(EditAnywhere, Category="NPC Spawner", meta = (ClampMin = 0, ClampMax = 20, Units = "s"))
 	float SpawnGroupDelay = 5.0f;
@@ -42,7 +42,7 @@ protected:
 	/** Number of NPCs to spawn per group */
 	UPROPERTY(EditAnywhere, Category="NPC Spawner", meta = (ClampMin = 0, ClampMax = 10))
 	int32 SpawnGroupSize = 3;
-	
+
 	/** Number of NPCs spawned in the current group */
 	int32 SpawnCount = 0;
 
@@ -55,7 +55,7 @@ protected:
 	/** Pointer to the recast nav mesh actor, used to provide NPC spawn locations */
 	TObjectPtr<ARecastNavMesh> NavData;
 
-public:	
+public:
 
 	/** Constructor */
 	ATwinStickSpawner();

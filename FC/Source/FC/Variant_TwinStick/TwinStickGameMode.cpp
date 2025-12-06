@@ -1,4 +1,4 @@
-// Copyright Epic Games, Inc. All Rights Reserved.
+// Copyright Slomotion Games. All Rights Reserved.
 
 
 #include "TwinStickGameMode.h"
@@ -16,7 +16,7 @@ void ATwinStickGameMode::BeginPlay()
 void ATwinStickGameMode::EndPlay(EEndPlayReason::Type EndPlayReason)
 {
 	Super::EndPlay(EndPlayReason);
-	
+
 	// clear the combo timer
 	GetWorld()->GetTimerManager().ClearTimer(ComboTimer);
 }

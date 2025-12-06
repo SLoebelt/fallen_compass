@@ -1,4 +1,4 @@
-// Copyright Epic Games, Inc. All Rights Reserved.
+// Copyright Slomotion Games. All Rights Reserved.
 
 
 #include "TwinStickAoEAttack.h"
@@ -39,7 +39,7 @@ ATwinStickAoEAttack::ATwinStickAoEAttack()
 void ATwinStickAoEAttack::BeginPlay()
 {
 	Super::BeginPlay();
-	
+
 	// set up the AoE timers
 	GetWorld()->GetTimerManager().SetTimer(StartAoETimer, this, &ATwinStickAoEAttack::StartAoE, StartAoETime, false);
 	GetWorld()->GetTimerManager().SetTimer(StopAoETimer, this, &ATwinStickAoEAttack::StopAoE, StopAoETime, false);

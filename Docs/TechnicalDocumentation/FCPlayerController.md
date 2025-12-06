@@ -61,7 +61,7 @@ Key responsibilities:
 
 9. **Startup consistency on load**
 
-   * Subscribes to `GameStateManager.OnStateChanged` and manually triggers `OnGameStateChanged(...)` on BeginPlay for certain states (Overworld_Travel / ExpeditionSummary / Camp_Local) so camera/input are correct after loading. 
+   * Defers subscription to `UFCGameStateManager::OnStateChanged` to `UFCPlayerModeCoordinator` (a controller-owned component). The coordinator caches the current state on BeginPlay, then immediately calls back into `AFCPlayerController::ApplyPresentationForGameState(OldState, NewState)` so camera/input/cursor are correct after loading.
 
 
 ## Public API
@@ -124,7 +124,7 @@ Key responsibilities:
 ### 4) `UFCGameStateManager` (subsystem) — authoritative state + pause stack
 
 **Delegated:** state transitions (`TransitionTo`, `PushState`, `PopState`), current state queries, and broadcasting changes.
-**Why:** controller reacts to state (camera/input/cursor), but the *truth* of state lives in the state manager.
+**Why:** `UFCPlayerModeCoordinator` reacts to state changes and asks the controller to apply camera/input/cursor presentation, but the *truth* of state lives in the state manager.
 
 ### 5) `UFCUIManager` (subsystem) — all UI creation/visibility + "blocks interaction" rules
 

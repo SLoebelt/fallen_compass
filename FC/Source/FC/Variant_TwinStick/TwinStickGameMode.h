@@ -1,4 +1,4 @@
-// Copyright Epic Games, Inc. All Rights Reserved.
+// Copyright Slomotion Games. All Rights Reserved.
 
 #pragma once
 
@@ -16,7 +16,7 @@ UCLASS(abstract)
 class ATwinStickGameMode : public AGameModeBase
 {
 	GENERATED_BODY()
-	
+
 protected:
 
 	/** Type of UI Widget to spawn */

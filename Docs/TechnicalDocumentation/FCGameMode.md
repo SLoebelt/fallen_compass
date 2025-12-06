@@ -1,93 +1,107 @@
-## AFCGameMode — Technical Documentation (Manager)
+## AFCBaseGameMode and thin GameModes — Technical Documentation
 
-### Where to find it (paths)
+### Where to find them (paths)
 
-* **Header:** `FCGameMode.h` 
-* **Source:** `FCGameMode.cpp` 
+- Base:
+  - Header: `Core/FCBaseGameMode.h`
+  - Source: `Core/FCBaseGameMode.cpp`
+- Office:
+  - Header: `GameModes/FCOfficeGameMode.h`
+  - Source: `GameModes/FCOfficeGameMode.cpp`
+- Camp:
+  - Header: `GameModes/FCCampGameMode.h`
+  - Source: `GameModes/FCCampGameMode.cpp`
+- Overworld:
+  - Header: `GameModes/FCOverworldGameMode.h`
+  - Source: `GameModes/FCOverworldGameMode.cpp`
+- Legacy:
+  - Monolithic `AFCGameMode` remains in `Core/FCGameMode.h/.cpp` for migration notes and any remaining maps still using it.
 
 ---
 
-## Responsibilities (what this “manager” owns)
+## Responsibilities (what these GameModes own)
 
-**`AFCGameMode`** is the project’s **GameModeBase implementation** used as a lightweight orchestration point at runtime (especially at level start). It primarily owns:
+### `AFCBaseGameMode` — global level-start kick
 
-1. **Template defaults for pawn + controller**
+`AFCBaseGameMode` is the shared base class for all per-scene GameModes. It primarily owns:
 
-   * Sets the default pawn class to `AFCFirstPersonCharacter`.
-   * Sets player controller class to `AFCPlayerController`. 
+1. **Global BeginPlay hook**
+
+  * Overrides `BeginPlay()` to call `Super::BeginPlay()` and then perform global startup work that should run for every level.
 
 2. **Boot-time diagnostics**
 
-   * Logs (and prints on-screen debug) the active pawn/controller and current map name on BeginPlay. 
+  * Logs the active GameMode class and current map name using the `LogFallenCompassGameMode` category.
 
 3. **Level-start transition finalization hook**
 
-   * On BeginPlay, it notifies `UFCLevelTransitionManager` to finalize any pending `TransitionViaLoading(...)` flows via `InitializeLevelTransitionOnLevelStart()`. 
+  * On BeginPlay, retrieves `UFCLevelTransitionManager` from the GameInstance and calls `InitializeOnLevelStart()` to finalize any pending transitions.
+
+It does **not** reference Office/Camp/Overworld-specific pawns or actors.
 
 ---
 
-## Public API
+### `AFCOfficeGameMode` — Office defaults + optional menu camera
 
-### Constructor
+`AFCOfficeGameMode` derives from `AFCBaseGameMode` and defines the Office scene contract:
 
-* `AFCGameMode()`
+1. **Template defaults for pawn + controller**
 
-  * Configures `DefaultPawnClass` and `PlayerControllerClass`.
-  * Logs a message confirming configuration. 
+  * In its constructor, sets `DefaultPawnClass = AFCFirstPersonCharacter::StaticClass()`.
+  * Sets `PlayerControllerClass = AFCPlayerController::StaticClass()`.
 
-### Lifecycle
+2. **Menu camera wiring (optional)**
 
-* `BeginPlay()`
-
-  * Prints debug info to log + screen (temporary “TODO remove” comment).
-  * Calls into `UFCLevelTransitionManager` (if available) to complete loading-based transitions. 
+  * In `BeginPlay()`, if `MenuCameraActor` is not set explicitly, searches for an `ACameraActor` tagged `MenuCamera`, assigns it, and logs a warning that a tag-based fallback was used.
+  * Leaves further Office-specific wiring to future milestones.
 
 ---
 
-## Connected systems (“connected managers”) and what/why is delegated
+### `AFCCampGameMode` — Camp defaults + pre-placed explorer pattern
 
-### 1) `UFCLevelTransitionManager` (transition completion)
+`AFCCampGameMode` derives from `AFCBaseGameMode` and defines the Camp scene contract:
 
-**What is delegated**
+1. **Camp pawn + controller defaults**
 
-* Completion of Loading → TargetState flows, especially cases like “Overworld → Office → ExpeditionSummary”. 
+  * In its constructor, sets `DefaultPawnClass = AFC_ExplorerCharacter::StaticClass()` (can be treated as a fallback if a level forgets to place an explorer).
+  * Sets `PlayerControllerClass = AFCPlayerController::StaticClass()`.
 
-**Why delegated**
+2. **Camp camera wiring**
 
-* GameMode is present at level start and is a reliable place to “kick” transition finalization, but the actual orchestration logic belongs in the transition subsystem. 
+  * Exposes an editor-visible `CampCameraActor`.
+  * In `BeginPlay()`, if `CampCameraActor` is not set, searches for an `ACameraActor` tagged `CampCamera`, assigns it, and logs a warning when a tag-based fallback is used.
+  * If a `CampCameraActor` is available, finds the player controller and calls `SetPOISceneCameraActor` so the camera manager can treat it as the Camp/POI camera.
 
----
+3. **Pre-placed explorer safety net**
 
-### 2) `AFCFirstPersonCharacter` (default pawn)
+  * In `BeginPlay()`, if the player controller currently has no pawn, searches for an `AFC_ExplorerCharacter` already placed in the level.
+  * If found, possesses that pawn so the player controls the pre-placed explorer instead of spawning a duplicate.
 
-**What is delegated**
-
-* Player pawn behavior for the Office level (comment indicates it’s intended for Office as part of a task milestone). 
-
-**Why delegated**
-
-* GameMode chooses the pawn class; pawn class owns movement/camera/interactions. 
+The older `SpawnDefaultPawnAtTransform`-override pattern for skipping explorer spawn has been superseded by this more explicit possession logic (see commented-out implementation in code for reference).
 
 ---
 
-### 3) `AFCPlayerController` (input + gameplay control)
+### `AFCOverworldGameMode` — Overworld convoy + camera wiring
 
-**What is delegated**
+`AFCOverworldGameMode` derives from `AFCBaseGameMode` and defines the Overworld scene contract:
 
-* Input/camera/UI interactions are left to the PlayerController rather than GameMode. 
+1. **Controller default**
 
-**Why delegated**
+  * In its constructor, leaves `DefaultPawnClass` as `nullptr` (convoy is level-placed) and sets `PlayerControllerClass = AFCPlayerController::StaticClass()`.
 
-* GameMode sets the controller class; controller implements actual runtime control. 
+2. **Convoy wiring**
+
+  * Exposes an editor-visible `DefaultConvoy` (`AFCOverworldConvoy*`).
+  * In `BeginPlay()`, if `DefaultConvoy` is not set explicitly, performs a one-time `GetAllActorsOfClass` search for `AFCOverworldConvoy`, assigns the first result, and logs a warning when a fallback is used; logs an error if no convoy is found.
+  * After resolving `DefaultConvoy`, obtains the player controller and calls `SetActiveConvoy(DefaultConvoy)` so the controller can bind convoy delegates without doing its own global search.
+
+3. **Overworld camera wiring**
+
+  * Exposes an editor-visible `OverworldCameraActor`.
+  * In `BeginPlay()`, if `OverworldCameraActor` is not set, searches for an `ACameraActor` tagged `OverworldCamera`, assigns it, and logs a warning when resolved by tag.
 
 ---
 
-### 4) Engine debug facilities (`GEngine`, `UE_LOG`)
+### Legacy `AFCGameMode` — monolithic predecessor
 
-**What is delegated**
-
-* On-screen messages (`AddOnScreenDebugMessage`) and log output. 
-
-**Why delegated**
-
-* Keeps this class useful during early prototype iterations; debug output is explicitly marked temporary (“TODO remove once proper UI system is in place”). 
+`AFCGameMode` (in `Core/FCGameMode.h/.cpp`) is the older monolithic GameMode that mixed Office defaults, Camp spawn rules, and global level-start behavior. It is kept only for migration notes and for any remaining maps that still reference it; new work should favor `AFCBaseGameMode` + the thin per-level GameModes above.

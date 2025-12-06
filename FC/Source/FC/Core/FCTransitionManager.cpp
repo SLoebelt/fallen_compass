@@ -1,4 +1,4 @@
-// Copyright Iron Anchor Interactive. All Rights Reserved.
+// Copyright Slomotion Games. All Rights Reserved.
 
 #include "Core/FCTransitionManager.h"
 #include "UI/FCScreenTransitionWidget.h"
@@ -31,7 +31,7 @@ void UFCTransitionManager::Initialize(FSubsystemCollectionBase& Collection)
 	// Create widget immediately and initialize to black for clean startup (Step 1C.4)
 	// This ensures PIE starts with a black screen instead of showing content before fade-in
 	CreateTransitionWidget();
-	
+
 	// If widget was created but ViewportClient wasn't ready, set up a timer to retry
 	if (TransitionWidget && !TransitionWidget->IsInViewport())
 	{
@@ -42,7 +42,7 @@ void UFCTransitionManager::Initialize(FSubsystemCollectionBase& Collection)
 			[this]()
 			{
 				EnsureWidgetInViewport();
-				
+
 				// Start game with automatic fade-in from black (Step 1C.5)
 				// Trigger fade-in after a short delay to ensure widget is fully initialized
 				FTimerHandle FadeInHandle;
@@ -64,7 +64,7 @@ void UFCTransitionManager::Initialize(FSubsystemCollectionBase& Collection)
 			false
 		);
 	}
-	
+
 	bCurrentlyFading = false;
 }
 
@@ -167,10 +167,10 @@ void UFCTransitionManager::EnsureWidgetInViewport()
 			TransitionWidget->TakeWidget(),
 			1000
 		);
-		
+
 		// Now that it's in the viewport, initialize to black
 		TransitionWidget->InitializeToBlack();
-		
+
 		UE_LOG(LogFCTransitions, Log, TEXT("FCTransitionManager: Widget added to viewport and initialized to black"));
 	}
 	else
@@ -205,7 +205,7 @@ void UFCTransitionManager::BeginFadeOut(float Duration, bool bShowLoadingIndicat
 	bCurrentlyFading = true;
 	TransitionWidget->BeginFadeOut(Duration, bShowLoadingIndicator);
 
-	UE_LOG(LogFCTransitions, Log, TEXT("FCTransitionManager: Fade out started (Duration: %.2fs, Loading: %s)"), 
+	UE_LOG(LogFCTransitions, Log, TEXT("FCTransitionManager: Fade out started (Duration: %.2fs, Loading: %s)"),
 		Duration, bShowLoadingIndicator ? TEXT("Yes") : TEXT("No"));
 }
 

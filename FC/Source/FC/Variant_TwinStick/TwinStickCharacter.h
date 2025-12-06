@@ -1,4 +1,4 @@
-// Copyright Epic Games, Inc. All Rights Reserved.
+// Copyright Slomotion Games. All Rights Reserved.
 
 #pragma once
 
@@ -121,7 +121,7 @@ protected:
 	FTimerHandle AutoFireTimer;
 
 public:
-	
+
 	/** Constructor */
 	ATwinStickCharacter();
 
@@ -136,8 +136,8 @@ protected:
 	/** Possessed by controller initialization */
 	virtual void NotifyControllerChanged() override;
 
-public:	
-	
+public:
+
 	/** Updates the character's rotation to face the aim direction */
 	virtual void Tick(float DeltaTime) override;
 

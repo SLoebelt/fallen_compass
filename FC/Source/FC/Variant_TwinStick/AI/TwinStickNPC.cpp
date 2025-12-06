@@ -1,4 +1,4 @@
-// Copyright Epic Games, Inc. All Rights Reserved.
+// Copyright Slomotion Games. All Rights Reserved.
 
 
 #include "TwinStickNPC.h"
@@ -105,7 +105,7 @@ void ATwinStickNPC::ProjectileImpact(const FVector& ForwardVector)
 	{
 		ATwinStickPickup* Pickup = GetWorld()->SpawnActor<ATwinStickPickup>(PickupClass, GetActorTransform());
 	}
-	
+
 	// spawn the NPC destruction proxy
 	ATwinStickNPCDestruction* DestructionProxy = GetWorld()->SpawnActor<ATwinStickNPCDestruction>(DestructionProxyClass, GetActorTransform());
 

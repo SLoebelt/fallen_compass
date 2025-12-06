@@ -1,4 +1,4 @@
-// Copyright Epic Games, Inc. All Rights Reserved.
+// Copyright Slomotion Games. All Rights Reserved.
 
 #include "FCGameMode.h"
 #include "FCFirstPersonCharacter.h"
@@ -10,7 +10,7 @@
 #include "Core/FCLevelManager.h"
 #include "Kismet/GameplayStatics.h"
 
-DEFINE_LOG_CATEGORY(LogFallenCompassGameMode);
+DEFINE_LOG_CATEGORY(LogFallenCompassOldGameMode);
 
 AFCGameMode::AFCGameMode()
 {
@@ -18,7 +18,7 @@ AFCGameMode::AFCGameMode()
     DefaultPawnClass = AFCFirstPersonCharacter::StaticClass();
     PlayerControllerClass = AFCPlayerController::StaticClass();
 
-    UE_LOG(LogFallenCompassGameMode, Log, TEXT("AFCGameMode configured with AFCFirstPersonCharacter and AFCPlayerController."));
+    UE_LOG(LogFallenCompassOldGameMode, Log, TEXT("AFCGameMode configured with AFCFirstPersonCharacter and AFCPlayerController."));
 }
 
 void AFCGameMode::BeginPlay()
@@ -35,7 +35,7 @@ void AFCGameMode::BeginPlay()
     const FString ControllerName = PlayerControllerClass ? PlayerControllerClass->GetName() : TEXT("None");
     const FString MapName = GetWorld() ? GetWorld()->GetMapName() : TEXT("Unknown");
 
-    UE_LOG(LogFallenCompassGameMode, Log, TEXT("AFCGameMode active | Pawn=%s | Controller=%s | Level=%s"),
+    UE_LOG(LogFallenCompassOldGameMode, Log, TEXT("AFCGameMode active | Pawn=%s | Controller=%s | Level=%s"),
         *PawnName,
         *ControllerName,
         *MapName);
@@ -77,7 +77,7 @@ APawn* AFCGameMode::SpawnDefaultPawnAtTransform_Implementation(AController* NewP
 				if (FoundExplorers.Num() > 0)
 				{
 					// Explorer already exists in level, don't spawn another one
-					UE_LOG(LogFallenCompassGameMode, Log,
+					UE_LOG(LogFallenCompassOldGameMode, Log,
 						TEXT("SpawnDefaultPawnAtTransform: Skipping spawn - explorer already placed in %s level"),
 						*UEnum::GetValueAsString(LevelType));
 					return nullptr;

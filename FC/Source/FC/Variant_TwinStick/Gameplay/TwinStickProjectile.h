@@ -1,4 +1,4 @@
-// Copyright Epic Games, Inc. All Rights Reserved.
+// Copyright Slomotion Games. All Rights Reserved.
 
 #pragma once
 
@@ -17,7 +17,7 @@ UCLASS(abstract)
 class ATwinStickProjectile : public AActor
 {
 	GENERATED_BODY()
-	
+
 	/** Projectile collision sphere */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components", meta = (AllowPrivateAccess = "true"))
 	USphereComponent* CollisionSphere;
@@ -30,7 +30,7 @@ class ATwinStickProjectile : public AActor
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components", meta = (AllowPrivateAccess = "true"))
 	UProjectileMovementComponent* ProjectileMovement;
 
-public:	
+public:
 
 	/** Constructor */
 	ATwinStickProjectile();
@@ -39,7 +39,7 @@ public:
 	virtual void NotifyHit(class UPrimitiveComponent* MyComp, AActor* Other, class UPrimitiveComponent* OtherComp, bool bSelfMoved, FVector HitLocation, FVector HitNormal, FVector NormalImpulse, const FHitResult& Hit) override;
 
 protected:
-	
+
 	/** Handles collisions that stop this projectile from moving */
 	UFUNCTION()
 	void OnProjectileStop(const FHitResult& ImpactResult);

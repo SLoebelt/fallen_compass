@@ -1,4 +1,4 @@
-// Copyright Iron Anchor Interactive. All Rights Reserved.
+// Copyright Slomotion Games. All Rights Reserved.
 
 #include "Interaction/FCTableInteractable.h"
 #include "GameFramework/PlayerController.h"

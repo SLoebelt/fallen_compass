@@ -1,4 +1,4 @@
-// Copyright Epic Games, Inc. All Rights Reserved.
+// Copyright Slomotion Games. All Rights Reserved.
 
 #pragma once
 
@@ -16,7 +16,7 @@ UCLASS(abstract)
 class ATwinStickPickup : public AActor
 {
 	GENERATED_BODY()
-	
+
 	/** Pickup collision sphere */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components", meta = (AllowPrivateAccess = "true"))
 	USphereComponent* CollisionSphere;
@@ -25,7 +25,7 @@ class ATwinStickPickup : public AActor
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components", meta = (AllowPrivateAccess = "true"))
 	UStaticMeshComponent* Mesh;
 
-public:	
+public:
 
 	/** Constructor */
 	ATwinStickPickup();

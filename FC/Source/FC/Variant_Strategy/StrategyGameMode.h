@@ -1,4 +1,4 @@
-// Copyright Epic Games, Inc. All Rights Reserved.
+// Copyright Slomotion Games. All Rights Reserved.
 
 #pragma once
 
@@ -13,5 +13,5 @@ UCLASS(abstract)
 class AStrategyGameMode : public AGameModeBase
 {
 	GENERATED_BODY()
-	
+
 };

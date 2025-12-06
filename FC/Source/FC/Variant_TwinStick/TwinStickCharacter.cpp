@@ -1,4 +1,4 @@
-// Copyright Epic Games, Inc. All Rights Reserved.
+// Copyright Slomotion Games. All Rights Reserved.
 
 
 #include "TwinStickCharacter.h"
@@ -49,7 +49,7 @@ ATwinStickCharacter::ATwinStickCharacter()
 void ATwinStickCharacter::BeginPlay()
 {
 	Super::BeginPlay();
-	
+
 	// update the items count
 	UpdateItems();
 }
@@ -83,16 +83,16 @@ void ATwinStickCharacter::Tick(float DeltaTime)
 		if (PlayerController)
 		{
 			// get the cursor world location
-			FHitResult OutHit; 
+			FHitResult OutHit;
 			PlayerController->GetHitResultUnderCursorByChannel(MouseAimTraceChannel, true, OutHit);
 
-			// find the aim rotation 
+			// find the aim rotation
 			const FRotator AimRot = UKismetMathLibrary::FindLookAtRotation(GetActorLocation(), OutHit.Location);
 
 			// save the aim angle
 			AimAngle = AimRot.Yaw;
 
-			
+
 
 			// update the yaw, reuse the pitch and roll
 			SetActorRotation(FRotator(OldRotation.Pitch, AimAngle, OldRotation.Roll));

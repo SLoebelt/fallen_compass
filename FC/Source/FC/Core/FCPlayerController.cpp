@@ -1,4 +1,4 @@
-// Copyright Epic Games, Inc. All Rights Reserved.
+// Copyright Slomotion Games. All Rights Reserved.
 
 #include "FCPlayerController.h"
 #include "Engine/Engine.h"
@@ -34,6 +34,7 @@
 #include "AIController.h"
 #include "Blueprint/AIBlueprintHelperLibrary.h"
 #include "NavigationSystem.h"
+#include "Components/FCPlayerModeCoordinator.h"
 
 DEFINE_LOG_CATEGORY(LogFallenCompassPlayerController);
 
@@ -47,6 +48,9 @@ AFCPlayerController::AFCPlayerController()
 
 	// Create interaction component (handles POI interactions across all scenes)
 	InteractionComponent = CreateDefaultSubobject<UFCInteractionComponent>(TEXT("InteractionComponent"));
+
+	// Create player mode coordinator component
+	PlayerModeCoordinator = CreateDefaultSubobject<UFCPlayerModeCoordinator>(TEXT("PlayerModeCoordinator"));
 
 	bIsPauseMenuDisplayed = false;
 	bShowMouseCursor = false;
@@ -77,62 +81,16 @@ void AFCPlayerController::BeginPlay()
 		// calls InitializeMainMenu after setting the menu camera.
 		GameInstance->RestorePlayerPosition();
 		UE_LOG(LogFallenCompassPlayerController, Log, TEXT("BeginPlay: Controller ready, input mode will be set by game state transitions"));
-
-		// Subscribe to game state changes
-		UFCGameStateManager* StateMgr = GameInstance->GetSubsystem<UFCGameStateManager>();
-		if (StateMgr)
-		{
-			StateMgr->OnStateChanged.AddDynamic(this, &AFCPlayerController::OnGameStateChanged);
-			UE_LOG(LogFallenCompassPlayerController, Log, TEXT("BeginPlay: Subscribed to GameStateManager.OnStateChanged"));
-
-			// Log current state to verify subscription timing
-			EFCGameStateID CurrentState = StateMgr->GetCurrentState();
-			UE_LOG(LogFallenCompassPlayerController, Log, TEXT("BeginPlay: Current game state is %s"),
-				*UEnum::GetValueAsString(CurrentState));
-
-			// If we're already in an in-world state that expects specific
-			// camera/input (e.g. Overworld_Travel, ExpeditionSummary, Camp_Local),
-			// manually trigger the handler so things are set up correctly on load.
-			if (CurrentState == EFCGameStateID::Overworld_Travel ||
-				CurrentState == EFCGameStateID::ExpeditionSummary ||
-				CurrentState == EFCGameStateID::Camp_Local)
-			{
-				UE_LOG(LogFallenCompassPlayerController, Warning,
-					TEXT("BeginPlay: Already in state %s, manually triggering camera/input switch"),
-					*UEnum::GetValueAsString(CurrentState));
-				OnGameStateChanged(EFCGameStateID::None, CurrentState);
-			}
-		}
-		else
-		{
-			UE_LOG(LogFallenCompassPlayerController, Error, TEXT("BeginPlay: Failed to get GameStateManager subsystem"));
-		}
 	}
 	else
 	{
 		UE_LOG(LogFallenCompassPlayerController, Error, TEXT("BeginPlay: Failed to get GameInstance"));
 	}
 
-	// Use delegates called in OnGameStateChanged - TODO - remove after testing
-	/* // Find convoy in level if we're in Overworld
-	TArray<AActor*> FoundConvoys;
-	UGameplayStatics::GetAllActorsOfClass(GetWorld(), AFCOverworldConvoy::StaticClass(), FoundConvoys);
-
-	if (FoundConvoys.Num() > 0)
-	{
-		ActiveConvoy = Cast<AFCOverworldConvoy>(FoundConvoys[0]);
-		UE_LOG(LogFallenCompassPlayerController, Log, TEXT("BeginPlay: Found convoy: %s"), *ActiveConvoy->GetName());
-
-		ActiveConvoy->OnConvoyPOIOverlap.RemoveAll(InteractionComponent);
-		UE_LOG(LogFallenCompassPlayerController, Log, TEXT("BeginPlay: Cleared existing convoy overlap delegates from InteractionComponent"));
-
-		ActiveConvoy->OnConvoyPOIOverlap.AddDynamic(InteractionComponent, &UFCInteractionComponent::NotifyPOIOverlap);
-		UE_LOG(LogFallenCompassPlayerController, Log, TEXT("Bound convoy overlap delegate -> InteractionComponent"));
-	}
-	else
-	{
-		UE_LOG(LogFallenCompassPlayerController, Error, TEXT("No OverworldConvoy found in map %s"), *GetWorld()->GetMapName());
-	} */
+	if (!IsLocalController())
+    {
+        return;
+    }
 
 	if (CameraManager && CameraManager->GetCameraMode() == EFCPlayerCameraMode::POIScene)
 	{
@@ -142,14 +100,21 @@ void AFCPlayerController::BeginPlay()
 				TEXT("Camp/POI mode but controller is not possessing AFC_ExplorerCharacter. Check Camp GameMode / pawn placement."));
 		}
 	}
+
+	// Optional: make sure config exists before applying mappings
+    const UFCInputConfig* Config = InputManager ? InputManager->GetInputConfig() : nullptr;
+    if (!Config)
+    {
+        UE_LOG(LogFallenCompassPlayerController, Error, TEXT("BeginPlay: InputConfig missing on InputManager"));
+        return;
+    }
+
+    SetInputMappingMode(EFCInputMappingMode::FirstPerson);
 }
 
 void AFCPlayerController::SetupInputComponent()
 {
 	Super::SetupInputComponent();
-
-	// Apply initial mapping context (default FirstPerson mode)
-	SetInputMappingMode(EFCInputMappingMode::FirstPerson);
 
 	UEnhancedInputComponent* EnhancedInput = Cast<UEnhancedInputComponent>(InputComponent);
 	if (!EnhancedInput)
@@ -965,118 +930,12 @@ void AFCPlayerController::HandleOverworldZoom(const FInputActionValue& Value)
 
 void AFCPlayerController::OnGameStateChanged(EFCGameStateID OldState, EFCGameStateID NewState)
 {
-	UE_LOG(LogFallenCompassPlayerController, Log, TEXT("OnGameStateChanged: %s -> %s"),
+	UE_LOG(LogFallenCompassPlayerController, Log, TEXT("OnGameStateChanged: State changed from %s to %s"),
 		*UEnum::GetValueAsString(OldState),
 		*UEnum::GetValueAsString(NewState));
 
-	// Unbind delegates when leaving Overworld_Travel state
-	UnbindOverworldConvoyDelegates();
-
-
-	// React to Overworld_Travel state entry
-	if (NewState == EFCGameStateID::Overworld_Travel)
-	{
-		// Show mouse cursor for click-to-move
-		bShowMouseCursor = true;
-		UE_LOG(LogFallenCompassPlayerController, Log, TEXT("OnGameStateChanged: Mouse cursor enabled for Overworld"));
-
-		// Switch to TopDown input mode
-		if (InputManager)
-		{
-			InputManager->SetInputMappingMode(EFCInputMappingMode::TopDown);
-			UE_LOG(LogFallenCompassPlayerController, Log, TEXT("OnGameStateChanged: Switched to TopDown input mode"));
-		}
-
-		// Blend to Overworld camera
-		if (CameraManager)
-		{
-			CameraManager->BlendToTopDown(2.0f);
-			UE_LOG(LogFallenCompassPlayerController, Log, TEXT("OnGameStateChanged: Blending to TopDown camera"));
-		}
-
-		BindOverworldConvoyDelegates();
-	}
-	// React to entering Camp_Local state (camp/local POI scene)
-	else if (NewState == EFCGameStateID::Camp_Local)
-	{
-		UE_LOG(LogFallenCompassPlayerController, Log,
-			TEXT("OnGameStateChanged: Entering Camp_Local, configuring POIScene camera/input"));
-
-		// Enable cursor for click-to-move and UI interaction
-		bShowMouseCursor = true;
-
-		// Switch to POI scene input mode (no camera pan/zoom, click-to-move explorer)
-		if (InputManager)
-		{
-			InputManager->SetInputMappingMode(EFCInputMappingMode::POIScene);
-			UE_LOG(LogFallenCompassPlayerController, Log, TEXT("OnGameStateChanged: Switched to POIScene input mode for Camp_Local"));
-		}
-
-		// Blend to fixed camp/POI camera (CameraManager will search for it if POISceneCameraActor is null)
-		if (CameraManager)
-		{
-			// Always call BlendToPOISceneCamera - it now searches for camera by tag/name if parameter is null
-			CameraManager->BlendToPOISceneCamera(POISceneCameraActor, 2.0f);
-			UE_LOG(LogFallenCompassPlayerController, Log, TEXT("OnGameStateChanged: Blending to POIScene camera for Camp_Local via CameraManager"));
-		}
-
-		// Use Game+UI input mode with free cursor
-		FInputModeGameAndUI InputMode;
-		InputMode.SetHideCursorDuringCapture(false);
-		InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
-		SetInputMode(InputMode);
-	}
-	// React to entering ExpeditionSummary state (summary shown in Office)
-	else if (NewState == EFCGameStateID::ExpeditionSummary)
-	{
-		// While in ExpeditionSummary we want to reuse the Office table-view
-		// camera setup, but keep gameplay input in a static-scene mode.
-		if (InputManager)
-		{
-			InputManager->SetInputMappingMode(EFCInputMappingMode::StaticScene);
-			UE_LOG(LogFallenCompassPlayerController, Log, TEXT("OnGameStateChanged: Switched to StaticScene input mode for ExpeditionSummary"));
-		}
-
-		// Blend camera to the table/desk view; this uses the same logic as
-		// the regular TableView mode (searching for BP_OfficeDesk and its
-		// CameraTargetPoint) but without opening any table widgets.
-		SetCameraModeLocal(EFCPlayerCameraMode::TableView, 2.0f);
-	}
-	// React to leaving Overworld_Travel state
-	else if (OldState == EFCGameStateID::Overworld_Travel)
-	{
-		// When leaving Overworld, either go to ExpeditionSummary (summary in Office)
-		// or back to first-person Office exploration.
-		if (InputManager && NewState == EFCGameStateID::Office_Exploration)
-		{
-			InputManager->SetInputMappingMode(EFCInputMappingMode::FirstPerson);
-			if (CameraManager)
-			{
-				CameraManager->BlendToFirstPerson(2.0f);
-			}
-			UE_LOG(LogFallenCompassPlayerController, Log, TEXT("OnGameStateChanged: Returned to FirstPerson mode from Overworld"));
-		}
-	}
-	// Generic entry into Office_Exploration from any non-Overworld/non-Camp state
-	else if (NewState == EFCGameStateID::Office_Exploration)
-	{
-		if (InputManager)
-		{
-			InputManager->SetInputMappingMode(EFCInputMappingMode::FirstPerson);
-		}
-		if (CameraManager)
-		{
-			CameraManager->BlendToFirstPerson(2.0f);
-		}
-		bShowMouseCursor = false;
-		bEnableClickEvents = false;
-		bEnableMouseOverEvents = false;
-
-		FInputModeGameOnly InputMode;
-		SetInputMode(InputMode);
-
-		UE_LOG(LogFallenCompassPlayerController, Log, TEXT("OnGameStateChanged: Entered Office_Exploration, restored FirstPerson camera/input"));
-	}
+	// Additional handling can be added here if needed
+	ApplyPresentationForGameState(OldState, NewState);
 }
 
 void AFCPlayerController::FadeScreenOut(float Duration, bool bShowLoading)
@@ -1444,6 +1303,19 @@ void AFCPlayerController::HandleOverworldClickMove()
 	}
 }
 
+void AFCPlayerController::SetActiveConvoy(AFCOverworldConvoy* InConvoy)
+{
+	ActiveConvoy = InConvoy;
+
+	// Avoid double-binding
+    ActiveConvoy->OnConvoyPOIOverlap.RemoveAll(InteractionComponent);
+    ActiveConvoy->OnConvoyPOIOverlap.AddDynamic(InteractionComponent, &UFCInteractionComponent::NotifyPOIOverlap);
+
+    UE_LOG(LogFallenCompassPlayerController, Log,
+        TEXT("SetActiveConvoy: Set active convoy to %s and bound OnConvoyPOIOverlap -> InteractionComponent"),
+		*GetNameSafe(ActiveConvoy));
+}
+
 void AFCPlayerController::MoveConvoyToLocation(const FVector& TargetLocation)
 {
 	if (!ActiveConvoy)
@@ -1561,16 +1433,8 @@ void AFCPlayerController::BindOverworldConvoyDelegates()
         return;
     }
 
-    ActiveConvoy = Cast<AFCOverworldConvoy>(FoundConvoys[0]);
-    UE_LOG(LogFallenCompassPlayerController, Log,
-        TEXT("BindOverworldConvoyDelegates: Found convoy %s"), *GetNameSafe(ActiveConvoy));
-
-    // Avoid double-binding
-    ActiveConvoy->OnConvoyPOIOverlap.RemoveAll(InteractionComponent);
-    ActiveConvoy->OnConvoyPOIOverlap.AddDynamic(InteractionComponent, &UFCInteractionComponent::NotifyPOIOverlap);
-
-    UE_LOG(LogFallenCompassPlayerController, Log,
-        TEXT("BindOverworldConvoyDelegates: Bound OnConvoyPOIOverlap -> InteractionComponent"));
+	AFCOverworldConvoy* FoundConvoy = Cast<AFCOverworldConvoy>(FoundConvoys[0]);
+    SetActiveConvoy(FoundConvoy);
 }
 
 void AFCPlayerController::UnbindOverworldConvoyDelegates()
@@ -1584,3 +1448,141 @@ void AFCPlayerController::UnbindOverworldConvoyDelegates()
 
     ActiveConvoy = nullptr;
 }
+
+void AFCPlayerController::ApplyPresentationForGameState(EFCGameStateID OldState, EFCGameStateID NewState)
+{
+	// Your current code always unbinds first
+	UnbindOverworldConvoyDelegates();
+
+	if (NewState == EFCGameStateID::Overworld_Travel)
+	{
+		ApplyOverworldTravelPresentation();
+		return;
+	}
+
+	if (NewState == EFCGameStateID::Camp_Local)
+	{
+		ApplyCampLocalPresentation();
+		return;
+	}
+
+	if (NewState == EFCGameStateID::ExpeditionSummary)
+	{
+		ApplyExpeditionSummaryPresentation();
+		return;
+	}
+
+	// This reproduces your “leaving overworld” special-case block
+	if (OldState == EFCGameStateID::Overworld_Travel)
+	{
+		ApplyLeavingOverworldPresentation(NewState);
+		return;
+	}
+
+	// Generic entry into Office_Exploration
+	if (NewState == EFCGameStateID::Office_Exploration)
+	{
+		ApplyOfficeExplorationPresentation();
+		return;
+	}
+}
+
+void AFCPlayerController::ApplyOverworldTravelPresentation()
+{
+	// Show mouse cursor for click-to-move
+	bShowMouseCursor = true;
+	UE_LOG(LogFallenCompassPlayerController, Log, TEXT("ApplyOverworldTravelPresentation: Mouse cursor enabled for Overworld"));
+
+	// Switch to TopDown input mode
+	if (InputManager)
+	{
+		InputManager->SetInputMappingMode(EFCInputMappingMode::TopDown);
+		UE_LOG(LogFallenCompassPlayerController, Log, TEXT("ApplyOverworldTravelPresentation: Switched to TopDown input mode"));
+	}
+
+	// Blend to Overworld camera
+	if (CameraManager)
+	{
+		CameraManager->BlendToTopDown(2.0f);
+		UE_LOG(LogFallenCompassPlayerController, Log, TEXT("ApplyOverworldTravelPresentation: Blending to TopDown camera"));
+	}
+
+	BindOverworldConvoyDelegates();
+}
+
+void AFCPlayerController::ApplyCampLocalPresentation()
+{
+	UE_LOG(LogFallenCompassPlayerController, Log,
+		TEXT("ApplyCampLocalPresentation: Entering Camp_Local, configuring POIScene camera/input"));
+
+	// Enable cursor for click-to-move and UI interaction
+	bShowMouseCursor = true;
+
+	// Switch to POI scene input mode (no camera pan/zoom, click-to-move explorer)
+	if (InputManager)
+	{
+		InputManager->SetInputMappingMode(EFCInputMappingMode::POIScene);
+		UE_LOG(LogFallenCompassPlayerController, Log, TEXT("ApplyCampLocalPresentation: Switched to POIScene input mode for Camp_Local"));
+	}
+
+	// Blend to fixed camp/POI camera (CameraManager will search for it if POISceneCameraActor is null)
+	if (CameraManager)
+	{
+		// Always call BlendToPOISceneCamera - it now searches for camera by tag/name if parameter is null
+		CameraManager->BlendToPOISceneCamera(POISceneCameraActor, 2.0f);
+		UE_LOG(LogFallenCompassPlayerController, Log, TEXT("ApplyCampLocalPresentation: Blending to POIScene camera for Camp_Local via CameraManager"));
+	}
+
+	// Use Game+UI input mode with free cursor
+	FInputModeGameAndUI InputMode;
+	InputMode.SetHideCursorDuringCapture(false);
+	InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+	SetInputMode(InputMode);
+}
+
+void AFCPlayerController::ApplyExpeditionSummaryPresentation()
+{
+	// While in ExpeditionSummary we want to reuse the Office table-view
+	// camera setup, but keep gameplay input in a static-scene mode.
+	if (InputManager)
+	{
+		InputManager->SetInputMappingMode(EFCInputMappingMode::StaticScene);
+		UE_LOG(LogFallenCompassPlayerController, Log, TEXT("ApplyExpeditionSummaryPresentation: Switched to StaticScene input mode for ExpeditionSummary"));
+	}
+
+	// Blend camera to the table/desk view; this uses the same logic as
+	// the regular TableView mode (searching for BP_OfficeDesk and its
+	// CameraTargetPoint) but without opening any table widgets.
+	SetCameraModeLocal(EFCPlayerCameraMode::TableView, 2.0f);
+}
+
+void AFCPlayerController::ApplyLeavingOverworldPresentation(EFCGameStateID NewState)
+{
+	// When leaving Overworld, either go to ExpeditionSummary (summary in Office)
+	// or back to first-person Office exploration.
+	if (InputManager && NewState == EFCGameStateID::Office_Exploration)
+	{
+		ApplyOfficeExplorationPresentation();
+	}
+}
+
+void AFCPlayerController::ApplyOfficeExplorationPresentation()
+{
+	if (InputManager)
+	{
+		InputManager->SetInputMappingMode(EFCInputMappingMode::FirstPerson);
+	}
+	if (CameraManager)
+	{
+		CameraManager->BlendToFirstPerson(2.0f);
+	}
+	bShowMouseCursor = false;
+	bEnableClickEvents = false;
+	bEnableMouseOverEvents = false;
+
+	FInputModeGameOnly InputMode;
+	SetInputMode(InputMode);
+
+	UE_LOG(LogFallenCompassPlayerController, Log, TEXT("ApplyOfficeExplorationPresentation: Entered Office_Exploration, restored FirstPerson camera/input"));
+}
+

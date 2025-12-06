@@ -1,4 +1,4 @@
-// Copyright Epic Games, Inc. All Rights Reserved.
+// Copyright Slomotion Games. All Rights Reserved.
 
 #pragma once
 
@@ -14,7 +14,7 @@ UCLASS(abstract)
 class UTwinStickUI : public UUserWidget
 {
 	GENERATED_BODY()
-	
+
 public:
 
 	/** Blueprint handler to update the items counter */

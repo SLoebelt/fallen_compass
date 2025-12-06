@@ -1,4 +1,4 @@
-// Copyright Epic Games, Inc. All Rights Reserved.
+// Copyright Slomotion Games. All Rights Reserved.
 
 #pragma once
 
@@ -16,7 +16,7 @@ UCLASS(abstract)
 class AStrategyHUD : public AHUD
 {
 	GENERATED_BODY()
-	
+
 protected:
 
 	/** Pointer to the UI user widget */

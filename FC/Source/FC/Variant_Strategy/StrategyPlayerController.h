@@ -1,4 +1,4 @@
-// Copyright Epic Games, Inc. All Rights Reserved.
+// Copyright Slomotion Games. All Rights Reserved.
 
 #pragma once
 
@@ -202,7 +202,7 @@ protected:
 
 	/** Start a select and hold input */
 	void SelectHoldStarted(const FInputActionValue& Value);
-	
+
 	/** Select and hold input triggered */
 	void SelectHoldTriggered(const FInputActionValue& Value);
 

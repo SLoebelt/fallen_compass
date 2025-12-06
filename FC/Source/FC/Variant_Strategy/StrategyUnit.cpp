@@ -1,4 +1,4 @@
-// Copyright Epic Games, Inc. All Rights Reserved.
+// Copyright Slomotion Games. All Rights Reserved.
 
 
 #include "StrategyUnit.h"
@@ -43,7 +43,7 @@ void AStrategyUnit::NotifyControllerChanged()
 {
 	// validate and save a copy of the AI controller reference
 	AIController = Cast<AAIController>(Controller);
-	
+
 	if (AIController)
 	{
 		// subscribe to the move finished handler on the path following component
@@ -87,7 +87,7 @@ void AStrategyUnit::Interact(AStrategyUnit* Interactor)
 		// play our own interaction behavior
 		BP_InteractionBehavior(Interactor);
 	}
-	
+
 }
 
 bool AStrategyUnit::MoveToLocation(const FVector& Location, float AcceptanceRadius)
@@ -110,7 +110,7 @@ bool AStrategyUnit::MoveToLocation(const FVector& Location, float AcceptanceRadi
 		// request a move to the AI Controller
 		FNavPathSharedPtr FollowedPath;
 		const FPathFollowingRequestResult ResultData = AIController->MoveTo(MoveReq, &FollowedPath);
-		
+
 		// check the move result
 		switch (ResultData.Code)
 		{

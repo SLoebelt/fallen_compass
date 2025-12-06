@@ -1,4 +1,4 @@
-// Copyright Epic Games, Inc. All Rights Reserved.
+// Copyright Slomotion Games. All Rights Reserved.
 
 #pragma once
 
@@ -16,10 +16,10 @@ DECLARE_LOG_CATEGORY_EXTERN(LogFCCameraManager, Log, All);
 
 /**
  * UFCCameraManager
- * 
+ *
  * Component responsible for managing camera transitions and view targets.
  * Handles camera mode switching, blend times, and temporary camera spawning.
- * 
+ *
  * Priority 3 Refactoring: Extracted from AFCPlayerController to reduce complexity
  * and enable reusability across different controller types.
  */

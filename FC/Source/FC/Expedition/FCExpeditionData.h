@@ -1,4 +1,4 @@
-// Copyright Iron Anchor Interactive. All Rights Reserved.
+// Copyright Slomotion Games. All Rights Reserved.
 
 #pragma once
 
@@ -8,7 +8,7 @@
 
 /**
  * EFCExpeditionStatus
- * 
+ *
  * Represents the current state of an expedition.
  * Used to track progression from planning through completion/failure.
  */

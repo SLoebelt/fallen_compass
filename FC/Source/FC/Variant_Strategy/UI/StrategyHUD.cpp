@@ -1,4 +1,4 @@
-// Copyright Epic Games, Inc. All Rights Reserved.
+// Copyright Slomotion Games. All Rights Reserved.
 
 
 #include "StrategyHUD.h"
@@ -70,7 +70,7 @@ void AStrategyHUD::DrawHUD()
 					DrawText(SelectionString, FColor::White, ScreenCoords.X - 25.0f, ScreenCoords.Y + 25.0f, nullptr, 1.5f);
 				}
 			}
-			
+
 		}
 	}
 

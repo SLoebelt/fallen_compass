@@ -1,4 +1,4 @@
-// Copyright Epic Games, Inc. All Rights Reserved.
+// Copyright Slomotion Games. All Rights Reserved.
 
 #include "Components/FCInputManager.h"
 #include "EnhancedInputSubsystems.h"
@@ -18,13 +18,31 @@ void UFCInputManager::BeginPlay()
 	Super::BeginPlay();
 
 	// Validate owner is a PlayerController
-	APlayerController* OwnerPC = Cast<APlayerController>(GetOwner());
-	if (!OwnerPC)
-	{
-		UE_LOG(LogFCInputManager, Error, TEXT("UFCInputManager must be attached to a PlayerController! Owner: %s"),
-			*GetNameSafe(GetOwner()));
-		return;
-	}
+    APlayerController* OwnerPC = Cast<APlayerController>(GetOwner());
+    if (!OwnerPC)
+    {
+        UE_LOG(LogFCInputManager, Error, TEXT("UFCInputManager must be attached to a PlayerController! Owner: %s"),
+            *GetNameSafe(GetOwner()));
+        return;
+    }
+
+	    // Only run on local controllers (server controllers have no LocalPlayer)
+    if (!OwnerPC->IsLocalController())
+    {
+        UE_LOG(LogFCInputManager, Verbose,
+            TEXT("UFCInputManager::BeginPlay skipped on non-local controller %s"),
+            *GetNameSafe(OwnerPC));
+        return;
+    }
+
+    // Ensure InputConfig is assigned
+    if (!InputConfig)
+    {
+        UE_LOG(LogFCInputManager, Error,
+            TEXT("UFCInputManager on %s has no InputConfig assigned"),
+            *GetNameSafe(this));
+        return;
+    }
 
 	// Validate all input mapping contexts are assigned
 	if (!InputConfig->FirstPersonMappingContext)

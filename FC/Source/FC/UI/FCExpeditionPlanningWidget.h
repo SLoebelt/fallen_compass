@@ -1,4 +1,4 @@
-// Copyright Iron Anchor Interactive. All Rights Reserved.
+// Copyright Slomotion Games. All Rights Reserved.
 
 #pragma once
 
@@ -51,7 +51,7 @@ private:
 
 public:
     // UI Components (exposed for Blueprint access if needed)
-    
+
     /** Root canvas panel */
     UPROPERTY(BlueprintReadOnly, Category = "Expedition|UI", meta = (BindWidget))
     TObjectPtr<UCanvasPanel> RootCanvas;

@@ -1,4 +1,4 @@
-// Copyright Epic Games, Inc. All Rights Reserved.
+// Copyright Slomotion Games. All Rights Reserved.
 
 #pragma once
 
@@ -17,7 +17,7 @@ UCLASS(abstract)
 class ATwinStickAoEAttack : public AActor
 {
 	GENERATED_BODY()
-	
+
 	/** Provides the visual representation for the AoE attack */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta = (AllowPrivateAccess = "true"))
 	UStaticMeshComponent* SphereVisual;
@@ -45,8 +45,8 @@ protected:
 	/** While true, the AoE will damage anything that overlaps it */
 	bool bIsAoEActive = false;
 
-public:	
-	
+public:
+
 	/** Constructor */
 	ATwinStickAoEAttack();
 

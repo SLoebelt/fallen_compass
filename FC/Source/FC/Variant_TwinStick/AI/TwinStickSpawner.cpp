@@ -1,4 +1,4 @@
-// Copyright Epic Games, Inc. All Rights Reserved.
+// Copyright Slomotion Games. All Rights Reserved.
 
 
 #include "TwinStickSpawner.h"
@@ -19,7 +19,7 @@ ATwinStickSpawner::ATwinStickSpawner()
 void ATwinStickSpawner::BeginPlay()
 {
 	Super::BeginPlay();
-	
+
 	// find the recast navmesh actor on the level
 	TArray<AActor*> ActorList;
 	UGameplayStatics::GetAllActorsOfClass(GetWorld(), ARecastNavMesh::StaticClass(), ActorList);

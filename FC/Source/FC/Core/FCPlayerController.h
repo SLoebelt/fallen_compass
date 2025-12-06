@@ -1,4 +1,4 @@
-// Copyright Epic Games, Inc. All Rights Reserved.
+// Copyright Slomotion Games. All Rights Reserved.
 
 #pragma once
 
@@ -17,6 +17,7 @@ class UUserWidget;
 class UFCCameraManager;
 class UFCInputManager;
 class UFCInteractionComponent;
+class UFCPlayerModeCoordinator;
 class AFCOverworldConvoy;
 class AFCConvoyMember;
 struct FInputActionValue;
@@ -151,9 +152,12 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Transition")
 	void FadeScreenIn(float Duration = 1.0f);
 
-	/** Get the possessed convoy reference */
-	UFUNCTION(BlueprintCallable, Category = "FC|Convoy")
+	/** Getter for the current active convoy */
+	UFUNCTION(BlueprintCallable, Category="FC|Convoy")
 	AFCOverworldConvoy* GetActiveConvoy() const { return ActiveConvoy; }
+
+	UFUNCTION(BlueprintCallable, Category="FC|Convoy")
+	void SetActiveConvoy(AFCOverworldConvoy* InConvoy);
 
 	/** Move convoy to target location (called by InteractionComponent for POI navigation) */
 	UFUNCTION(BlueprintCallable, Category = "FC|Convoy")
@@ -209,6 +213,10 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<UFCInteractionComponent> InteractionComponent;
 
+	/** Player mode coordinator component */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	TObjectPtr<UFCPlayerModeCoordinator> PlayerModeCoordinator;
+
 	/** Fixed camera actor for POI/local scenes such as Camp */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Camera")
 	TObjectPtr<ACameraActor> POISceneCameraActor;
@@ -247,6 +255,16 @@ private:
 
 	void BindOverworldConvoyDelegates();
 	void UnbindOverworldConvoyDelegates();
+
+public:
+	void ApplyPresentationForGameState(EFCGameStateID OldState, EFCGameStateID NewState);
+
+private:
+	void ApplyOverworldTravelPresentation();
+	void ApplyCampLocalPresentation();
+	void ApplyExpeditionSummaryPresentation();
+	void ApplyOfficeExplorationPresentation();
+
+	// Optional TODO - remove if unneeded
+	void ApplyLeavingOverworldPresentation(EFCGameStateID NewState);
 };
-
-

@@ -1,4 +1,4 @@
-// Copyright Epic Games, Inc. All Rights Reserved.
+// Copyright Slomotion Games. All Rights Reserved.
 
 #pragma once
 
@@ -16,7 +16,7 @@ UCLASS(abstract)
 class ATwinStickAIController : public AAIController
 {
 	GENERATED_BODY()
-	
+
 	/** StateTree Component */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta = (AllowPrivateAccess = "true"))
 	UStateTreeAIComponent* StateTreeAI;
