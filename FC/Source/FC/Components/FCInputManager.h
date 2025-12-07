@@ -72,6 +72,7 @@ public:
 
 	virtual void BeginPlay() override;
 
+	void SetInputConfig(UFCInputConfig* NewConfig);
 	const UFCInputConfig* GetInputConfig() const { return InputConfig; }
 
 	/**

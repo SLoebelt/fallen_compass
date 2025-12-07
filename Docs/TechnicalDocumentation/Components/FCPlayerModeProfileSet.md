@@ -12,7 +12,7 @@
 
 ## Responsibilities (what this data asset owns)
 
-`UFCPlayerModeProfileSet` is a `UDataAsset` that groups together editor-configurable `FPlayerModeProfile` entries keyed by `EFCPlayerMode`. It is intended to be referenced by `UFCPlayerModeCoordinator` so that player presentation (input config, camera mode, interaction profile, click policy, cursor/mouse lock) can be driven entirely by data.
+`UFCPlayerModeProfileSet` is a `UDataAsset` that groups together editor-configurable `FPlayerModeProfile` entries keyed by `EFCPlayerMode`. It is referenced by `UFCPlayerModeCoordinator` so that player presentation (camera mode, input mapping mode, cursor/mouse lock, and future click/interaction behavior) is driven by data rather than hard-coded controller branches.
 
 ### 1. Profile map
 
@@ -40,7 +40,10 @@
   - Overworld profile (Overworld_Travel / combat states).
   - Camp profile (Camp_Local / POIScene).
   - Static profile (MainMenu, Paused, Loading, ExpeditionSummary).
-- The coordinator then looks up the appropriate `FPlayerModeProfile` based on the current `EFCPlayerMode` and applies it.
+- The coordinator then looks up the appropriate `FPlayerModeProfile` based on the current `EFCPlayerMode` and applies it via `ApplyMode`, which:
+  - Derives and applies the correct input mapping mode through `UFCInputManager`.
+  - Applies cursor visibility and input mode.
+  - Requests the appropriate camera mode via `SetCameraModeLocal` on the controller.
 
 ---
 
@@ -62,7 +65,7 @@ The current implementation is intentionally minimal:
   };
   ```
 
-- No methods are implemented yet in `FCPlayerModeProfileSet.cpp` beyond the include; all behavior lives in the coordinator (e.g., lookups and validation) per the refactor plan.
+// `FCPlayerModeProfileSet.cpp` currently just includes the header; lookups, validation, and application logic live in `UFCPlayerModeCoordinator`.
 
 ---
 

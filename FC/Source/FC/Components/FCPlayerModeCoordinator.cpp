@@ -2,6 +2,9 @@
 #include "GameFramework/PlayerController.h"
 #include "TimerManager.h"
 #include "FCPlayerController.h"
+#include "Components/FCInputManager.h"
+#include "Components/FCInteractionComponent.h"
+#include "Input/FCInputConfig.h"
 
 DEFINE_LOG_CATEGORY(LogFCPlayerModeCoordinator);
 
@@ -55,12 +58,6 @@ void UFCPlayerModeCoordinator::OnGameStateChanged(EFCGameStateID OldState, EFCGa
 
 	const EFCPlayerMode NewMode = MapStateToMode(NewState);
 	ApplyMode(NewMode);
-
-	// Phase 1: preserve existing behavior via controller helpers/router
-	if (AFCPlayerController* FCPC = Cast<AFCPlayerController>(GetOwner()))
-	{
-		FCPC->ApplyPresentationForGameState(OldState, NewState);
-	}
 }
 
 // Map high-level game states to player modes
@@ -94,17 +91,175 @@ EFCPlayerMode UFCPlayerModeCoordinator::MapStateToMode(EFCGameStateID State) con
 	}
 }
 
+static EFCInputMappingMode DeriveMappingMode(EFCPlayerMode Mode, EFCPlayerCameraMode Cam)
+{
+    switch (Cam)
+    {
+        case EFCPlayerCameraMode::FirstPerson: return EFCInputMappingMode::FirstPerson;
+        case EFCPlayerCameraMode::TopDown:     return EFCInputMappingMode::TopDown;
+        case EFCPlayerCameraMode::POIScene:    return EFCInputMappingMode::POIScene;
+        case EFCPlayerCameraMode::TableView:
+        case EFCPlayerCameraMode::SaveSlotView:
+        case EFCPlayerCameraMode::MainMenu:    return EFCInputMappingMode::StaticScene;
+        default:                               return EFCInputMappingMode::FirstPerson;
+    }
+}
+
+
 void UFCPlayerModeCoordinator::ApplyMode(EFCPlayerMode NewMode)
 {
-	if (NewMode == CurrentMode) return;
+	AFCPlayerController* PC = Cast<AFCPlayerController>(GetOwner());
+    if (!PC || !PC->IsLocalController())
+    {
+        return;
+    }
 
-	UE_LOG(LogFCPlayerModeCoordinator, Log, TEXT("ApplyMode: %s -> %s | Profile=%s"),
+    const bool bIsReapply = (NewMode == CurrentMode);
+
+	UE_LOG(LogFCPlayerModeCoordinator, Log, TEXT("ApplyMode: %s -> %s%s | ProfileSet=%s"),
 		*UEnum::GetValueAsString(CurrentMode),
 		*UEnum::GetValueAsString(NewMode),
+		bIsReapply ? TEXT(" (reapply)") : TEXT(""),
 		*GetNameSafe(ModeProfileSet));
 
 	CurrentMode = NewMode;
 
-	// IMPORTANT: In Phase 1, ApplyMode stays “high level”.
-	// It should not do camera/input directly yet (that’s in the controller helper router above).
+	FPlayerModeProfile Profile;
+	if (!GetProfileForMode(NewMode, Profile))
+	{
+		UE_LOG(LogFCPlayerModeCoordinator, Error, TEXT("ApplyMode: No valid profile for mode %s"), *UEnum::GetValueAsString(NewMode));
+		return;
+	}
+
+	FString Problems;
+    if (!ValidateProfile(Profile, Problems))
+    {
+        UE_LOG(LogFCPlayerModeCoordinator, Warning, TEXT("ApplyMode: Profile invalid for %s: %s"),
+            *UEnum::GetValueAsString(NewMode), *Problems);
+        // Still continue applying *safe* parts where possible.
+    }
+	else if (!Problems.IsEmpty())
+    {
+        UE_LOG(LogFCPlayerModeCoordinator, Verbose, TEXT("ApplyMode: Profile warnings for %s: %s"),
+            *UEnum::GetValueAsString(NewMode), *Problems);
+    }
+
+	// 1) Camera
+	const float BlendTime = (Profile.CameraMode == EFCPlayerCameraMode::MainMenu) ? 0.0f : 2.0f;
+	PC->SetCameraModeLocal(Profile.CameraMode, BlendTime);
+
+	// 2) Input config + mapping mode
+	if (UFCInputManager* InputMgr = PC->FindComponentByClass<UFCInputManager>())
+	{
+		// Optional override (future-friendly). If unset, keep what BP assigned.
+		if (!Profile.InputConfig.IsNull())
+		{
+			UFCInputConfig* LoadedConfig = Profile.InputConfig.LoadSynchronous();
+			if (LoadedConfig)
+			{
+				if (InputMgr->GetInputConfig() != LoadedConfig)
+				{
+					InputMgr->SetInputConfig(LoadedConfig);
+					UE_LOG(LogFCPlayerModeCoordinator, Log, TEXT("ApplyMode: InputConfig=%s"), *GetPathNameSafe(LoadedConfig));
+				}
+			}
+			else
+			{
+				UE_LOG(LogFCPlayerModeCoordinator, Warning, TEXT("ApplyMode: Failed to load InputConfig for %s"),
+					*UEnum::GetValueAsString(NewMode));
+			}
+		}
+
+		const EFCInputMappingMode DesiredMapping = DeriveMappingMode(NewMode, Profile.CameraMode);
+		if (InputMgr->GetCurrentMappingMode() != DesiredMapping)
+		{
+			InputMgr->SetInputMappingMode(DesiredMapping);
+		}
+	}
+	else
+	{
+		UE_LOG(LogFCPlayerModeCoordinator, Warning, TEXT("ApplyMode: UFCInputManager missing on %s"), *GetNameSafe(PC));
+	}
+
+	// 3) Cursor + input mode (profile-driven)
+	const bool bDesiredCursor = (Profile.CameraMode == EFCPlayerCameraMode::MainMenu) ? true : Profile.bShowMouseCursor;
+	if (PC->bShowMouseCursor != bDesiredCursor)
+	{
+		PC->bShowMouseCursor = bDesiredCursor;
+	}
+
+	if (Profile.CameraMode == EFCPlayerCameraMode::MainMenu)
+	{
+		FInputModeUIOnly M;
+		M.SetLockMouseToViewportBehavior(Profile.MouseLockMode);
+		PC->SetInputMode(M);
+	}
+	else if (!bDesiredCursor)
+	{
+		FInputModeGameOnly M;
+		PC->SetInputMode(M);
+	}
+	else
+	{
+		FInputModeGameAndUI M;
+		M.SetHideCursorDuringCapture(false);
+		M.SetLockMouseToViewportBehavior(Profile.MouseLockMode);
+		PC->SetInputMode(M);
+	}
+
+	UE_LOG(LogFCPlayerModeCoordinator, Log, TEXT("ApplyMode: Cursor=%s Lock=%d Cam=%s"),
+		bDesiredCursor ? TEXT("On") : TEXT("Off"),
+		(int32)Profile.MouseLockMode,
+		*UEnum::GetValueAsString(Profile.CameraMode));
+
+	// 4) Interaction gating (no tick polling)
+	if (UFCInteractionComponent* Interaction = PC->FindComponentByClass<UFCInteractionComponent>())
+	{
+		Interaction->SetFirstPersonFocusEnabled(Profile.CameraMode == EFCPlayerCameraMode::FirstPerson);
+		// Later: Interaction->ApplyModeProfile(Profile); (once we add it)
+	}
 }
+
+bool UFCPlayerModeCoordinator::GetProfileForMode(EFCPlayerMode Mode, FPlayerModeProfile& OutProfile) const
+{
+    if (!ModeProfileSet)
+    {
+        UE_LOG(LogFCPlayerModeCoordinator, Warning, TEXT("GetProfileForMode: ModeProfileSet is null"));
+        return false;
+    }
+
+    if (const FPlayerModeProfile* Found = ModeProfileSet->Profiles.Find(Mode))
+    {
+        OutProfile = *Found;
+        return true;
+    }
+
+    UE_LOG(LogFCPlayerModeCoordinator, Warning,
+        TEXT("GetProfileForMode: Missing profile for %s in %s"),
+        *UEnum::GetValueAsString(Mode),
+        *GetNameSafe(ModeProfileSet));
+
+    return false;
+}
+
+bool UFCPlayerModeCoordinator::ValidateProfile(const FPlayerModeProfile& Profile, FString& OutProblems)
+{
+    bool bOk = true;
+
+    if (Profile.InputConfig.IsNull())
+    {
+        OutProblems += TEXT("InputConfig not set (will use InputManager default if available). ");
+    }
+
+    if (const UEnum* CamEnum = StaticEnum<EFCPlayerCameraMode>())
+    {
+        if (!CamEnum->IsValidEnumValue((int64)Profile.CameraMode))
+        {
+            bOk = false;
+            OutProblems += TEXT("CameraMode is invalid. ");
+        }
+    }
+
+    return bOk;
+}
+

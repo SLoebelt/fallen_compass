@@ -82,8 +82,6 @@ void UFCInteractionComponent::TickComponent(float DeltaTime, ELevelTick TickType
 		return;
 	}
 
-	UpdateFirstPersonFocusGateFromCameraMode();
-
     if (!bFirstPersonFocusEnabled)
     {
         // Setter already cleared focus when disabled; no trace or prompt updates in non-FP modes.
@@ -525,6 +523,7 @@ void UFCInteractionComponent::ClearFocusAndHidePrompt()
     }
 }
 
+// TODO - delete this function, when coordinator-driven gating tested and robust
 void UFCInteractionComponent::UpdateFirstPersonFocusGateFromCameraMode()
 {
     AFCPlayerController* PC = GetOwnerPCCheckedOrNull();

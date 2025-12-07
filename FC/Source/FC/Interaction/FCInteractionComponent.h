@@ -121,7 +121,7 @@ private:
     /** Clears current focus target and hides the prompt widget, if any. */
     void ClearFocusAndHidePrompt();
 
-    /** TEMP: derive the focus gate from the current camera mode until a coordinator exists. */
+    // TODO - delete this function, when coordinator-driven gating tested and robust
     void UpdateFirstPersonFocusGateFromCameraMode();
 
 public:

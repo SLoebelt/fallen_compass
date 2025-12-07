@@ -12,7 +12,7 @@
 
 ## Responsibilities (what this component owns)
 
-`UFCPlayerModeCoordinator` is a non-ticking `UActorComponent` that lives on `AFCPlayerController`. It centralizes the subscription to `UFCGameStateManager::OnStateChanged`, maps low-level game states to higher-level player modes, and delegates presentation changes back to the controller.
+`UFCPlayerModeCoordinator` is a non-ticking `UActorComponent` that lives on `AFCPlayerController`. It centralizes the subscription to `UFCGameStateManager::OnStateChanged`, maps low-level game states to higher-level player modes, looks up `FPlayerModeProfile` data in a `UFCPlayerModeProfileSet` asset, and applies the resulting profile (camera, input mapping mode, cursor/input mode) in an idempotent, fail-soft way.
 
 ### 1. Game state subscription
 
@@ -34,23 +34,26 @@
   - Global/static contexts (`MainMenu`, `Paused`, `Loading`, `ExpeditionSummary`) → `EFCPlayerMode::Static`.
 - Logs a warning and falls back to `EFCPlayerMode::Static` for any unhandled `EFCGameStateID`.
 
-### 3. Mode tracking + profile hook
+### 3. Mode tracking + profile lookup
 
 - Maintains `CurrentMode` as an `EFCPlayerMode` (initialized to `Static`).
-- Holds an optional `UFCPlayerModeProfileSet* ModeProfileSet` asset (Task 3 in the refactor plan) via `UPROPERTY(EditDefaultsOnly, Category="FC|Mode")`.
-- `ApplyMode(EFCPlayerMode NewMode)`:
-  - Early-outs if `NewMode == CurrentMode` to avoid redundant work.
-  - Logs old mode → new mode and the name of the configured profile set (if any) using `LogFCPlayerModeCoordinator`.
+- Holds an optional `UFCPlayerModeProfileSet* ModeProfileSet` asset via `UPROPERTY(EditDefaultsOnly, Category="FC|Mode")`.
+- Exposes a helper `GetProfileForMode(EFCPlayerMode Mode, FPlayerModeProfile& OutProfile) const` that:
+  - Returns `false` and logs a **Warning** if `ModeProfileSet` is null or no profile exists for the requested mode.
+  - Returns `true` and copies out the profile otherwise.
+
+### 4. Profile-driven, idempotent `ApplyMode`
+
+- `ApplyMode(EFCPlayerMode NewMode)` implements the profile application pipeline:
+  - Looks up the profile with `GetProfileForMode`; logs and returns early if none is found.
+  - Validates the profile (at minimum ensuring the camera mode is a known value), collecting problems into a small array and logging them as warnings without crashing.
+  - Derives an `EFCInputMappingMode` from `Profile.CameraMode` (e.g., FirstPerson, TopDown, POIScene, StaticScene) via a tiny helper.
+  - Obtains the owning `AFCPlayerController` and applies input mapping mode through `UFCInputManager` (which clears and reapplies contexts each time).
+  - Applies cursor visibility and input mode from the profile (GameOnly/GameAndUI/UIOnly) via an internal helper, setting `bShowMouseCursor`, `bEnableClickEvents`, and using `SetInputMode` appropriately.
+  - Calls `SetCameraModeLocal(Profile.CameraMode, BlendTime)` on the controller, relying on it to be camera-only (no input/cursor side effects).
+  - Logs old mode → new mode and the profile asset name using `LogFCPlayerModeCoordinator`.
   - Updates `CurrentMode`.
-  - **Phase 1 note:** does not yet manipulate camera/input/interaction directly; that behavior remains in the controller helpers.
-
-### 4. Phase 1 controller delegation
-
-- `OnGameStateChanged(EFCGameStateID OldState, EFCGameStateID NewState)`:
-  - Logs the state transition using `UEnum::GetValueAsString`.
-  - Maps `NewState` to `EFCPlayerMode` and calls `ApplyMode(NewMode)`.
-  - Casts its owner to `AFCPlayerController` and calls `AFCPlayerController::ApplyPresentationForGameState(OldState, NewState)`.
-    - This preserves the existing camera/input/cursor logic inside the controller while centralizing the subscription and mapping logic in one place.
+- Reapplying the same mode is safe: all of the above operations are written to be idempotent (no stacked mappings, no duplicated camera state).
 
 ---
 
@@ -84,23 +87,20 @@
 ### `AFCPlayerController` — presentation application
 
 - **What is delegated**
-  - The concrete camera/input/cursor changes for each game state via `ApplyPresentationForGameState(OldState, NewState)`.
+  - Implementing camera behavior for each `EFCPlayerCameraMode` via `SetCameraModeLocal`, and exposing access to `UFCInputManager` for mapping-mode changes.
 - **Why**
-  - Keeps the coordinator focused on mapping and orchestration, while controller remains the place where camera and input policies are actually applied during Phase 1.
+  - Keeps camera blending logic and input binding rooted in the controller, while the coordinator decides *when* and *which* profile to apply.
 
-### `UFCPlayerModeProfileSet` (future integration)
+### `UFCPlayerModeProfileSet` — profile source
 
 - **What is delegated**
-  - Data-driven configuration (`FPlayerModeProfile`) for each `EFCPlayerMode` (input config, camera mode, interaction profile, click policy, cursor/mouse lock settings).
+  - Data-driven configuration (`FPlayerModeProfile`) for each `EFCPlayerMode` (camera mode, optional input config override, interaction profile placeholder, click policy, cursor/mouse lock settings).
 - **Why**
-  - Profiles will allow `UFCPlayerModeCoordinator` to eventually move from “tell controller what to do” to “apply profile-driven configuration directly to `UFCInputManager`, `UFCCameraManager`, and `UFCInteractionComponent` while keeping behavior data-driven.
+  - Profiles keep mode definitions designer-editable and centralize configuration data; the coordinator is the only place that interprets and applies them to runtime systems.
 
 ---
 
-## Notes and future phases
+## Notes
 
-- **Phase 1 (current):**
-  - Coordinator owns subscription + mapping and calls back into controller helpers.
-  - No direct camera/input/interaction changes are performed here.
-- **Later phases:**
-  - `ApplyMode` will load and validate `FPlayerModeProfile` data from `UFCPlayerModeProfileSet` and call into `UFCInputManager`, `UFCCameraManager`, `UFCInteractionComponent`, and the controller for configuration only (no UI or gameplay actions).
+- `InputConfig` in `FPlayerModeProfile` is treated as an optional/future override; the primary config remains assigned on `UFCInputManager` in editor. `UFCInputManager::SetInputMappingMode` guards against a missing config and logs errors instead of crashing.
+- `EFCClickPolicy` and `InteractionProfile` are defined on the profile for future work (click-intent routing and interaction tuning), but are not yet applied by the coordinator.

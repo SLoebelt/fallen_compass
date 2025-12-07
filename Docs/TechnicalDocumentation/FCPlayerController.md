@@ -61,7 +61,7 @@ Key responsibilities:
 
 9. **Startup consistency on load**
 
-   * Defers subscription to `UFCGameStateManager::OnStateChanged` to `UFCPlayerModeCoordinator` (a controller-owned component). The coordinator caches the current state on BeginPlay, then immediately calls back into `AFCPlayerController::ApplyPresentationForGameState(OldState, NewState)` so camera/input/cursor are correct after loading.
+   * Defers subscription to `UFCGameStateManager::OnStateChanged` to `UFCPlayerModeCoordinator` (a controller-owned component). The coordinator caches the current state on BeginPlay, maps it to an `EFCPlayerMode`, looks up an `FPlayerModeProfile` in its `UFCPlayerModeProfileSet`, and applies camera/input/cursor directly so presentation is correct after loading.
 
 
 ## Public API
@@ -69,7 +69,7 @@ Key responsibilities:
 ### Input / camera
 
 * `SetInputMappingMode(EFCInputMappingMode NewMode)` → delegates mapping changes to `UFCInputManager`.
-* `SetCameraModeLocal(EFCPlayerCameraMode NewMode, float BlendTime=2.0f)` → camera switching + cursor/input-mode cleanup. 
+* `SetCameraModeLocal(EFCPlayerCameraMode NewMode, float BlendTime=2.0f)` → camera switching only; cursor/input-mode configuration is now profile-driven via `UFCPlayerModeCoordinator`. 
 * `FadeScreenOut(float Duration=1.0f, bool bShowLoading=false)` / `FadeScreenIn(float Duration=1.0f)` → delegates fades to `UFCTransitionManager`. 
 
 ### Game flow

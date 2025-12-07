@@ -21,10 +21,10 @@ Key responsibilities:
 
 2. **Mode-aware movement**
 
-   * Detects current camera mode (via `UFCCameraManager`) to choose appropriate movement command:
-     * **TopDown (Overworld):** calls `AFCPlayerController::MoveConvoyToLocation()`
-     * **POIScene (Camp):** calls `AFCPlayerController::MoveExplorerToLocation()`
-   * Uses NavMesh-based movement via the controller's movement commands (no AIController owned by this component).
+    * Detects current camera mode (via `UFCCameraManager`) to choose appropriate movement command:
+       * **TopDown (Overworld):** calls `AFCPlayerController::MoveConvoyToLocation()`
+       * **POIScene (Camp):** calls `AFCPlayerController::MoveExplorerToLocation()`
+    * Uses NavMesh-based movement via the controller's movement commands (no AIController owned by this component).
 
 3. **Action selection callback**
 
@@ -102,7 +102,7 @@ Key responsibilities:
 - No need to duplicate POI logic on different pawn types.
 - Mode-aware design allows same component to handle different movement patterns.
 - Internally caches its `AFCPlayerController` owner in `OnRegister`/`BeginPlay` and uses that cached pointer everywhere (no `GetInstigatorController`/`GetFirstPlayerController`), logging a clear error once if mis-owned.
-- Gates FirstPerson focus tracing and prompts behind a boolean (`bFirstPersonFocusEnabled`) that is currently derived from `UFCCameraManager::GetCameraMode()`. When disabled, it clears the current focus, hides the prompt widget, and early-outs from its trace/prompt update path so Overworld/Camp do not run FP traces.
+- Gates FirstPerson focus tracing and prompts behind a boolean (`bFirstPersonFocusEnabled`) that is now toggled explicitly by higher-level configuration (e.g., `UFCPlayerModeCoordinator`) instead of being recomputed every Tick from `UFCCameraManager::GetCameraMode()`. When disabled, it clears the current focus, hides the prompt widget, and early-outs from its trace/prompt update path so Overworld/Camp do not run FP traces.
 
 ### Movement pattern difference
 

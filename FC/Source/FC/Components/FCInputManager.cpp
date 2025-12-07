@@ -94,6 +94,24 @@ UEnhancedInputLocalPlayerSubsystem* UFCInputManager::GetEnhancedInputSubsystem()
 	return Subsystem;
 }
 
+void UFCInputManager::SetInputConfig(UFCInputConfig* NewConfig)
+{
+	if (InputConfig == NewConfig)
+	{
+		return;
+	}
+
+	InputConfig = NewConfig;
+
+	UE_LOG(LogFCInputManager, Log, TEXT("SetInputConfig: %s"), *GetPathNameSafe(InputConfig));
+
+	// Re-assert current mapping mode
+	if (InputConfig)
+	{
+		SetInputMappingMode(CurrentMappingMode);
+	}
+}
+
 void UFCInputManager::SetInputMappingMode(EFCInputMappingMode NewMode)
 {
 	UEnhancedInputLocalPlayerSubsystem* Subsystem = GetEnhancedInputSubsystem();
@@ -101,6 +119,12 @@ void UFCInputManager::SetInputMappingMode(EFCInputMappingMode NewMode)
 	{
 		return;
 	}
+
+	if (!InputConfig)
+    {
+        UE_LOG(LogFCInputManager, Error, TEXT("SetInputMappingMode: InputConfig is null (assign in editor)."));
+        return;
+    }
 
 	// Determine which context to use
 	UInputMappingContext* ContextToApply = nullptr;

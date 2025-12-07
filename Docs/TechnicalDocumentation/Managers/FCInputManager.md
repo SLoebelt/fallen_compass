@@ -20,11 +20,13 @@ It owns:
 2. **Config reference + mapping lookup (via `UFCInputConfig`)**
 
    * Holds a single reference to a `UFCInputConfig` data asset, which contains all `UInputMappingContext*`s and `UInputAction*`s for this player.
+   * Exposes `SetInputConfig(UFCInputConfig* NewConfig)` / `GetInputConfig() const` so higher-level systems (like `UFCPlayerModeCoordinator`) can override or inspect the active config.
    * When `SetInputMappingMode` is called, the manager looks up the appropriate `UInputMappingContext` for the requested mode from this config and applies it.
 
 3. **Switching logic**
 
    * Clears all existing mappings and applies exactly one context for the requested mode, at `DefaultMappingPriority`, using the mapping context pulled from `InputConfig`.
+   * Safely early-outs (with a warning) if no `InputConfig` is set, to avoid null dereferences.
 
 4. **Owner validation + diagnostics**
 
@@ -39,7 +41,17 @@ It owns:
 * `SetInputMappingMode(EFCInputMappingMode NewMode)`
 
    * Reads the configured `UFCInputConfig`, looks up the context for the mode, clears current mappings, and applies that context.
-* `GetCurrentMappingMode() -> EFCInputMappingMode` 
+   * Logs a warning and does nothing if `InputConfig` is null, instead of crashing.
+* `GetCurrentMappingMode() -> EFCInputMappingMode`
+
+### Config control
+
+* `SetInputConfig(UFCInputConfig* NewConfig)`
+
+   * Updates the underlying `InputConfig` pointer if it changed, logs the new asset, and re-asserts the current mapping mode by calling `SetInputMappingMode(CurrentMappingMode)`.
+* `GetInputConfig() const -> const UFCInputConfig*`
+
+   * Returns the currently assigned config (may be null if not yet set).
 
 ### Modes (`EFCInputMappingMode`)
 
@@ -68,5 +80,6 @@ It owns:
 ## Where to configure / extend (practical notes)
 
 * Configure a single `UFCInputConfig` asset with both `UInputAction*` and `UInputMappingContext*` references and assign it on `UFCInputManager` (component defaults on `BP_FC_PlayerController`). `SetInputMappingMode` will then have valid contexts to apply.
-* There are no longer per-mode `*MappingContext` UPROPERTYs on the component; the config asset is the single source of truth.
-* If you introduce a new gameplay mode, extend `EFCInputMappingMode`, add a new `UInputMappingContext*` property, and add another switch case in `SetInputMappingMode`.
+* Profiles in `UFCPlayerModeProfileSet` may optionally override the config at runtime by calling `SetInputConfig` from `UFCPlayerModeCoordinator`; if no override is provided, the editor-assigned config remains the primary source of truth.
+* There are no longer per-mode `*MappingContext` UPROPERTYs on the component; the config asset is the single source of truth for mapping contexts.
+* If you introduce a new gameplay mode, extend `EFCInputMappingMode`, add the corresponding context references to `UFCInputConfig`, and add another switch case in `SetInputMappingMode`.

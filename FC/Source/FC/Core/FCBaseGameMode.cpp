@@ -1,5 +1,5 @@
-#include "CoreMinimal.h"
 #include "Core/FCBaseGameMode.h"
+#include "CoreMinimal.h"
 
 #include "Core/FCLevelTransitionManager.h"
 #include "Engine/GameInstance.h"

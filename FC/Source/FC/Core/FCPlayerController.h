@@ -7,6 +7,7 @@
 #include "Components/FCInputManager.h"
 #include "Interaction/IFCInteractablePOI.h"
 #include "Input/FCInputConfig.h"
+#include "Components/Data/FCPlayerCameraTypes.h"
 #include "FCPlayerController.generated.h"
 
 
@@ -20,22 +21,10 @@ class UFCInteractionComponent;
 class UFCPlayerModeCoordinator;
 class AFCOverworldConvoy;
 class AFCConvoyMember;
+class UInputConfig;
 struct FInputActionValue;
 
 DECLARE_LOG_CATEGORY_EXTERN(LogFallenCompassPlayerController, Log, All);
-
-UENUM(BlueprintType)
-enum class EFCPlayerCameraMode : uint8
-{
-	FirstPerson = 0,
-	TableView,
-	MainMenu,
-	SaveSlotView,
-	TopDown,  // Week 3: Overworld camera mode
-
-	/** Fixed top-down camera for POI/local scenes such as Camp */
-	POIScene
-};
 
 UENUM(BlueprintType)
 enum class EFCGameState : uint8
@@ -78,6 +67,9 @@ public:
 	bool IsPauseMenuDisplayed() const { return bIsPauseMenuDisplayed; }
 	EFCInputMappingMode GetCurrentMappingMode() const;
 	EFCGameState GetCurrentGameState() const { return CurrentGameState; }
+
+    /** Convenience: exposes InputManager's currently assigned InputConfig (may be null). */
+    const UFCInputConfig* GetInputConfig() const;
 
 	/**
 	 * Switch to a different input mapping context (e.g., FirstPerson → TopDown).
@@ -258,13 +250,4 @@ private:
 
 public:
 	void ApplyPresentationForGameState(EFCGameStateID OldState, EFCGameStateID NewState);
-
-private:
-	void ApplyOverworldTravelPresentation();
-	void ApplyCampLocalPresentation();
-	void ApplyExpeditionSummaryPresentation();
-	void ApplyOfficeExplorationPresentation();
-
-	// Optional TODO - remove if unneeded
-	void ApplyLeavingOverworldPresentation(EFCGameStateID NewState);
 };

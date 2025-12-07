@@ -15,7 +15,7 @@ This document is a **map**: what each manager/class is for, how they connect, an
    `AFCBaseGameMode` is the shared level bootstrap: it logs level start and kicks **LevelTransition finalization** on level start via `UFCLevelTransitionManager::InitializeOnLevelStart()` so “Loading → TargetState” and other flows complete reliably. Thin per-level GameModes (Office/Camp/Overworld) derive from this base and provide scene-specific defaults.
 
 3. **PlayerController runtime (per player)**  
-  `AFCPlayerController` is the glue for “how the player can interact right now”: input routing, camera mode switching (via CameraManager/InputManager), UI gating, and reacting to `UFCGameStateManager` state changes. `UFCPlayerModeCoordinator` (a controller-owned component) subscribes to `UFCGameStateManager::OnStateChanged`, maps game state → player mode, and asks the controller to apply the corresponding presentation.
+  `AFCPlayerController` is the glue for “how the player can interact right now”: input routing, camera mode switching (via CameraManager/InputManager), UI gating, and reacting to `UFCGameStateManager` state changes. `UFCPlayerModeCoordinator` (a controller-owned component) subscribes to `UFCGameStateManager::OnStateChanged`, maps game state → `EFCPlayerMode`, looks up an `FPlayerModeProfile` in a `UFCPlayerModeProfileSet` data asset, and applies the resulting profile (camera, input mapping mode, cursor/input mode) in an idempotent, fail-soft way.
 
 ### Architecture layers
 
@@ -117,11 +117,11 @@ Details: `Managers/FCCameraManager.md` → `Components/FCCameraManager.h/.cpp`.
 
 Details: `Components/FCInteractionComponent.md` → `FCInteractionComponent.h/.cpp`.
 
-### `UFCPlayerModeCoordinator` (ActorComponent) — "Game state → player mode → presentation router"
+### `UFCPlayerModeCoordinator` (ActorComponent) — "Game state → player mode → profile application"
 - Lives on `AFCPlayerController` as a non-ticking component.
 - Subscribes to `UFCGameStateManager::OnStateChanged` and logs OldState → NewState transitions.
 - Maps `EFCGameStateID` values to a higher-level `EFCPlayerMode` enum (Office / Overworld / Camp / Static) and tracks the current player mode.
-- In the current phase, delegates presentation changes back to the controller via `AFCPlayerController::ApplyPresentationForGameState(OldState, NewState)`, preserving existing camera/input/cursor behavior while centralizing the subscription.
+- Looks up an `FPlayerModeProfile` for the current mode in a `UFCPlayerModeProfileSet` data asset and applies the resulting profile directly: camera mode (via `SetCameraModeLocal` / camera manager), input mapping mode (via `UFCInputManager`), and cursor/input mode, in an idempotent, fail-soft way.
 
 Details: `FCPlayerModeCoordinator.md` → `Components/FCPlayerModeCoordinator.h/.cpp` (plus `Core/FCPlayerModeTypes.h`).
 

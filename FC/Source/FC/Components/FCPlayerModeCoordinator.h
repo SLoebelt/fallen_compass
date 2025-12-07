@@ -3,7 +3,7 @@
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
 #include "Core/FCGameStateManager.h"
-#include "Core/FCPlayerModeTypes.h"
+#include "Components/Data/FCPlayerModeTypes.h"
 #include "Components/Data/FCPlayerModeProfileSet.h"
 #include "FCPlayerModeCoordinator.generated.h"
 
@@ -32,9 +32,15 @@ protected:
 	void ApplyMode(EFCPlayerMode NewMode);
 
 	UPROPERTY(EditDefaultsOnly, Category="FC|Mode")
-	TObjectPtr<UFCPlayerModeProfileSet> ModeProfileSet = nullptr;
+	TObjectPtr<UFCPlayerModeProfileSet> ModeProfileSet;
+
 
 private:
 	TWeakObjectPtr<UFCGameStateManager> CachedStateMgr;
 	EFCPlayerMode CurrentMode = EFCPlayerMode::Static;
+
+    static bool ValidateProfile(const FPlayerModeProfile& Profile, FString& OutProblems);
+
+public:
+	bool GetProfileForMode(EFCPlayerMode Mode, FPlayerModeProfile& OutProfile) const;
 };

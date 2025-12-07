@@ -112,6 +112,11 @@ void AFCPlayerController::BeginPlay()
     SetInputMappingMode(EFCInputMappingMode::FirstPerson);
 }
 
+const UFCInputConfig* AFCPlayerController::GetInputConfig() const
+{
+    return InputManager ? InputManager->GetInputConfig() : nullptr;
+}
+
 void AFCPlayerController::SetupInputComponent()
 {
 	Super::SetupInputComponent();
@@ -584,84 +589,67 @@ void AFCPlayerController::SetCameraModeLocal(EFCPlayerCameraMode NewMode, float 
 		case EFCPlayerCameraMode::FirstPerson:
 			CameraManager->BlendToFirstPerson(BlendTime);
 
-			// Handle table view cleanup (input/cursor state)
-			if (bIsInTableView)
-			{
-				bIsInTableView = false;
-
-				// Disable cursor and mouse events
-				bShowMouseCursor = false;
-				bEnableClickEvents = false;
-				bEnableMouseOverEvents = false;
-
-				// Set input mode back to Game Only
-				FInputModeGameOnly InputMode;
-				SetInputMode(InputMode);
-			}
-
-			// Restore FirstPerson input mapping
-			SetInputMappingMode(EFCInputMappingMode::FirstPerson);
+			bIsInTableView = false;
 			break;
 
 		case EFCPlayerCameraMode::TableView:
 		case EFCPlayerCameraMode::SaveSlotView:
-			// Find BP_OfficeDesk in the level to get CameraTargetPoint
+		// Find BP_OfficeDesk in the level to get CameraTargetPoint
+		{
+			TArray<AActor*> FoundDesks;
+			UGameplayStatics::GetAllActorsOfClass(GetWorld(), AActor::StaticClass(), FoundDesks);
+
+			for (AActor* Actor : FoundDesks)
 			{
-				TArray<AActor*> FoundDesks;
-				UGameplayStatics::GetAllActorsOfClass(GetWorld(), AActor::StaticClass(), FoundDesks);
-
-				for (AActor* Actor : FoundDesks)
+				if (Actor->GetName().Contains(TEXT("BP_OfficeDesk")))
 				{
-					if (Actor->GetName().Contains(TEXT("BP_OfficeDesk")))
+					// Find the CameraTargetPoint component
+					USceneComponent* CameraTarget = nullptr;
+					TArray<USceneComponent*> Components;
+					Actor->GetComponents<USceneComponent>(Components);
+
+					for (USceneComponent* Component : Components)
 					{
-						// Find the CameraTargetPoint component
-						USceneComponent* CameraTarget = nullptr;
-						TArray<USceneComponent*> Components;
-						Actor->GetComponents<USceneComponent>(Components);
-
-						for (USceneComponent* Component : Components)
+						if (Component->GetName().Contains(TEXT("CameraTargetPoint")))
 						{
-							if (Component->GetName().Contains(TEXT("CameraTargetPoint")))
-							{
-								CameraTarget = Component;
-								break;
-							}
-						}
-
-						if (CameraTarget)
-						{
-							// Delegate table object camera to CameraManager
-							CameraManager->BlendToTableObject(Actor, BlendTime);
-
-							bIsInTableView = true;
-
-							// Switch to StaticScene input mapping
-							SetInputMappingMode(EFCInputMappingMode::StaticScene);
-
-							// Enable cursor and click events
-							bShowMouseCursor = true;
-							bEnableClickEvents = true;
-							bEnableMouseOverEvents = true;
-
-							// Set input mode to Game and UI
-							FInputModeGameAndUI InputMode;
-							InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
-							InputMode.SetHideCursorDuringCapture(false);
-							SetInputMode(InputMode);
-
-							LogStateChange(FString::Printf(TEXT("Camera switched to mode %d"), static_cast<int32>(NewMode)));
-							return;
+							CameraTarget = Component;
+							break;
 						}
 					}
-				}
 
-				UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("TableView: Could not find BP_OfficeDesk or CameraTargetPoint"));
-				return;
+					if (CameraTarget)
+					{
+						// Delegate table object camera to CameraManager
+						CameraManager->BlendToTableObject(Actor, BlendTime);
+
+						bIsInTableView = true;
+
+						LogStateChange(FString::Printf(TEXT("Camera switched to mode %d"), static_cast<int32>(NewMode)));
+						return;
+					}
+				}
 			}
+
+			UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("TableView: Could not find BP_OfficeDesk or CameraTargetPoint"));
+			return;
+		}
 
 		case EFCPlayerCameraMode::TopDown:
 			CameraManager->BlendToTopDown(BlendTime);
 			break;
+
+		case EFCPlayerCameraMode::POIScene:
+		{
+			if (!CameraManager)
+			{
+				UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("SetCameraModeLocal: CameraManager missing"));
+				return;
+			}
+
+			// Profile/coordinator should decide cursor + input mode + mapping; this is camera-only.
+			CameraManager->BlendToPOISceneCamera(POISceneCameraActor, BlendTime);
+			break;
+		}
 
 		default:
 			UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("SetCameraModeLocal: Unknown camera mode %d"), static_cast<int32>(NewMode));
@@ -1451,138 +1439,13 @@ void AFCPlayerController::UnbindOverworldConvoyDelegates()
 
 void AFCPlayerController::ApplyPresentationForGameState(EFCGameStateID OldState, EFCGameStateID NewState)
 {
-	// Your current code always unbinds first
-	UnbindOverworldConvoyDelegates();
+	// State-specific extras (NOT camera/input/cursor)
+    UnbindOverworldConvoyDelegates();
 
-	if (NewState == EFCGameStateID::Overworld_Travel)
-	{
-		ApplyOverworldTravelPresentation();
-		return;
-	}
+    if (NewState == EFCGameStateID::Overworld_Travel)
+    {
+        BindOverworldConvoyDelegates();
+    }
 
-	if (NewState == EFCGameStateID::Camp_Local)
-	{
-		ApplyCampLocalPresentation();
-		return;
-	}
-
-	if (NewState == EFCGameStateID::ExpeditionSummary)
-	{
-		ApplyExpeditionSummaryPresentation();
-		return;
-	}
-
-	// This reproduces your “leaving overworld” special-case block
-	if (OldState == EFCGameStateID::Overworld_Travel)
-	{
-		ApplyLeavingOverworldPresentation(NewState);
-		return;
-	}
-
-	// Generic entry into Office_Exploration
-	if (NewState == EFCGameStateID::Office_Exploration)
-	{
-		ApplyOfficeExplorationPresentation();
-		return;
-	}
+    // If there are other non-profile side-effects, add them here.
 }
-
-void AFCPlayerController::ApplyOverworldTravelPresentation()
-{
-	// Show mouse cursor for click-to-move
-	bShowMouseCursor = true;
-	UE_LOG(LogFallenCompassPlayerController, Log, TEXT("ApplyOverworldTravelPresentation: Mouse cursor enabled for Overworld"));
-
-	// Switch to TopDown input mode
-	if (InputManager)
-	{
-		InputManager->SetInputMappingMode(EFCInputMappingMode::TopDown);
-		UE_LOG(LogFallenCompassPlayerController, Log, TEXT("ApplyOverworldTravelPresentation: Switched to TopDown input mode"));
-	}
-
-	// Blend to Overworld camera
-	if (CameraManager)
-	{
-		CameraManager->BlendToTopDown(2.0f);
-		UE_LOG(LogFallenCompassPlayerController, Log, TEXT("ApplyOverworldTravelPresentation: Blending to TopDown camera"));
-	}
-
-	BindOverworldConvoyDelegates();
-}
-
-void AFCPlayerController::ApplyCampLocalPresentation()
-{
-	UE_LOG(LogFallenCompassPlayerController, Log,
-		TEXT("ApplyCampLocalPresentation: Entering Camp_Local, configuring POIScene camera/input"));
-
-	// Enable cursor for click-to-move and UI interaction
-	bShowMouseCursor = true;
-
-	// Switch to POI scene input mode (no camera pan/zoom, click-to-move explorer)
-	if (InputManager)
-	{
-		InputManager->SetInputMappingMode(EFCInputMappingMode::POIScene);
-		UE_LOG(LogFallenCompassPlayerController, Log, TEXT("ApplyCampLocalPresentation: Switched to POIScene input mode for Camp_Local"));
-	}
-
-	// Blend to fixed camp/POI camera (CameraManager will search for it if POISceneCameraActor is null)
-	if (CameraManager)
-	{
-		// Always call BlendToPOISceneCamera - it now searches for camera by tag/name if parameter is null
-		CameraManager->BlendToPOISceneCamera(POISceneCameraActor, 2.0f);
-		UE_LOG(LogFallenCompassPlayerController, Log, TEXT("ApplyCampLocalPresentation: Blending to POIScene camera for Camp_Local via CameraManager"));
-	}
-
-	// Use Game+UI input mode with free cursor
-	FInputModeGameAndUI InputMode;
-	InputMode.SetHideCursorDuringCapture(false);
-	InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
-	SetInputMode(InputMode);
-}
-
-void AFCPlayerController::ApplyExpeditionSummaryPresentation()
-{
-	// While in ExpeditionSummary we want to reuse the Office table-view
-	// camera setup, but keep gameplay input in a static-scene mode.
-	if (InputManager)
-	{
-		InputManager->SetInputMappingMode(EFCInputMappingMode::StaticScene);
-		UE_LOG(LogFallenCompassPlayerController, Log, TEXT("ApplyExpeditionSummaryPresentation: Switched to StaticScene input mode for ExpeditionSummary"));
-	}
-
-	// Blend camera to the table/desk view; this uses the same logic as
-	// the regular TableView mode (searching for BP_OfficeDesk and its
-	// CameraTargetPoint) but without opening any table widgets.
-	SetCameraModeLocal(EFCPlayerCameraMode::TableView, 2.0f);
-}
-
-void AFCPlayerController::ApplyLeavingOverworldPresentation(EFCGameStateID NewState)
-{
-	// When leaving Overworld, either go to ExpeditionSummary (summary in Office)
-	// or back to first-person Office exploration.
-	if (InputManager && NewState == EFCGameStateID::Office_Exploration)
-	{
-		ApplyOfficeExplorationPresentation();
-	}
-}
-
-void AFCPlayerController::ApplyOfficeExplorationPresentation()
-{
-	if (InputManager)
-	{
-		InputManager->SetInputMappingMode(EFCInputMappingMode::FirstPerson);
-	}
-	if (CameraManager)
-	{
-		CameraManager->BlendToFirstPerson(2.0f);
-	}
-	bShowMouseCursor = false;
-	bEnableClickEvents = false;
-	bEnableMouseOverEvents = false;
-
-	FInputModeGameOnly InputMode;
-	SetInputMode(InputMode);
-
-	UE_LOG(LogFallenCompassPlayerController, Log, TEXT("ApplyOfficeExplorationPresentation: Entered Office_Exploration, restored FirstPerson camera/input"));
-}
-

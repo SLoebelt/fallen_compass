@@ -252,41 +252,22 @@
 
 ## 3. Design and Implement `FPlayerModeProfile` Data Structures
 
-### 3.1 Define `FPlayerModeProfile` struct
+### 3.1 Define shared mode/profile types
 
-3.1.1 Create `FCPlayerModeTypes.h` (or similar) and define:
+3.1.1 Create or update `Core/FCPlayerCameraTypes.h` to contain `EFCPlayerCameraMode` (moved out of `FCPlayerController.h`), so other systems (like the coordinator) can reference it without circular dependencies.
 
-```cpp
-USTRUCT(BlueprintType)
-struct FPlayerModeProfile
-{
-    GENERATED_BODY();
+3.1.2 Create or update `Core/FCPlayerModeTypes.h` to define:
+- `EFCPlayerMode` (existing, reused).
+- `EFCClickPolicy` as a `UENUM(BlueprintType) enum class : uint8` (e.g., `None`, `OverworldClickMove`, `CampClickMove`, `TableObjectClick`).
+- `FPlayerModeProfile` as a `USTRUCT(BlueprintType)` containing:
+  - `TSoftObjectPtr<UFCInputConfig> InputConfig` (optional/future override; not required for Milestone 3).
+  - `EFCPlayerCameraMode CameraMode`.
+  - `TSoftObjectPtr<UObject> InteractionProfile` (placeholder for a concrete type later).
+  - `EFCClickPolicy ClickPolicy`.
+  - `bool bShowMouseCursor`.
+  - `EMouseLockMode MouseLockMode`.
 
-    UPROPERTY(EditDefaultsOnly, Category="FC|Mode")
-    TSoftObjectPtr<UFCInputConfig> InputConfig;
-
-    UPROPERTY(EditDefaultsOnly, Category="FC|Mode")
-    EFCPlayerCameraMode CameraMode;
-
-    UPROPERTY(EditDefaultsOnly, Category="FC|Mode")
-    TSoftObjectPtr<UObject> InteractionProfile; // Placeholder for a concrete type later
-
-    UPROPERTY(EditDefaultsOnly, Category="FC|Mode")
-    TEnumAsByte<EFCClickPolicy> ClickPolicy; // New small enum
-
-    UPROPERTY(EditDefaultsOnly, Category="FC|Mode")
-    bool bShowMouseCursor = true;
-
-    UPROPERTY(EditDefaultsOnly, Category="FC|Mode")
-    TEnumAsByte<EMouseLockMode> MouseLockMode = EMouseLockMode::DoNotLock;
-};
-```
-
-3.1.2 Define a small `EFCClickPolicy` enum (e.g., `None`, `OverworldClickMove`, `CampClickMove`, `TableObjectClick`) to express high-level click intent.
-
-3.1.3 Add sensible defaults that match current behavior for Office, Overworld, Camp, and Static modes.
-
-3.1.4 Document each field’s intent using comments, referencing the PRD where relevant.
+3.1.3 Provide sensible editor defaults and field comments so designers can understand and edit profiles safely.
 
 **Acceptance criteria**
 - `FPlayerModeProfile` compiles and can be edited in the editor.
@@ -294,13 +275,13 @@ struct FPlayerModeProfile
 
 ---
 
-### 3.2 Create a profile set container asset
+### 3.2 Implement `UFCPlayerModeProfileSet` and hook it into the coordinator
 
-3.2.1 Define a `UDataAsset` subclass (e.g., `UFCPlayerModeProfileSet`) with:
+3.2.1 Define `UFCPlayerModeProfileSet : public UDataAsset` in `Components/Data/FCPlayerModeProfileSet.h` with:
 
 ```cpp
 UCLASS(BlueprintType)
-class UFCPlayerModeProfileSet : public UDataAsset
+class FC_API UFCPlayerModeProfileSet : public UDataAsset
 {
     GENERATED_BODY();
 
@@ -310,9 +291,11 @@ public:
 };
 ```
 
-3.2.2 Add a `UPROPERTY(EditDefaultsOnly, Category="FC|Mode")` `TObjectPtr<UFCPlayerModeProfileSet>` to `UFCPlayerModeCoordinator`.
+3.2.2 Add a `UPROPERTY(EditDefaultsOnly, Category="FC|Mode")` `TObjectPtr<UFCPlayerModeProfileSet>` to `UFCPlayerModeCoordinator` and expose it in the controller defaults.
 
-3.2.3 Implement a helper in the coordinator, e.g. `bool GetProfileForMode(EFCPlayerMode Mode, FPlayerModeProfile& OutProfile) const`.
+3.2.3 Implement a helper on the coordinator, e.g. `bool GetProfileForMode(EFCPlayerMode Mode, FPlayerModeProfile& OutProfile) const`, that:
+- Returns `false` and logs a **Warning** if `ModeProfileSet` is null or if the map does not contain `Mode`.
+- Returns `true` and copies out the profile otherwise.
 
 3.2.4 Create a default profile set asset in the editor (e.g., `/Game/FC/Config/DA_PlayerModeProfiles`) and populate entries for Office, Overworld, Camp, and Static.
 
@@ -322,91 +305,108 @@ public:
 
 ---
 
-### 3.3 Implement validation and idempotent apply helpers
+### 3.3 Make `ApplyMode` profile-driven, idempotent, and fail-soft
 
-3.3.1 Implement a `ValidateProfile(const FPlayerModeProfile&)` method (static or member) that checks:
-- `InputConfig` is set.
-- Camera mode is a known value.
-- Other required fields per mode (if any) are present.
+3.3.1 Implement `ValidateProfile(const FPlayerModeProfile&, TArray<FString>& OutProblems)` (static or member) that checks:
+- `CameraMode` is a known value (required).
+- Optional fields (`InputConfig`, `InteractionProfile`) are logged as warnings only when missing, not treated as hard errors.
 
-3.3.2 In `ApplyMode`, call `ValidateProfile` and log warnings for incomplete profiles, skipping only the invalid parts.
+3.3.2 Refactor `UFCPlayerModeCoordinator::ApplyMode(EFCPlayerMode NewMode)` to:
+- Allow reapplying the same mode (remove the early-out on `NewMode == CurrentMode`).
+- Retrieve the profile via `GetProfileForMode`; warn and return early if missing.
+- Call `ValidateProfile` and log any reported problems, but proceed with the valid parts.
+- Derive an `EFCInputMappingMode` from `Profile.CameraMode` using a small helper (e.g., FirstPerson → FirstPerson, TopDown → TopDown, POIScene → POIScene, Table/Static → StaticScene).
+- Ask the controller to apply mapping mode via `UFCInputManager` (e.g., `InputManager->SetInputMappingMode(...)`), which remains idempotent by clearing and reapplying contexts.
+- Apply cursor visibility and mouse lock via a helper such as `ApplyCursorAndInputMode(const FPlayerModeProfile&)`, configuring `bShowMouseCursor` and `SetInputMode(FInputModeGameOnly/GameAndUI/UIOnly)` appropriately.
+- Call `SetCameraModeLocal(Profile.CameraMode, BlendTime)` on the controller (now camera-only) so the camera moves into the correct mode without re-doing input/cursor work.
+- Log old mode → new mode and the profile asset name for debugging.
 
-3.3.3 Ensure that calling `ApplyMode` twice with the same mode/profile does not stack duplicate mappings, cursors, or camera changes (idempotent behavior):
-- E.g., `UFCInputManager` should clear + apply contexts every time; `UFCCameraManager` should be prepared for repeated calls.
-
-3.3.4 For now, use synchronous `LoadSynchronous()` on soft references as needed, and document that future milestones may switch to async.
+3.3.3 Ensure `UFCInputManager::SetInputMappingMode` has a guard that logs an **Error** and returns if its `InputConfig` is null, but otherwise remains safe to call repeatedly (clears mappings before applying new ones).
 
 **Acceptance criteria**
-- Invalid or incomplete profiles do not crash; they emit warnings and skip broken sections.
-- Reapplying the same mode does not produce duplicated effects (e.g., multiple contexts, broken camera state).
+- Invalid or incomplete profiles do not crash; they emit warnings and skip only the broken pieces.
+- Reapplying the same mode does not produce duplicated effects (no stacked input mappings, no repeated camera transitions, no cursor/input-mode drift).
+- Controller no longer needs to manage camera/input/cursor configuration in its `Apply*Presentation` helpers; profiles + `ApplyMode` are the single source of truth.
 
 ---
 
-## 4. Wire Coordinator to Input/Camera/Interaction/Controller
+## 4. Make Coordinator the Single Profile-Driven Applier
 
-### 4.1 Integrate coordinator with `UFCInputManager`
+### 4.1 Finish `UFCInputManager` API and harden mapping
 
-4.1.1 Confirm current `UFCInputManager` API for setting mapping mode and owning `UFCInputConfig`.
+4.1.1 Implement `GetInputConfig`, `GetCurrentMappingMode`, and `SetInputConfig` in `FCInputManager.cpp` to back the existing declarations in `FCInputManager.h`.
 
-4.1.2 Add or reuse an API (e.g., `SetInputConfig(const UFCInputConfig* Config)`) if necessary, or ensure the manager already holds a pointer to a config.
+4.1.2 In `SetInputConfig`, early-out if the config pointer is unchanged, assign `InputConfig`, log the asset name, and re-assert the current mapping mode by calling `SetInputMappingMode(CurrentMappingMode)` (which clears and reapplies contexts).
 
-4.1.3 In `UFCPlayerModeCoordinator::ApplyMode`, after resolving `FPlayerModeProfile` and its `InputConfig`, pass that config to `UFCInputManager` and call `SetInputMappingMode` with the appropriate `EFCInputMappingMode` for this `EFCPlayerMode`.
+4.1.3 In `SetInputMappingMode`, guard against a missing enhanced input subsystem and a null `InputConfig`; if `InputConfig` is null, log a **Warning** and return without attempting to add mapping contexts.
 
-4.1.4 Log input config application with the asset name (or path) for debugging.
+4.1.4 Keep `SetInputMappingMode` idempotent by always clearing existing mappings before applying the new mapping context.
 
 **Acceptance criteria**
-- Mode changes trigger the correct `UFCInputConfig` and mapping context via `UFCInputManager`.
-- No direct config manipulation occurs in `AFCPlayerController` for mode-based mapping.
+- `UFCInputManager` exposes working `GetInputConfig`, `GetCurrentMappingMode`, and `SetInputConfig` implementations.
+- Calling `SetInputMappingMode` with a null `InputConfig` logs a warning instead of crashing.
+- Mapping contexts do not stack across mode changes.
 
 ---
 
-### 4.2 Integrate coordinator with `UFCCameraManager`
+### 4.2 Implement profile-driven `ApplyMode` in `UFCPlayerModeCoordinator`
 
-4.2.1 Confirm existing `UFCCameraManager` APIs for setting camera mode (e.g., `SetFallenCompassCameraMode` or equivalents).
+4.2.1 Add required includes in `FCPlayerModeCoordinator.cpp` for `UFCInputManager`, `UFCInteractionComponent`, and `UFCInputConfig` so the coordinator can coordinate components directly.
 
-4.2.2 Map `FPlayerModeProfile.CameraMode` to the appropriate `UFCCameraManager` call(s).
+4.2.2 Implement a helper that derives `EFCInputMappingMode` from `EFCPlayerMode` and `EFCPlayerCameraMode` (e.g., FirstPerson → FirstPerson, TopDown → TopDown, POIScene → POIScene, menu/table/save views → StaticScene).
 
-4.2.3 In `ApplyMode`, delegate camera operations **only** to `UFCCameraManager`, not directly using `SetViewTargetWithBlend`.
+4.2.3 Implement `GetProfileForMode` on the coordinator to read from `ModeProfileSet->Profiles`, returning `false` and logging a **Warning** if the set is null or the map does not contain the given mode.
 
-4.2.4 Add logs only for high-level camera mode changes, not for every internal blend.
+4.2.4 Implement `ValidateProfile` so it ensures `CameraMode` is valid, treats missing optional fields (like `InputConfig` and `InteractionProfile`) as warnings, and returns a boolean success flag plus a human-readable problems string.
+
+4.2.5 Refactor `ApplyMode(EFCPlayerMode NewMode)` to:
+- Allow reapplying the same mode (no early-out based on `NewMode == CurrentMode`).
+- Log old mode → new mode, whether this is a reapply, and the active profile set asset.
+- Retrieve the `FPlayerModeProfile` via `GetProfileForMode` and return early if no profile is found.
+- Run `ValidateProfile` and log any problems, but proceed with applying safe parts.
+- Call `SetCameraModeLocal(Profile.CameraMode, BlendTime)` on the controller so the camera mode is set in one place.
+- Optionally override `UFCInputManager`'s `InputConfig` from the profile (if set), loading the soft reference and calling `SetInputConfig` only when it changes.
+- Derive and apply the desired `EFCInputMappingMode` through `UFCInputManager`, guarded by `GetCurrentMappingMode` so we avoid redundant calls.
+- Apply cursor visibility and `SetInputMode` (`GameOnly`, `GameAndUI`, or `UIOnly`) from profile fields, including mouse lock behavior.
+- Log final cursor, lock mode, and camera mode values for debugging.
+- Gate first-person interaction by enabling/disabling the interaction component's FP focus based on camera mode instead of polling every tick.
 
 **Acceptance criteria**
-- Changing `EFCPlayerMode` results in the expected camera mode (FirstPerson/TopDown/POIScene/Static) via `UFCCameraManager`.
-- The coordinator never calls `SetViewTargetWithBlend` directly.
+- `ApplyMode` is the single place where camera mode, input mapping mode, and cursor/input mode are applied from `FPlayerModeProfile`.
+- Reapplying the same mode is safe and does not stack mappings, re-blend cameras unnecessarily, or drift cursor/input mode.
+- Missing or partially configured profiles emit warnings but do not crash.
 
 ---
 
-### 4.3 Integrate coordinator with `UFCInteractionComponent`
+### 4.3 Remove per-tick camera polling from `UFCInteractionComponent`
 
-4.3.1 Decide which interaction behaviors should be controlled by profile (e.g., enabling FP focus, interaction trace distance, which interaction profile asset to use).
+4.3.1 In `TickComponent` of `FCInteractionComponent.cpp`, remove the call that re-derives FP focus from camera mode each frame (e.g., `UpdateFirstPersonFocusGateFromCameraMode()`).
 
-4.3.2 Extend `UFCInteractionComponent` with a lightweight configuration API such as `ApplyInteractionProfile(UObject* ProfileObject)` or a struct-based setter.
+4.3.2 Keep the existing early-outs and booleans so the component still short-circuits when interaction is disabled, but rely on the coordinator to toggle first-person focus when modes change.
 
-4.3.3 In `ApplyMode`, after resolving the profile, call into `UFCInteractionComponent` to apply the profile or its parameters.
-
-4.3.4 Ensure `UFCInteractionComponent` continues to own behavior (what happens when interacting), while the coordinator only chooses configuration (when/where/how probing happens).
+4.3.3 Optionally retain `UpdateFirstPersonFocusGateFromCameraMode` as a debug helper or remove it entirely once the coordinator-driven gating proves stable.
 
 **Acceptance criteria**
-- Interaction probing/gating (e.g., FP focus, trace) adjusts correctly when switching modes.
-- No interaction behavior (like actually performing actions) is moved into the coordinator.
+- `UFCInteractionComponent` no longer polls camera mode every Tick just to decide if FP focus is enabled.
+- FP interaction gating is controlled via explicit configuration from the coordinator.
 
 ---
 
-### 4.4 Apply cursor and input mode rules on `AFCPlayerController`
+### 4.4 Strip mode configuration from `AFCPlayerController` presentation helpers
 
-4.4.1 In `ApplyMode`, use the `FPlayerModeProfile` cursor and mouse lock fields to configure:
-- `bShowMouseCursor`.
-- `SetInputMode(FInputModeGameOnly/GameAndUI/UIOnly)` as appropriate.
+4.4.1 Audit `AFCPlayerController`'s `Apply*Presentation` helpers (e.g., Overworld, Camp, Office, ExpeditionSummary) and remove any code that:
+- Sets `bShowMouseCursor`.
+- Calls `SetInputMode(...)`.
+- Calls into `UFCInputManager::SetInputMappingMode(...)`.
+- Directly sets camera mode or calls `SetViewTargetWithBlend` or equivalent.
 
-4.4.2 Carefully preserve existing rules around UI blocking (e.g., blocking widgets still override click handling), just moving the default cursor/input configuration into profiles.
+4.4.2 Keep only non-configuration "extras" in these helpers, such as binding or unbinding convoy delegates, or other behavior that is not already encoded in `FPlayerModeProfile`.
 
-4.4.3 Remove duplicated cursor/input-mode setup from scattered controller state-handling code, replacing it with calls triggered by coordinator mode application.
-
-4.4.4 Add minimal logs for profile-driven cursor/input-mode changes (one per mode switch).
+4.4.3 Simplify `ApplyPresentationForGameState` so it only manages Overworld convoy delegate binding/unbinding on state transitions and does not re-apply camera/input/cursor modes.
 
 **Acceptance criteria**
-- Cursor and input mode are now determined by the active `FPlayerModeProfile`.
-- Controller does not branch on game state to set these values directly; it relies on the coordinator.
+- `AFCPlayerController` no longer applies camera, input mapping, or cursor/input-mode configuration based on game state; it only handles per-state extras.
+- There is no risk of mode stacking or conflicting configuration paths between controller and coordinator.
 
 ---
 
