@@ -107,6 +107,9 @@ public:
 	/** Returns true if UI state allows world interaction traces (no blocking map/table widgets). */
 	bool CanProcessWorldInteraction() const;
 
+	bool CanWorldClick() const;
+	bool CanWorldInteract() const;
+
 	/**
 	 * Perform table interaction with clicked object
 	 * @param TableObject The actor to interact with (must implement IFCTableInteractable)
@@ -127,10 +130,6 @@ public:
 	/** Dev quick load (F9) */
 	UFUNCTION(BlueprintCallable, Category = "SaveGame")
 	void DevQuickLoad();
-
-	/** Timer-safe restore input after camera blend completes */
-	UFUNCTION()
-	void RestoreInputAfterBlend();
 
 	/** Timer-safe deferred call to restore player position after level load */
 	UFUNCTION()
@@ -163,10 +162,6 @@ public:
 	/** Command explorer to move to target location (Camp/POI click-to-move) */
 	UFUNCTION(BlueprintCallable, Category = "FC|Camp")
 	void MoveExplorerToLocation(const FVector& TargetLocation);
-
-	/** Set the menu camera actor used by the camera manager for main menu view. */
-	UFUNCTION(BlueprintCallable, Category = "Camera")
-	void SetMenuCameraActor(ACameraActor* InMenuCamera);
 
 	/** Set the fixed camera actor used for POI/local scenes (e.g. Camp). */
 	UFUNCTION(BlueprintCallable, Category = "Camera")

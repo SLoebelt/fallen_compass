@@ -15,8 +15,8 @@
 #include "Kismet/GameplayStatics.h"
 #include "Blueprint/UserWidget.h"
 #include "Kismet/KismetSystemLibrary.h"
-#include "../Interaction/FCInteractionComponent.h"
-#include "../Interaction/IFCInteractablePOI.h"
+#include "Interaction/FCInteractionComponent.h"
+#include "Interaction/IFCInteractablePOI.h"
 #include "UFCGameInstance.h"
 #include "FCTransitionManager.h"
 #include "Core/FCLevelManager.h"
@@ -24,7 +24,7 @@
 #include "Core/FCGameStateManager.h"
 #include "Core/FCLevelTransitionManager.h"
 #include "Components/FCInputManager.h"
-#include "../Interaction/FCTableInteractable.h"
+#include "Interaction/FCTableInteractable.h"
 #include "GameFramework/Character.h"
 #include "Components/FCCameraManager.h"
 #include "World/FCOverworldCamera.h"
@@ -35,6 +35,7 @@
 #include "Blueprint/AIBlueprintHelperLibrary.h"
 #include "NavigationSystem.h"
 #include "Components/FCPlayerModeCoordinator.h"
+#include "Core/FCUIBlockSubsystem.h"
 
 DEFINE_LOG_CATEGORY(LogFallenCompassPlayerController);
 
@@ -108,8 +109,6 @@ void AFCPlayerController::BeginPlay()
         UE_LOG(LogFallenCompassPlayerController, Error, TEXT("BeginPlay: InputConfig missing on InputManager"));
         return;
     }
-
-    SetInputMappingMode(EFCInputMappingMode::FirstPerson);
 }
 
 const UFCInputConfig* AFCPlayerController::GetInputConfig() const
@@ -179,12 +178,30 @@ void AFCPlayerController::HandleToggleOverworldMap()
 	// If widget is already open, close it and restore input/cursor
 	if (CurrentOverworldMapWidget)
 	{
+		if (UFCGameInstance* GI = GetGameInstance<UFCGameInstance>())
+		{
+			if (UFCUIManager* UIManager = GI->GetSubsystem<UFCUIManager>())
+			{
+				if (UIManager->FocusedBlockingWidget == CurrentOverworldMapWidget)
+				{
+					UIManager->SetFocusedBlockingWidget(nullptr);
+				}
+			}
+		}
+
 		CurrentOverworldMapWidget->RemoveFromParent();
 		CurrentOverworldMapWidget = nullptr;
 
-		bShowMouseCursor = false;
-		FInputModeGameOnly InputMode;
-		SetInputMode(InputMode);
+		if (PlayerModeCoordinator)
+		{
+			PlayerModeCoordinator->ReapplyCurrentMode();
+		}
+		else
+		{
+			bShowMouseCursor = false;
+			FInputModeGameOnly M;
+			SetInputMode(M);
+		}
 
 		UE_LOG(LogFallenCompassPlayerController, Log, TEXT("HandleToggleOverworldMap: Closed Overworld map widget"));
 		return;
@@ -234,6 +251,11 @@ void AFCPlayerController::HandleToggleOverworldMap()
 
 void AFCPlayerController::HandleInteractPressed()
 {
+	if (!CanWorldInteract())
+	{
+		return;
+	}
+
 	EFCPlayerCameraMode CurrentMode = CameraManager ? CameraManager->GetCameraMode() : EFCPlayerCameraMode::FirstPerson;
 
 	// Camp / POI local scenes: reuse Overworld POI interaction pattern but
@@ -399,20 +421,9 @@ void AFCPlayerController::HandlePausePressed()
 		{
 			UIManager->HidePauseMenu();
 			bIsPauseMenuDisplayed = false;
+
 			UE_LOG(LogFallenCompassPlayerController, Log, TEXT("HandlePausePressed: Resumed from pause, returned to %s"),
 				*UEnum::GetValueAsString(StateMgr->GetCurrentState()));
-
-			// If we resumed back into Overworld_Travel, restore cursor and
-			// game+UI input mode so the overworld can still be controlled.
-			if (StateMgr->GetCurrentState() == EFCGameStateID::Overworld_Travel)
-			{
-				bShowMouseCursor = true;
-				FInputModeGameAndUI InputMode;
-				InputMode.SetHideCursorDuringCapture(false);
-				InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
-				SetInputMode(InputMode);
-				UE_LOG(LogFallenCompassPlayerController, Log, TEXT("HandlePausePressed: Resumed Overworld_Travel with cursor visible"));
-			}
 		}
 		return;
 	}
@@ -576,7 +587,7 @@ void AFCPlayerController::SetCameraModeLocal(EFCPlayerCameraMode NewMode, float 
 
 	if (CameraManager->GetCameraMode() == NewMode)
 	{
-		return; // Already in this mode
+		return;
 	}
 
 	// Delegate to CameraManager based on mode
@@ -674,25 +685,8 @@ void AFCPlayerController::InitializeMainMenu()
 		}
 	}
 
+	// TODO - remove deprecated CurrentGameState usage after week 3 cleanup
 	CurrentGameState = EFCGameState::MainMenu; // DEPRECATED: Keep for backward compatibility (Week 3 cleanup)
-
-	// Clear all input contexts
-	if (ULocalPlayer* LocalPlayer = GetLocalPlayer())
-	{
-		if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(LocalPlayer))
-		{
-			Subsystem->ClearAllMappings();
-		}
-	}
-
-	// Set input mode to UI only
-	FInputModeUIOnly InputMode;
-	InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
-	SetInputMode(InputMode);
-	bShowMouseCursor = true;
-
-	// Set camera to MenuCamera
-	SetCameraModeLocal(EFCPlayerCameraMode::MainMenu, 0.0f); // No blend on initial load
 
 	// Get UIManager and show main menu (reuse GI from above)
 	if (GI)
@@ -756,14 +750,6 @@ void AFCPlayerController::TransitionToGameplay()
 		// TODO - Spawn AFCFirstPersonCharacter at designated start location (Task 5.4)
 		UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("TransitionToGameplay: No pawn found - need to spawn player"));
 	}
-
-	// Blend camera to first-person
-	SetCameraModeLocal(EFCPlayerCameraMode::FirstPerson, 2.0f);
-
-	// Delay input restoration until after camera blend — use a UObject timer delegate so it's safe if controller is destroyed during level load
-	FTimerHandle InputRestoreTimer;
-	FTimerDelegate InputRestoreDel = FTimerDelegate::CreateUObject(this, &AFCPlayerController::RestoreInputAfterBlend);
-	GetWorldTimerManager().SetTimer(InputRestoreTimer, InputRestoreDel, 2.0f, false); // Wait for camera blend to complete
 
 	LogStateChange(TEXT("Transitioning to Gameplay"));
 }
@@ -847,19 +833,6 @@ void AFCPlayerController::DevQuickLoad()
 	}
 
 	GameInstance->LoadGameAsync(TEXT("QuickSave"));
-}
-
-void AFCPlayerController::RestoreInputAfterBlend()
-{
-	// Restore first-person input
-	SetInputMappingMode(EFCInputMappingMode::FirstPerson);
-
-	// Set input mode to game only
-	FInputModeGameOnly InputMode;
-	SetInputMode(InputMode);
-	bShowMouseCursor = false;
-
-	UE_LOG(LogFallenCompassPlayerController, Log, TEXT("RestoreInputAfterBlend: Input restored after camera blend"));
 }
 
 void AFCPlayerController::RestorePlayerPositionDeferred()
@@ -981,7 +954,7 @@ void AFCPlayerController::HandleClick(const FInputActionValue& Value)
 	// POI/local scene (e.g. Camp): command AI-controlled explorer to move (same pattern as convoy)
 	if (CurrentMode == EFCPlayerCameraMode::POIScene)
 	{
-		if (!CanProcessWorldInteraction())
+		if (!CanWorldClick())
 		{
 			return;
 		}
@@ -1035,7 +1008,7 @@ void AFCPlayerController::HandleClick(const FInputActionValue& Value)
 void AFCPlayerController::HandleTableObjectClick()
 {
 	// If a blocking table/map widget is open, ignore world/table clicks entirely.
-	if (!CanProcessWorldInteraction())
+	if (!CanWorldClick())
 	{
 		return;
 	}
@@ -1099,6 +1072,36 @@ bool AFCPlayerController::CanProcessWorldInteraction() const
 	}
 
 	return !UIManager->IsTableWidgetOpen();
+}
+
+bool AFCPlayerController::CanWorldClick() const
+{
+    const UFCGameInstance* GI = GetGameInstance<UFCGameInstance>();
+    if (!GI) return true;
+
+    if (const UFCUIBlockSubsystem* Blocker = GI->GetSubsystem<UFCUIBlockSubsystem>())
+    {
+        return Blocker->CanWorldClick();
+    }
+
+    // Safety fallback: keep old behavior until all widgets migrate
+	// TODO - remove when migration is complete
+    return CanProcessWorldInteraction();
+}
+
+bool AFCPlayerController::CanWorldInteract() const
+{
+    const UFCGameInstance* GI = GetGameInstance<UFCGameInstance>();
+    if (!GI) return true;
+
+    if (const UFCUIBlockSubsystem* Blocker = GI->GetSubsystem<UFCUIBlockSubsystem>())
+    {
+        return Blocker->CanWorldInteract();
+    }
+
+	// Safety fallback: keep old behavior until all widgets migrate
+	// TODO - remove when migration is complete
+    return CanProcessWorldInteraction();
 }
 
 void AFCPlayerController::OnTableObjectClicked(AActor* TableObject)
@@ -1214,7 +1217,7 @@ void AFCPlayerController::HandleOverworldClickMove()
 {
 	// If a blocking UI widget (e.g., overworld map or table) is open,
 	// ignore click-to-move so the map can be interacted with safely.
-	if (!CanProcessWorldInteraction())
+	if (!CanWorldClick())
 	{
 		UE_LOG(LogFallenCompassPlayerController, Verbose, TEXT("HandleOverworldClickMove: UI is blocking overworld movement"));
 		return;
@@ -1297,7 +1300,7 @@ void AFCPlayerController::SetActiveConvoy(AFCOverworldConvoy* InConvoy)
 
 	// Avoid double-binding
     ActiveConvoy->OnConvoyPOIOverlap.RemoveAll(InteractionComponent);
-    ActiveConvoy->OnConvoyPOIOverlap.AddDynamic(InteractionComponent, &UFCInteractionComponent::NotifyPOIOverlap);
+    ActiveConvoy->OnConvoyPOIOverlap.AddDynamic(InteractionComponent, &UFCInteractionComponent::NotifyArrivedAtPOI);
 
     UE_LOG(LogFallenCompassPlayerController, Log,
         TEXT("SetActiveConvoy: Set active convoy to %s and bound OnConvoyPOIOverlap -> InteractionComponent"),
@@ -1366,22 +1369,6 @@ void AFCPlayerController::MoveExplorerToLocation(const FVector& WorldLocation)
         TEXT("MoveExplorerToLocation: Requested move for Explorer %s to %s"),
         *Explorer->GetName(),
         *WorldLocation.ToString());
-}
-
-void AFCPlayerController::SetMenuCameraActor(ACameraActor* InMenuCamera)
-{
-	if (!CameraManager)
-	{
-		UE_LOG(LogFallenCompassPlayerController, Error, TEXT("SetMenuCameraActor: CameraManager is null"));
-		return;
-	}
-
-	if (!InMenuCamera)
-	{
-		UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("SetMenuCameraActor: InMenuCamera is null"));
-	}
-
-	CameraManager->SetMenuCamera(InMenuCamera);
 }
 
 // If POISceneCameraActor is null, UFCCameraManager will auto-resolve by tag/name.

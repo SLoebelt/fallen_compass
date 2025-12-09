@@ -42,7 +42,7 @@
   - Returns `false` and logs a **Warning** if `ModeProfileSet` is null or no profile exists for the requested mode.
   - Returns `true` and copies out the profile otherwise.
 
-### 4. Profile-driven, idempotent `ApplyMode`
+### 4. Profile-driven, idempotent `ApplyMode` (plus `ReapplyCurrentMode`)
 
 - `ApplyMode(EFCPlayerMode NewMode)` implements the profile application pipeline:
   - Looks up the profile with `GetProfileForMode`; logs and returns early if none is found.
@@ -51,9 +51,11 @@
   - Obtains the owning `AFCPlayerController` and applies input mapping mode through `UFCInputManager` (which clears and reapplies contexts each time).
   - Applies cursor visibility and input mode from the profile (GameOnly/GameAndUI/UIOnly) via an internal helper, setting `bShowMouseCursor`, `bEnableClickEvents`, and using `SetInputMode` appropriately.
   - Calls `SetCameraModeLocal(Profile.CameraMode, BlendTime)` on the controller, relying on it to be camera-only (no input/cursor side effects).
+  - Optionally adjusts `UFCInteractionComponent` (e.g., toggling `bFirstPersonFocusEnabled`) so interaction gating is driven by modes instead of Tick-based camera polling.
   - Logs old mode → new mode and the profile asset name using `LogFCPlayerModeCoordinator`.
   - Updates `CurrentMode`.
 - Reapplying the same mode is safe: all of the above operations are written to be idempotent (no stacked mappings, no duplicated camera state).
+- Exposes a small helper `ReapplyCurrentMode()` used by UI flows (e.g., closing the Overworld map) to restore the active profile cleanly instead of hardcoding cursor/input restoration.
 
 ---
 

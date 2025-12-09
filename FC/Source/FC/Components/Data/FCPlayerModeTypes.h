@@ -9,6 +9,7 @@
 #include "FCPlayerModeTypes.generated.h"
 
 class UFCInputConfig;
+class UFCInteractionProfile;
 
 /**
  * High-level click intent for a given player mode.
@@ -26,6 +27,7 @@ enum class EFCClickPolicy : uint8
 UENUM(BlueprintType)
 enum class EFCPlayerMode : uint8
 {
+	MainMenu   UMETA(DisplayName = "Main Menu"),
 	Office     UMETA(DisplayName = "Office"),
 	Overworld  UMETA(DisplayName = "Overworld"),
 	Camp       UMETA(DisplayName = "Camp"),
@@ -50,8 +52,8 @@ struct FPlayerModeProfile
 	EFCPlayerCameraMode CameraMode = EFCPlayerCameraMode::FirstPerson;
 
 	/** Placeholder for future mode-specific interaction profile asset/type. */
-	UPROPERTY(EditDefaultsOnly, Category = "FC|Mode")
-	TSoftObjectPtr<UObject> InteractionProfile;
+	UPROPERTY(EditDefaultsOnly, Category="FC|Mode")
+	TSoftObjectPtr<UFCInteractionProfile> InteractionProfile;
 
 	/** High-level click intent for this mode (move, interact, none). */
 	UPROPERTY(EditDefaultsOnly, Category = "FC|Mode")

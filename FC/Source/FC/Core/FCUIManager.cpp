@@ -107,6 +107,7 @@ void UFCUIManager::ShowPauseMenu()
 	if (!PauseMenuWidget->IsInViewport())
 	{
 		PauseMenuWidget->AddToViewport(100);
+		SetFocusedBlockingWidget(PauseMenuWidget);
 		UE_LOG(LogFCUIManager, Log, TEXT("ShowPauseMenu: Widget added to viewport"));
 
 		// Conditionally enable engine pause based on current level
@@ -166,6 +167,11 @@ void UFCUIManager::HidePauseMenu()
 	{
 		PauseMenuWidget->RemoveFromParent();
 		UE_LOG(LogFCUIManager, Log, TEXT("HidePauseMenu: Widget removed from viewport"));
+
+		if (FocusedBlockingWidget == PauseMenuWidget)
+		{
+			SetFocusedBlockingWidget(nullptr); // NEW: unblocks world input
+		}
 
 		// Conditionally disable engine pause if it was enabled
 		// Check current level to determine if engine pause was used
@@ -376,6 +382,8 @@ void UFCUIManager::ShowTableWidget(AActor* TableObject)
 	// Add to viewport
 	CurrentTableWidget->AddToViewport();
 	UE_LOG(LogFCUIManager, Log, TEXT("ShowTableWidget: Created and displayed widget for %s"), *TableObject->GetName());
+	SetFocusedBlockingWidget(CurrentTableWidget);
+
 }
 
 void UFCUIManager::CloseTableWidget()
@@ -392,6 +400,11 @@ void UFCUIManager::CloseTableWidget()
 
 	// Clear reference
 	CurrentTableWidget = nullptr;
+
+	if (FocusedBlockingWidget == CurrentTableWidget)
+	{
+		SetFocusedBlockingWidget(nullptr);
+	}
 }
 
 UUserWidget* UFCUIManager::ShowPOIActionSelection(const TArray<FFCPOIActionData>& Actions, UFCInteractionComponent* InteractionComponent)
@@ -458,6 +471,8 @@ UUserWidget* UFCUIManager::ShowPOIActionSelection(const TArray<FFCPOIActionData>
 	// Add to viewport
 	CurrentPOIActionSelectionWidget->AddToViewport();
 	UE_LOG(LogFCUIManager, Log, TEXT("ShowPOIActionSelection: Created and displayed POI action selection widget with %d actions"), Actions.Num());
+	SetFocusedBlockingWidget(CurrentPOIActionSelectionWidget);
+
 
 	return CurrentPOIActionSelectionWidget;
 }
@@ -477,6 +492,11 @@ void UFCUIManager::ClosePOIActionSelection()
 	// Clear references
 	CurrentPOIActionSelectionWidget = nullptr;
 	PendingInteractionComponent = nullptr;
+
+	if (FocusedBlockingWidget == CurrentPOIActionSelectionWidget)
+	{
+		SetFocusedBlockingWidget(nullptr);
+	}
 }
 
 void UFCUIManager::HandlePOIActionSelected(EFCPOIAction Action)

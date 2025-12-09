@@ -1,4 +1,19 @@
 // Copyright Slomotion Games. All Rights Reserved.
+// Interaction Predictability State Machine (0003)
+//
+// RMB Interact intent:
+//   Idle -> (Selecting) -> MovingToPOI -> Arrived/Overlap -> Executing -> Idle
+//
+// Overlap intent (enemy ambush / incidental):
+//   Idle -> (Selecting) -> Executing -> Idle
+//
+// Canonical fields:
+//   PendingPOI + PendingAction + (bAwaitingSelection / bAwaitingArrival)
+// Rules:
+//   - ResetInteractionState() is called ONCE per logical transition.
+//   - Movement issuance (when needed) should originate from UFCInteractionComponent (single movement authority).
+//   - Overlap may occur at any time; pending action execution must be idempotent (never double fire).
+
 
 #include "FCInteractionComponent.h"
 #include "IFCInteractable.h"
@@ -14,6 +29,7 @@
 #include "Core/FCPlayerController.h"
 #include "Components/FCCameraManager.h"
 #include "Characters/Convoy/FCOverworldConvoy.h"
+#include "Interaction/FCInteractionProfile.h"
 
 DEFINE_LOG_CATEGORY(LogFCInteraction);
 
@@ -117,33 +133,41 @@ void UFCInteractionComponent::DetectInteractables()
 
 	// If UI (e.g., table/map widgets) is currently blocking interaction,
 	// skip world traces so prompts and logs aren't spammed behind UIs.
-	if (const AFCPlayerController* FCPC = Cast<AFCPlayerController>(PC))
+	if (!PC->CanWorldInteract())
 	{
-		if (!FCPC->CanProcessWorldInteraction())
-		{
-			CurrentInteractable = nullptr;
-			return;
-		}
+		CurrentInteractable = nullptr;
+		return;
 	}
 
-	// Get camera location and direction
-	FVector CameraLocation;
-	FRotator CameraRotation;
-	PC->GetPlayerViewPoint(CameraLocation, CameraRotation);
-	FVector TraceEnd = CameraLocation + (CameraRotation.Vector() * InteractionTraceDistance);
+	// Resolve interaction profile to drive trace config.
+    UFCInteractionProfile* Profile = GetEffectiveProfile();
 
-	// Perform line trace
-	FHitResult HitResult;
-	FCollisionQueryParams QueryParams;
-	QueryParams.AddIgnoredActor(OwnerActor);
+    // Get camera location and direction
+    FVector CameraLocation;
+    FRotator CameraRotation;
+    PC->GetPlayerViewPoint(CameraLocation, CameraRotation);
 
-	bool bHit = GetWorld()->LineTraceSingleByChannel(
-		HitResult,
-		CameraLocation,
-		TraceEnd,
-		ECC_Visibility,
-		QueryParams
-	);
+    const float Range = Profile ? Profile->Range : InteractionTraceDistance;
+    ECollisionChannel Channel = ECC_Visibility;
+	if (Profile)
+	{
+		Channel = static_cast<ECollisionChannel>(Profile->TraceChannel.GetValue());
+	}
+
+    const FVector TraceEnd = CameraLocation + (CameraRotation.Vector() * Range);
+
+    // Perform line trace (probe type = LineTrace for now; extend later if needed).
+    FHitResult HitResult;
+    FCollisionQueryParams QueryParams;
+    QueryParams.AddIgnoredActor(OwnerActor);
+
+    const bool bHit = GetWorld()->LineTraceSingleByChannel(
+        HitResult,
+        CameraLocation,
+        TraceEnd,
+        Channel,
+        QueryParams
+    );
 
 	// Debug visualization
 	if (bShowDebugTrace)
@@ -156,35 +180,56 @@ void UFCInteractionComponent::DetectInteractables()
 	}
 
 	// Check if we hit an interactable
-	if (bHit && HitResult.GetActor())
-	{
-		AActor* HitActor = HitResult.GetActor();
+    if (bHit && HitResult.GetActor())
+    {
+        AActor* HitActor = HitResult.GetActor();
 
-		// Check if the actor implements the interactable interface
-		if (HitActor->GetClass()->ImplementsInterface(UIFCInteractable::StaticClass()))
-		{
-			// Check if within interaction range
-			float InteractionRange = IIFCInteractable::Execute_GetInteractionRange(HitActor);
-			float Distance = FVector::Dist(CameraLocation, HitResult.ImpactPoint);
+        // Optional tag filtering from profile
+        if (Profile && Profile->AllowedTags.Num() > 0)
+        {
+            bool bTagOk = false;
+            for (const FName Tag : Profile->AllowedTags)
+            {
+                if (HitActor->ActorHasTag(Tag))
+                {
+                    bTagOk = true;
+                    break;
+                }
+            }
 
-			if (Distance <= InteractionRange)
-			{
-				// Check if we can interact with this object
-				bool bCanInteract = IIFCInteractable::Execute_CanInteract(HitActor, OwnerActor);
+            if (!bTagOk)
+            {
+                // Ignore this hit completely if it does not match the profile's tag filter.
+                CurrentInteractable = nullptr;
+                return;
+            }
+        }
 
-				if (bCanInteract)
-				{
-					// New interactable found
-					if (CurrentInteractable != HitActor)
-					{
-						CurrentInteractable = HitActor;
-						UE_LOG(LogFCInteraction, Log, TEXT("New interactable in focus: %s"), *HitActor->GetName());
-					}
-					return;
-				}
-			}
-		}
-	}
+        // Check if the actor implements the interactable interface
+        if (HitActor->GetClass()->ImplementsInterface(UIFCInteractable::StaticClass()))
+        {
+            // Check if within interaction range (per-object); still using the interface range.
+            const float InteractionRange = IIFCInteractable::Execute_GetInteractionRange(HitActor);
+            const float Distance = FVector::Dist(CameraLocation, HitResult.ImpactPoint);
+
+            if (Distance <= InteractionRange)
+            {
+                const bool bCanInteract = IIFCInteractable::Execute_CanInteract(HitActor, OwnerActor);
+
+                if (bCanInteract)
+                {
+                    if (CurrentInteractable != HitActor)
+                    {
+                        CurrentInteractable = HitActor;
+                        UE_LOG(LogFCInteraction, Log,
+                            TEXT("New interactable in focus: %s"),
+                            *HitActor->GetName());
+                    }
+                    return;
+                }
+            }
+        }
+    }
 
 	// No valid interactable found
 	if (CurrentInteractable.IsValid())
@@ -261,241 +306,273 @@ void UFCInteractionComponent::Interact()
 
 void UFCInteractionComponent::HandlePOIClick(AActor* POIActor)
 {
-	if (!POIActor) return;
+	// New click always resets stale pending state (prevents ghost actions or stacked moves).
+	ResetInteractionState();
 
-	// Query available actions via interface
-	IIFCInteractablePOI* POIInterface = Cast<IIFCInteractablePOI>(POIActor);
-	if (!POIInterface) return;
-
-	TArray<FFCPOIActionData> AvailableActions = POIInterface->Execute_GetAvailableActions(POIActor);
-	FString POIName = POIInterface->Execute_GetPOIName(POIActor);
-
-	UE_LOG(LogFCInteraction, Log, TEXT("POI click on '%s', %d actions available"), *POIName, AvailableActions.Num());
-
-	// Reset convoy-at-POI flag for right-click scenarios
-	bConvoyAlreadyAtPOI = false;
-
-	// Handle based on action count
-	if (AvailableActions.Num() == 0)
+	if (!IsValid(POIActor))
 	{
-		// No actions available - ignore click
-		UE_LOG(LogFCInteraction, Warning, TEXT("POI '%s' has no available actions"), *POIName);
+		UE_LOG(LogFCInteraction, Warning, TEXT("[Interaction] Click ignored: invalid POI"));
 		return;
 	}
-	else if (AvailableActions.Num() == 1)
+
+	// Treat this click as the new intent source of truth.
+	FocusedTarget = POIActor;
+	PendingPOI = POIActor;
+	bPendingPOIAlreadyReached = false;
+
+	// Query available actions via POI interface.
+	if (!POIActor->GetClass()->ImplementsInterface(UIFCInteractablePOI::StaticClass()))
 	{
-		// Single action - auto-select and trigger movement
-		PendingInteractionPOI = POIActor;
-		PendingInteractionAction = AvailableActions[0].ActionType;
-		bHasPendingPOIInteraction = true;
-
-		UE_LOG(LogFCInteraction, Log, TEXT("Auto-selected action '%s' for POI '%s'"),
-			*UEnum::GetValueAsString(PendingInteractionAction), *POIName);
-
-		// Trigger movement to POI (mode-aware: convoy in Overworld, explorer in Camp)
-		AFCPlayerController* PC = GetOwnerPCCheckedOrNull();
-		if (!PC) { return; }
-
-		if (PendingInteractionPOI)
-		{
-			FVector POILocation = PendingInteractionPOI->GetActorLocation();
-
-			// Check camera mode to determine which movement function to call
-			UFCCameraManager* CameraManager = PC->FindComponentByClass<UFCCameraManager>();
-			if (CameraManager && CameraManager->GetCameraMode() == EFCPlayerCameraMode::POIScene)
-			{
-				// Camp mode - move explorer
-				PC->MoveExplorerToLocation(POILocation);
-				UE_LOG(LogFCInteraction, Log, TEXT("Triggered explorer movement to POI at %s (single action)"), *POILocation.ToString());
-			}
-			else
-			{
-				// Overworld mode - move convoy
-				PC->MoveConvoyToLocation(POILocation);
-				UE_LOG(LogFCInteraction, Log, TEXT("Triggered convoy movement to POI at %s (single action)"), *POILocation.ToString());
-			}
-		}
+		UE_LOG(LogFCInteraction, Warning, TEXT("[Interaction] Clicked actor %s is not a POI"), *GetNameSafe(POIActor));
+		return;
 	}
-	else
+
+	const TArray<FFCPOIActionData> AvailableActions = IIFCInteractablePOI::Execute_GetAvailableActions(POIActor);
+	const FString POIName = IIFCInteractablePOI::Execute_GetPOIName(POIActor);
+
+	UE_LOG(LogFCInteraction, Log, TEXT("[Interaction] POI click on '%s', %d actions available"), *POIName, AvailableActions.Num());
+
+	if (AvailableActions.Num() == 0)
 	{
-		// Multiple actions - delegate to UIManager for widget display
-		UE_LOG(LogFCInteraction, Log, TEXT("Requesting action selection for POI '%s'"), *POIName);
+		UE_LOG(LogFCInteraction, Warning, TEXT("[Interaction] POI '%s' has no available actions"), *POIName);
+		return;
+	}
 
-		PendingInteractionPOI = POIActor;
-		bHasPendingPOIInteraction = false; // Wait for selection
+	AFCPlayerController* PC = GetOwnerPCCheckedOrNull();
+	if (!PC)
+	{
+		return;
+	}
 
-		// Get UIManager to show action selection widget
-		UFCGameInstance* GameInstance = Cast<UFCGameInstance>(GetWorld()->GetGameInstance());
-		if (GameInstance)
+	UFCCameraManager* CameraManager = PC->FindComponentByClass<UFCCameraManager>();
+
+	// Helper lambda: issue exactly one movement command based on current camera mode.
+	auto IssueMovementToPOI = [&]()
+	{
+		const FVector POILocation = POIActor->GetActorLocation();
+
+		if (CameraManager && CameraManager->GetCameraMode() == EFCPlayerCameraMode::POIScene)
 		{
-			UFCUIManager* UIManager = GameInstance->GetSubsystem<UFCUIManager>();
-			if (UIManager)
-			{
-				UIManager->ShowPOIActionSelection(AvailableActions, this);
-				UE_LOG(LogFCInteraction, Log, TEXT("HandlePOIClick: Showing POI action selection widget"));
-			}
-			else
-			{
-				UE_LOG(LogFCInteraction, Error, TEXT("HandlePOIClick: Failed to get UIManager subsystem"));
-			}
+			PC->MoveExplorerToLocation(POILocation);
 		}
 		else
 		{
-			UE_LOG(LogFCInteraction, Error, TEXT("HandlePOIClick: Failed to get game instance"));
+			PC->MoveConvoyToLocation(POILocation);
 		}
+	};
+
+	// Helper lambda: compute whether movement is actually required.
+	auto NeedsMovement = [&]() -> bool
+	{
+		const AActor* OwnerActor = GetOwner();
+		if (!OwnerActor || !IsValid(POIActor))
+		{
+			return false;
+		}
+
+		const FVector CurrentLocation = OwnerActor->GetActorLocation();
+		const FVector TargetLocation = POIActor->GetActorLocation();
+		const float DistanceToPOI = FVector::Dist(CurrentLocation, TargetLocation);
+
+		// Tunable threshold; kept conservative to avoid jittery re-issues.
+		constexpr float ClickAcceptRadius = 100.0f;
+		return DistanceToPOI > ClickAcceptRadius;
+	};
+
+	// Multi-action path: go into Selecting phase first, movement (if any) is decided on selection.
+	if (AvailableActions.Num() > 1)
+	{
+		bAwaitingSelection = true;
+		bAwaitingArrival = false;
+
+		if (UFCGameInstance* GameInstance = Cast<UFCGameInstance>(GetWorld()->GetGameInstance()))
+		{
+			if (UFCUIManager* UIManager = GameInstance->GetSubsystem<UFCUIManager>())
+			{
+				UIManager->ShowPOIActionSelection(AvailableActions, this);
+
+				const AActor* PendingPOIActor = PendingPOI.Get();
+				UE_LOG(LogFCInteraction, Log,
+					TEXT("[Interaction] Phase=Selecting POI=%s"),
+					*GetNameSafe(PendingPOIActor));
+			}
+		}
+
+		return;
+	}
+
+	// Single-action path: we know the action immediately and can decide movement now.
+	check(AvailableActions.Num() == 1);
+
+	PendingAction = AvailableActions[0].ActionType;
+
+	const bool bNeedsMove = NeedsMovement();
+	if (bNeedsMove)
+	{
+		bAwaitingArrival = true;
+		IssueMovementToPOI();
+
+		const AActor* PendingPOIActor = PendingPOI.Get();
+		UE_LOG(LogFCInteraction, Log,
+			TEXT("[Interaction] Phase=MovingToPOI POI=%s Action=%s"),
+			*GetNameSafe(PendingPOIActor),
+			*UEnum::GetValueAsString(PendingAction.GetValue()));
+	}
+	else
+	{
+		// Already at POI: treat this as an immediate arrival, no movement.
+		bAwaitingArrival = false;
+		UE_LOG(LogFCInteraction, Log, TEXT("[Interaction] Phase=Executing (already at POI) POI=%s Action=%s"),
+			*GetNameSafe(PendingPOI.Get()),
+			*UEnum::GetValueAsString(PendingAction.GetValue()));
+
+		NotifyArrivedAtPOI(POIActor);
 	}
 }
 
 void UFCInteractionComponent::OnPOIActionSelected(EFCPOIAction SelectedAction)
 {
-	if (!PendingInteractionPOI)
+	if (!bAwaitingSelection || !PendingPOI.IsValid())
+    {
+        UE_LOG(LogFCInteraction, Warning, TEXT("[Interaction] Selection ignored: not awaiting selection"));
+        return;
+    }
+
+    PendingAction = SelectedAction;
+    bAwaitingSelection = false;
+
+    UE_LOG(LogFCInteraction, Log, TEXT("[Interaction] Selected action %s for POI %s"),
+        *UEnum::GetValueAsString(SelectedAction),
+        *GetNameSafe(PendingPOI.Get()));
+
+	if (bPendingPOIAlreadyReached)
 	{
-		UE_LOG(LogFCInteraction, Warning, TEXT("OnPOIActionSelected: No pending POI"));
+		bPendingPOIAlreadyReached = false;
+
+		// Execute immediately at current overlap location (no movement, no overlap call)
+		ExecutePOIActionNow(PendingPOI.Get(), PendingAction.GetValue());
 		return;
 	}
 
-	// Store selected action
-	PendingInteractionAction = SelectedAction;
-	bHasPendingPOIInteraction = true;
+    // Not at POI yet: move now and wait for arrival
+    bAwaitingArrival = true;
 
-	IIFCInteractablePOI* POIInterface = Cast<IIFCInteractablePOI>(PendingInteractionPOI);
-	if (POIInterface)
-	{
-		FString POIName = POIInterface->Execute_GetPOIName(PendingInteractionPOI);
-		UE_LOG(LogFCInteraction, Log, TEXT("Selected action '%s' for POI '%s'"),
-			*UEnum::GetValueAsString(SelectedAction), *POIName);
-	}
+    AFCPlayerController* PC = GetOwnerPCCheckedOrNull();
+    if (!PC) return;
 
-	// Only trigger movement if not already at POI
-	if (!bConvoyAlreadyAtPOI)
-	{
-		// Right-click multiple-action scenario: move to POI (mode-aware)
-		AFCPlayerController* PC = GetOwnerPCCheckedOrNull();
-		if (!PC) { return; }
-		if (PendingInteractionPOI)
-		{
-			FVector POILocation = PendingInteractionPOI->GetActorLocation();
+    const FVector POILocation = PendingPOI->GetActorLocation();
+    UFCCameraManager* CameraManager = PC->FindComponentByClass<UFCCameraManager>();
 
-			// Check camera mode to determine which movement function to call
-			UFCCameraManager* CameraManager = PC->FindComponentByClass<UFCCameraManager>();
-			if (CameraManager && CameraManager->GetCameraMode() == EFCPlayerCameraMode::POIScene)
-			{
-				// Camp mode - move explorer
-				PC->MoveExplorerToLocation(POILocation);
-				UE_LOG(LogFCInteraction, Log, TEXT("Triggered explorer movement to POI at %s (right-click multiple)"), *POILocation.ToString());
-			}
-			else
-			{
-				// Overworld mode - move convoy
-				PC->MoveConvoyToLocation(POILocation);
-				UE_LOG(LogFCInteraction, Log, TEXT("Triggered convoy movement to POI at %s (right-click multiple)"), *POILocation.ToString());
-			}
-		}
-	}
-	else
-	{
-		// Left-click scenario: already at POI, execute immediately
-		UE_LOG(LogFCInteraction, Log, TEXT("Already at POI, executing action immediately"));
-		bConvoyAlreadyAtPOI = false; // Reset flag
-		NotifyPOIOverlap(PendingInteractionPOI);
-	}
+    if (CameraManager && CameraManager->GetCameraMode() == EFCPlayerCameraMode::POIScene)
+    {
+        PC->MoveExplorerToLocation(POILocation);
+    }
+    else
+    {
+        PC->MoveConvoyToLocation(POILocation);
+    }
 }
+
 
 void UFCInteractionComponent::NotifyPOIOverlap(AActor* POIActor)
 {
-	if (!POIActor) return;
+	if (!IsValid(POIActor))
+	{
+		return;
+	}
+
 	UE_LOG(LogFCInteraction, Log, TEXT("NotifyPOIOverlap received: %s"), *GetNameSafe(POIActor));
 
-
-	IIFCInteractablePOI* POIInterface = Cast<IIFCInteractablePOI>(POIActor);
-	if (!POIInterface) return;
-
-	FString POIName = POIInterface->Execute_GetPOIName(POIActor);
-
-	// Check if this is the pending interaction POI
-	if (bHasPendingPOIInteraction && PendingInteractionPOI == POIActor)
+	// Robust interface check (works for BP implementations too)
+	if (!POIActor->GetClass()->ImplementsInterface(UIFCInteractablePOI::StaticClass()))
 	{
-		// Execute pending action
-		UE_LOG(LogFCInteraction, Log, TEXT("Executing pending action '%s' on POI '%s'"),
-			*UEnum::GetValueAsString(PendingInteractionAction), *POIName);
-
-		POIInterface->Execute_ExecuteAction(POIActor, PendingInteractionAction, GetOwner());
-
-		// Clear pending interaction
-		bHasPendingPOIInteraction = false;
-		PendingInteractionPOI = nullptr;
-
-		// Clear convoy interaction flag
-		AFCPlayerController* PC = GetOwnerPCCheckedOrNull();
-		if (!PC) { return; }
-
-		AFCOverworldConvoy* Convoy = PC->GetActiveConvoy();
-		if (Convoy)
-		{
-			Convoy->SetInteractingWithPOI(false);
-			UE_LOG(LogFCInteraction, Log, TEXT("Cleared convoy interaction flag"));
-		}
+		return;
 	}
-	else
+
+	const FString POIName = IIFCInteractablePOI::Execute_GetPOIName(POIActor);
+
+	// Pending execution path: execute ONLY if this is our pending POI and we have a selected action.
+	if (PendingPOI.IsValid() && PendingPOI.Get() == POIActor && PendingAction.IsSet() && !bAwaitingSelection)
 	{
-		// Unintentional overlap (exploration, fleeing, enemy chase)
-		TArray<FFCPOIActionData> AvailableActions = POIInterface->Execute_GetAvailableActions(POIActor);
+		ExecutePOIActionNow(POIActor, PendingAction.GetValue());
+		return;
+	}
 
-		if (AvailableActions.Num() == 0)
+	// Unintentional overlap (exploration, fleeing, enemy chase)
+	const TArray<FFCPOIActionData> AvailableActions = IIFCInteractablePOI::Execute_GetAvailableActions(POIActor);
+
+	if (AvailableActions.Num() == 0)
+	{
+		UE_LOG(LogFCInteraction, Log, TEXT("Unintentional overlap with POI '%s' (no actions)"), *POIName);
+		return;
+	}
+	else if (AvailableActions.Num() == 1)
+	{
+		ExecutePOIActionNow(POIActor, AvailableActions[0].ActionType);
+		return;
+	}
+	else // > 1
+	{
+		ResetInteractionState();
+		FocusedTarget = POIActor;
+		PendingPOI = POIActor;
+		bAwaitingSelection = true;
+		bPendingPOIAlreadyReached = true;
+
+		if (UFCGameInstance* GameInstance = Cast<UFCGameInstance>(GetWorld()->GetGameInstance()))
 		{
-			// No actions - ignore overlap
-			UE_LOG(LogFCInteraction, Log, TEXT("Unintentional overlap with POI '%s' (no actions)"), *POIName);
-		}
-		else if (AvailableActions.Num() == 1)
-		{
-			// Single action - auto-execute
-			UE_LOG(LogFCInteraction, Log, TEXT("Unintentional overlap: auto-executing '%s' on POI '%s'"),
-				*UEnum::GetValueAsString(AvailableActions[0].ActionType), *POIName);
-
-			POIInterface->Execute_ExecuteAction(POIActor, AvailableActions[0].ActionType, GetOwner());
-
-			// Clear convoy interaction flag
-			AFCPlayerController* PC = GetOwnerPCCheckedOrNull();
-			if (!PC) { return; }
-
-			AFCOverworldConvoy* Convoy = PC->GetActiveConvoy();
-			if (Convoy)
+			if (UFCUIManager* UIManager = GameInstance->GetSubsystem<UFCUIManager>())
 			{
-				Convoy->SetInteractingWithPOI(false);
-				UE_LOG(LogFCInteraction, Log, TEXT("Cleared convoy interaction flag after auto-execute"));
-			}
-		}
-		else
-		{
-			// Multiple actions - show selection dialog
-			UE_LOG(LogFCInteraction, Log, TEXT("Unintentional overlap: showing action selection for POI '%s'"), *POIName);
-
-			PendingInteractionPOI = POIActor;
-			bHasPendingPOIInteraction = false; // Wait for selection
-			bConvoyAlreadyAtPOI = true; // Convoy already at POI (left-click scenario)
-
-			// Get UIManager to show action selection widget
-			UFCGameInstance* GameInstance = Cast<UFCGameInstance>(GetWorld()->GetGameInstance());
-			if (GameInstance)
-			{
-				UFCUIManager* UIManager = GameInstance->GetSubsystem<UFCUIManager>();
-				if (UIManager)
-				{
-					UIManager->ShowPOIActionSelection(AvailableActions, this);
-					UE_LOG(LogFCInteraction, Log, TEXT("NotifyPOIOverlap: Showing POI action selection widget"));
-				}
-				else
-				{
-					UE_LOG(LogFCInteraction, Error, TEXT("NotifyPOIOverlap: Failed to get UIManager subsystem"));
-				}
-			}
-			else
-			{
-				UE_LOG(LogFCInteraction, Error, TEXT("NotifyPOIOverlap: Failed to get game instance"));
+				UIManager->ShowPOIActionSelection(AvailableActions, this);
 			}
 		}
 	}
 }
+
+void UFCInteractionComponent::NotifyArrivedAtPOI(AActor* POIActor)
+{
+    if (!IsValid(POIActor))
+    {
+        UE_LOG(LogFCInteraction, Verbose, TEXT("[Interaction] Arrival ignored: POIActor invalid"));
+        return;
+    }
+
+    // 1) Intentional, arrival-gated execution:
+    //    We previously chose a POI + action and issued movement for it.
+    if (bAwaitingArrival && PendingPOI.IsValid())
+    {
+        if (PendingPOI.Get() == POIActor && PendingAction.IsSet())
+        {
+            UE_LOG(LogFCInteraction, Log,
+                TEXT("[Interaction] Arrival at pending POI %s, executing action %s"),
+                *GetNameSafe(POIActor),
+                *UEnum::GetValueAsString(PendingAction.GetValue()));
+
+            // This clears state and (for convoy) clears the interaction gate.
+            ExecutePOIActionNow(POIActor, PendingAction.GetValue());
+
+            // bAwaitingArrival and PendingXXX are cleared inside ExecutePOIActionNow/ResetInteractionState.
+            return;
+        }
+
+        // We were waiting for some other POI; treat this as an interrupt to that intent.
+        UE_LOG(LogFCInteraction, Log,
+            TEXT("[Interaction] Arrival mismatch: expected %s but overlapped %s. Cancelling pending interaction."),
+            *GetNameSafe(PendingPOI.Get()), *GetNameSafe(POIActor));
+
+        ResetInteractionState();
+        // fall through to incidental handling for POIActor
+    }
+
+    // 2) No pending arrival for this POI: treat as incidental overlap.
+    //    This covers:
+    //       - pure LMB move collisions
+    //       - enemy ambushes
+    //       - exploratory walks that happen to hit POIs
+    NotifyPOIOverlap(POIActor);
+}
+
+
 
 void UFCInteractionComponent::SetFirstPersonFocusEnabled(bool bEnabled)
 {
@@ -523,25 +600,90 @@ void UFCInteractionComponent::ClearFocusAndHidePrompt()
     }
 }
 
-// TODO - delete this function, when coordinator-driven gating tested and robust
-void UFCInteractionComponent::UpdateFirstPersonFocusGateFromCameraMode()
+EFCInteractionPhase UFCInteractionComponent::GetCurrentInteractionPhase() const
 {
-    AFCPlayerController* PC = GetOwnerPCCheckedOrNull();
-    if (!PC)
+    if (bAwaitingSelection) return EFCInteractionPhase::Selecting;
+    if (bAwaitingArrival)   return EFCInteractionPhase::MovingToPOI;
+
+    // Usually "Executing" is momentary; this is mostly for logs.
+    if (PendingPOI.IsValid() && PendingAction.IsSet())
     {
-        SetFirstPersonFocusEnabled(false);
-        return;
+        return EFCInteractionPhase::Executing;
     }
 
-    UFCCameraManager* CameraManager = PC->FindComponentByClass<UFCCameraManager>();
-    if (!CameraManager)
+    return EFCInteractionPhase::Idle;
+}
+
+void UFCInteractionComponent::ResetInteractionState()
+{
+    bAwaitingSelection = false;
+    bAwaitingArrival = false;
+    bPendingPOIAlreadyReached = false;
+
+    PendingPOI.Reset();
+    PendingAction.Reset();
+
+    // Keep FocusedTarget if you want POI highlighting to persist; otherwise reset it too:
+    // FocusedTarget.Reset();
+}
+
+void UFCInteractionComponent::ExecutePOIActionNow(AActor* POIActor, EFCPOIAction Action)
+{
+	if (!IsValid(POIActor) || !POIActor->GetClass()->ImplementsInterface(UIFCInteractablePOI::StaticClass()))
+	{
+		UE_LOG(LogFCInteraction, Warning, TEXT("[Interaction] ExecutePOIActionNow ignored (invalid POI)"));
+		return;
+	}
+
+	// Clear first to prevent re-entrant overlap causing double fire
+	ResetInteractionState();
+
+	UE_LOG(LogFCInteraction, Log, TEXT("[Interaction] Executing action %s on POI %s"),
+		*UEnum::GetValueAsString(Action), *GetNameSafe(POIActor));
+
+	IIFCInteractablePOI::Execute_ExecuteAction(POIActor, Action, GetOwner());
+
+	// Preserve your existing convoy gate cleanup where applicable
+	if (AFCPlayerController* PC = GetOwnerPCCheckedOrNull())
+	{
+		if (AFCOverworldConvoy* Convoy = PC->GetActiveConvoy())
+		{
+			Convoy->SetInteractingWithPOI(false);
+		}
+	}
+}
+
+UFCInteractionProfile* UFCInteractionComponent::GetEffectiveProfile() const
+{
+    if (ActiveProfile && ActiveProfile->IsValidProfile())
     {
-        SetFirstPersonFocusEnabled(false);
-        return;
+        return ActiveProfile;
     }
 
-    const bool bShouldEnable =
-        (CameraManager->GetCameraMode() == EFCPlayerCameraMode::FirstPerson);
+    if (DefaultProfile.IsNull())
+    {
+        return nullptr;
+    }
 
-    SetFirstPersonFocusEnabled(bShouldEnable);
+    UFCInteractionProfile* Loaded = DefaultProfile.Get();
+    if (!Loaded)
+    {
+        Loaded = DefaultProfile.LoadSynchronous();
+    }
+
+    if (Loaded && Loaded->IsValidProfile())
+    {
+        return Loaded;
+    }
+
+    return nullptr;
+}
+
+
+void UFCInteractionComponent::ApplyInteractionProfile(UFCInteractionProfile* NewProfile)
+{
+    ActiveProfile = (NewProfile && NewProfile->IsValidProfile()) ? NewProfile : nullptr;
+
+    // Optional: rebuild prompt widget if class differs
+    ClearFocusAndHidePrompt();
 }

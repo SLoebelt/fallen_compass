@@ -2,6 +2,10 @@
 
 #include "Logging/LogMacros.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "Components/CapsuleComponent.h"
+#include "Core/FCPlayerController.h"
+#include "Interaction/FCInteractionComponent.h"
+#include "Interaction/IFCInteractablePOI.h"
 #include "NavigationSystem.h"
 #include "NavigationPath.h"
 
@@ -45,6 +49,24 @@ void AFC_ExplorerCharacter::BeginPlay()
     UE_LOG(LogFCExplorerCharacter, Log, TEXT("ExplorerCharacter BeginPlay:"));
     UE_LOG(LogFCExplorerCharacter, Log, TEXT("  ExplorerType: %s"), *UEnum::GetValueAsString(ExplorerType));
     UE_LOG(LogFCExplorerCharacter, Log, TEXT("  Controller: %s"), CurrentController ? *CurrentController->GetName() : TEXT("NONE"));
+
+	if (UCapsuleComponent* CapsuleComp = GetCapsuleComponent())
+    {
+        CapsuleComp->OnComponentBeginOverlap.AddDynamic(this, &AFC_ExplorerCharacter::OnCapsuleBeginOverlap);
+        UE_LOG(LogFCExplorerCharacter, Log, TEXT("ExplorerCharacter: Bound capsule overlap event"));
+    }
+
+    if (AFCPlayerController* PC = Cast<AFCPlayerController>(CurrentController))
+    {
+        UFCInteractionComponent* IC = PC->FindComponentByClass<UFCInteractionComponent>();
+        InteractionComponent = IC;
+        if (!InteractionComponent.IsValid())
+        {
+            UE_LOG(LogFCExplorerCharacter, Warning,
+                TEXT("ExplorerCharacter: No UFCInteractionComponent found on controller %s"),
+                *GetNameSafe(PC));
+        }
+    }
 }
 
 
@@ -147,4 +169,36 @@ void AFC_ExplorerCharacter::MoveExplorerToLocation(const FVector& TargetLocation
         PathPoints.Num(),
         *StartLocation.ToString(),
         *TargetLocation.ToString());
+}
+
+void AFC_ExplorerCharacter::OnCapsuleBeginOverlap(
+    UPrimitiveComponent* OverlappedComponent,
+    AActor* OtherActor,
+    UPrimitiveComponent* OtherComp,
+    int32 OtherBodyIndex,
+    bool bFromSweep,
+    const FHitResult& SweepResult)
+{
+    if (!OtherActor || OtherActor == this)
+    {
+        return;
+    }
+
+    if (!OtherActor->GetClass()->ImplementsInterface(UIFCInteractablePOI::StaticClass()))
+    {
+        return;
+    }
+
+    if (!InteractionComponent.IsValid())
+    {
+        UE_LOG(LogFCExplorerCharacter, Warning,
+            TEXT("OnCapsuleBeginOverlap: InteractionComponent invalid, cannot notify arrival"));
+        return;
+    }
+
+    UE_LOG(LogFCExplorerCharacter, Log,
+        TEXT("ExplorerCharacter: Detected overlap with POI %s, notifying InteractionComponent"),
+        *OtherActor->GetName());
+
+    InteractionComponent->NotifyArrivedAtPOI(OtherActor);
 }

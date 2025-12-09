@@ -1,11 +1,16 @@
 #include "UI/FCBlockingWidgetBase.h"
+
 #include "Core/UFCGameInstance.h"
 #include "Core/FCUIManager.h"
+#include "Core/FCUIBlockSubsystem.h"
 
 void UFCBlockingWidgetBase::NativeConstruct()
 {
 	Super::NativeConstruct();
 
+	RegisterAsBlocker();
+
+	// Backward-compat: keep your existing focused widget path until all gating is migrated.
 	if (UWorld* World = GetWorld())
 	{
 		if (UFCGameInstance* GI = Cast<UFCGameInstance>(World->GetGameInstance()))
@@ -20,13 +25,15 @@ void UFCBlockingWidgetBase::NativeConstruct()
 
 void UFCBlockingWidgetBase::NativeDestruct()
 {
+	UnregisterAsBlocker();
+
+	// Backward-compat: clear focused widget only if we're still the focused one.
 	if (UWorld* World = GetWorld())
 	{
 		if (UFCGameInstance* GI = Cast<UFCGameInstance>(World->GetGameInstance()))
 		{
 			if (UFCUIManager* UIManager = GI->GetSubsystem<UFCUIManager>())
 			{
-				// Only clear if we're still the focused widget
 				if (UIManager->FocusedBlockingWidget == this)
 				{
 					UIManager->SetFocusedBlockingWidget(nullptr);
@@ -36,4 +43,32 @@ void UFCBlockingWidgetBase::NativeDestruct()
 	}
 
 	Super::NativeDestruct();
+}
+
+void UFCBlockingWidgetBase::RegisterAsBlocker()
+{
+	if (UWorld* World = GetWorld())
+	{
+		if (UFCGameInstance* GI = Cast<UFCGameInstance>(World->GetGameInstance()))
+		{
+			if (UFCUIBlockSubsystem* Blocker = GI->GetSubsystem<UFCUIBlockSubsystem>())
+			{
+				Blocker->RegisterBlocker(this, bBlocksWorldClick, bBlocksWorldInteract);
+			}
+		}
+	}
+}
+
+void UFCBlockingWidgetBase::UnregisterAsBlocker()
+{
+	if (UWorld* World = GetWorld())
+	{
+		if (UFCGameInstance* GI = Cast<UFCGameInstance>(World->GetGameInstance()))
+		{
+			if (UFCUIBlockSubsystem* Blocker = GI->GetSubsystem<UFCUIBlockSubsystem>())
+			{
+				Blocker->UnregisterBlocker(this);
+			}
+		}
+	}
 }

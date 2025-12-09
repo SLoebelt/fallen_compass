@@ -3,7 +3,7 @@
 #include "TimerManager.h"
 #include "FCPlayerController.h"
 #include "Components/FCInputManager.h"
-#include "Components/FCInteractionComponent.h"
+#include "Interaction/FCInteractionComponent.h"
 #include "Input/FCInputConfig.h"
 
 DEFINE_LOG_CATEGORY(LogFCPlayerModeCoordinator);
@@ -66,8 +66,10 @@ EFCPlayerMode UFCPlayerModeCoordinator::MapStateToMode(EFCGameStateID State) con
 {
 	switch (State)
 	{
+		case EFCGameStateID::MainMenu:
+			return EFCPlayerMode::MainMenu;
+
 		case EFCGameStateID::Office_Exploration:
-		case EFCGameStateID::Office_TableView:
 			return EFCPlayerMode::Office;
 
 		case EFCGameStateID::Overworld_Travel:
@@ -78,10 +80,10 @@ EFCPlayerMode UFCPlayerModeCoordinator::MapStateToMode(EFCGameStateID State) con
 		case EFCGameStateID::Camp_Local:
 			return EFCPlayerMode::Camp;
 
-		case EFCGameStateID::MainMenu:
 		case EFCGameStateID::Paused:
 		case EFCGameStateID::Loading:
 		case EFCGameStateID::ExpeditionSummary:
+		case EFCGameStateID::Office_TableView:
 			return EFCPlayerMode::Static;
 
 		default:
@@ -218,6 +220,11 @@ void UFCPlayerModeCoordinator::ApplyMode(EFCPlayerMode NewMode)
 		Interaction->SetFirstPersonFocusEnabled(Profile.CameraMode == EFCPlayerCameraMode::FirstPerson);
 		// Later: Interaction->ApplyModeProfile(Profile); (once we add it)
 	}
+}
+
+void UFCPlayerModeCoordinator::ReapplyCurrentMode()
+{
+    ApplyMode(CurrentMode);
 }
 
 bool UFCPlayerModeCoordinator::GetProfileForMode(EFCPlayerMode Mode, FPlayerModeProfile& OutProfile) const

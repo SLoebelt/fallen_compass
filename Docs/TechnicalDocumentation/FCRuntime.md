@@ -58,6 +58,7 @@ Details: `Managers/FCTransitionManager.md` → `Core/FCTransitionManager.h/.cpp`
 
 ### `UFCUIManager` — “Widget lifecycle + UI ↔ gameplay mediation”
 Central widget creation/show/hide, table-widget registry, blocking widgets, POI action selection mediator.  
+Delegates world-input gating to `UFCUIBlockSubsystem` by registering/unregistering blocking widgets (pause, tables, POI selection, overworld map, expedition summary), and stays view-only for POI actions (shows selection UI and forwards the chosen `EFCPOIAction` back to `UFCInteractionComponent`).  
 Details: `Managers/FCUIManager.md` → `Core/FCUIManager.h/.cpp`.
 
 ### `UFCLevelTransitionManager` — “Multi-system flows”
@@ -67,6 +68,10 @@ Details: `Managers/FCLevelTransitionManager.md` → `Core/FCLevelTransitionManag
 ### `UFCExpeditionManager` — “Expedition lifecycle + world-map exploration”
 Owns current expedition state, fog-of-war reveal, route preview, autosave of exploration state; delegates grid/pathfinding to `FFCWorldMapExploration`.  
 Details: `Managers/FCExpeditionManager.md` → `Expedition/FCExpeditionManager.h/.cpp`.
+
+### `UFCUIBlockSubsystem` — “World input gating (click vs interact)”
+Tracks which widgets currently block world input and exposes cached `CanWorldClick()` / `CanWorldInteract()` queries. Widgets register/unregister as blockers; `AFCPlayerController` and `UFCInteractionComponent` use this to avoid clicking/interacting through modal UI.  
+Details: `Managers/FCUIBlockSubsystem.md` → `Core/FCUIBlockSubsystem.h/.cpp`.
 
 ---
 
@@ -88,12 +93,14 @@ Details: `FCGameMode.md` — documents the legacy monolithic `AFCGameMode` and p
 
 ## 5) Player runtime layer — glossary (Controller + components + pawn)
 
-### `AFCPlayerController` — "Input router + camera mode driver + UI gating"
-- Routes input (Enhanced Input) and chooses behavior by camera mode (FirstPerson/TableView/TopDown/POIScene).
+### `AFCPlayerController` — "Input router + movement commands + UI gating"
+- Routes input (Enhanced Input) and forwards actions to systems like `UFCInteractionComponent`, `UFCGameInstance`, and `UFCUIManager`.
 - Owns `UFCInputManager`, `UFCCameraManager`, `UFCInteractionComponent`, and `UFCPlayerModeCoordinator` as ActorComponents.
 - Commands movement across scenes: `MoveConvoyToLocation()` for Overworld, `MoveExplorerToLocation()` for Camp.
-- Applies camera/input/cursor "presentation" for each game state via helper functions (e.g., Overworld_Travel, Camp_Local, ExpeditionSummary, Office_Exploration) that are invoked by `UFCPlayerModeCoordinator`.
-- Triggers UIManager flows (main menu, pause, table widgets, overworld HUD) and blocks "world interaction" when UI is active.
+- Does **not** own per-state camera/input/cursor defaults anymore; those are applied by `UFCPlayerModeCoordinator` from `FPlayerModeProfile`. Its `SetCameraModeLocal` helper is camera-only.
+- Uses a slim `ApplyPresentationForGameState` hook for event wiring only (e.g., binding/unbinding Overworld convoy delegates on state transitions), avoiding duplicate configuration paths.
+- Uses explicit world-input queries `CanWorldClick()` / `CanWorldInteract()` backed by `UFCUIBlockSubsystem` so click-to-move and "E interact" are correctly blocked when modal UI is active.
+- Triggers UIManager flows (main menu, pause, table widgets, overworld HUD) but keeps all POI action and movement decisions in `UFCInteractionComponent`.
 - Treats the overworld convoy and camp explorer as **event sources**: binds their POI-overlap delegates to the controller-owned `UFCInteractionComponent` (no pawn crawling or global controller lookups).
 
 Details: `FCPlayerController.md` → `FCPlayerController.h/.cpp`.
@@ -106,16 +113,13 @@ Details: `Managers/FCInputManager.md` → `Components/FCInputManager.h/.cpp`.
 Encapsulates camera transitions (menu, first-person, table-object, overworld top-down, POI/camp); manages temp cameras and restores previous targets.  
 Details: `Managers/FCCameraManager.md` → `Components/FCCameraManager.h/.cpp`.
 
-### `UFCInteractionComponent` (ActorComponent) — "POI interaction + action selection orchestration"
-- Lives on `AFCPlayerController` (not on pawns), making it available across all scenes (Office, Overworld, Camp).
-- Detects interactables in front of the player (trace-based in Office), exposes `Interact()` for focused targets.
-- Orchestrates POI click/overlap flows (Overworld + Camp): determine available actions → optionally open action selection UI (via `UFCUIManager`) → move convoy/explorer (via `AFCPlayerController`) → execute POI action on arrival.
-- Mode-aware movement: calls `MoveConvoyToLocation()` in Overworld (TopDown), `MoveExplorerToLocation()` in Camp (POIScene).
-- Shows/hides/updates an interaction prompt widget (requires a widget contract function like `SetInteractionPrompt`).
-- Caches its owning `AFCPlayerController` in `OnRegister`/`BeginPlay` and uses `GetOwnerPCCheckedOrNull()` for all controller access (no `GetInstigatorController` / `GetFirstPlayerController`); logs a single high-signal error if mis-owned.
-- Gates FirstPerson focus tracing and prompts via a boolean flag (`bFirstPersonFocusEnabled`) that is currently derived from `UFCCameraManager::GetCameraMode()`; when disabled it clears focus, hides the prompt, and early-outs from its trace/prompt update path so Overworld/Camp do not run FP traces.
+### `UFCInteractionComponent` (ActorComponent) — “Central interaction orchestrator”
+- Lives on `AFCPlayerController` and mediates interaction across Office, Overworld, and Camp.
+- Owns the POI interaction state machine (click → optional selection → move → arrival → execute) and the pending state it needs (POI, action, selection/arrival flags).
+- Issues movement **indirectly** via controller helpers (`MoveConvoyToLocation` / `MoveExplorerToLocation`) and executes POI actions on arrival in an idempotent way.
+- Also handles FirstPerson “look at + interact” for Office, but keeps that logic separate from POI flows.
 
-Details: `Components/FCInteractionComponent.md` → `FCInteractionComponent.h/.cpp`.
+Details: `TechnicalDocumentation/Components/FCInteractionComponent.md` → `FCInteractionComponent.h/.cpp` (full state machine + click/arrival API details).
 
 ### `UFCPlayerModeCoordinator` (ActorComponent) — "Game state → player mode → profile application"
 - Lives on `AFCPlayerController` as a non-ticking component.
@@ -155,7 +159,7 @@ Details: `Managers/FCWorldMapExploration.md` → `WorldMap/FCWorldMapExploration
 ## 7) Key cross-system contracts (how things connect)
 
 ### A) State → player experience
-`UFCGameStateManager.OnStateChanged` → `UFCPlayerModeCoordinator` (on the player controller) reacts, logs the transition, maps to `EFCPlayerMode`, and asks `AFCPlayerController` to apply the appropriate presentation (camera mode + input mapping + cursor/input mode) and call `UFCUIManager` where needed.
+`UFCGameStateManager.OnStateChanged` → `UFCPlayerModeCoordinator` (on the player controller) reacts, logs the transition, maps to `EFCPlayerMode`, and applies the appropriate `FPlayerModeProfile` (camera mode, input mapping mode, cursor/input mode) directly. `AFCPlayerController` remains responsible for movement commands and UI flows, but no longer re-derives camera/input/cursor defaults per state.
 
 ### B) Level travel orchestration (fade + load + finalize)
 `UFCLevelTransitionManager` sequences:  

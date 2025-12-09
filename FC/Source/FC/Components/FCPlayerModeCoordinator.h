@@ -43,4 +43,7 @@ private:
 
 public:
 	bool GetProfileForMode(EFCPlayerMode Mode, FPlayerModeProfile& OutProfile) const;
+
+	UFUNCTION(BlueprintCallable, Category="FC|Mode")
+	void ReapplyCurrentMode();
 };

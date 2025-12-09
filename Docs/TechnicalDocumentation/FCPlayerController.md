@@ -28,14 +28,13 @@ Key responsibilities:
 
 3. **Camera-mode routing**
 
-   * Owns "what camera mode should we be in," but delegates the actual blending to `UFCCameraManager`.
-   * `SetCameraModeLocal(...)` switches between MainMenu / FirstPerson / TableView / TopDown / POIScene and updates cursor + input mode accordingly. 
-   - For Camp/POI (`EFCGameStateID::Camp_Local`), the controller does **not** search for cameras itself; instead it calls `UFCCameraManager::BlendToPOISceneCamera(POISceneCameraActor, BlendTime)` when the state changes.
-   - If `POISceneCameraActor` is `nullptr`, `UFCCameraManager` auto-resolves an `ACameraActor` tagged `CampCamera` (or named accordingly) and uses `SetViewTargetWithBlend` on the controller to keep the Camp camera static while the player-controlled `AFC_ExplorerCharacter` moves.
+   * Exposes `SetCameraModeLocal(...)` as a **camera-only** helper that selects which logical camera mode should be active and delegates the actual blending to `UFCCameraManager`.
+   * Does **not** update cursor visibility or input mode here; those are applied from `FPlayerModeProfile` by `UFCPlayerModeCoordinator`.
+   - For Camp/POI, the controller does **not** search for cameras itself; instead `UFCCameraManager::BlendToPOISceneCamera(POISceneCameraActor, BlendTime)` handles static Camp camera targets and uses `SetViewTargetWithBlend` on the controller while the player-controlled `AFC_ExplorerCharacter` moves.
 
 4. **Game-flow entry points**
 
-   * Initializes the main menu UI (`InitializeMainMenu()`), starts gameplay from menu (`TransitionToGameplay()`), and can return to main menu (`ReturnToMainMenu()`). 
+   * Initializes the main menu UI (`InitializeMainMenu()`), starts gameplay from menu (`TransitionToGameplay()`), and can return to main menu (`ReturnToMainMenu()`), primarily by driving `UFCGameStateManager` transitions and UIManager flows. Presentation (camera/input/cursor) for each resulting state is applied by `UFCPlayerModeCoordinator`.
 
 5. **World interaction routing**
 
@@ -113,13 +112,25 @@ Key responsibilities:
 
 ### 3) `UFCInteractionComponent` (component) — POI interaction orchestration
 
-**Delegated:** POI action selection, movement triggering, and overlap handling (`HandlePOIClick`, `OnPOIActionSelected`, `NotifyPOIOverlap`).
-**Why:** centralizes POI interaction logic across Office, Overworld, and Camp; mode-aware movement (convoy vs explorer).
+**Delegated:** POI action selection, movement triggering, and arrival/overlap handling (`HandlePOIClick`, `OnPOIActionSelected`, `NotifyArrivedAtPOI`, `NotifyPOIOverlap`).
+**Why:** centralizes POI interaction logic across Office, Overworld, and Camp; mode-aware movement (convoy vs explorer) with a single arrival-gated execution path.
 **How it connects now:**
-- Overworld convoy and (optionally) camp explorer expose POI-overlap delegates.
-- `AFCPlayerController` resolves the active convoy (`ActiveConvoy`) at startup and binds its overlap delegate to `UFCInteractionComponent::NotifyPOIOverlap`.
+- Overworld convoy and Camp explorer expose POI-overlap or arrival delegates.
+- `AFCPlayerController` resolves the active convoy (`ActiveConvoy`) at startup and binds its overlap delegate to `UFCInteractionComponent::NotifyArrivedAtPOI`, treating convoy overlaps as **arrivals** into the interaction state machine.
+- Camp explorer reports capsule overlaps with POIs into `NotifyArrivedAtPOI` as well, so both movement sources share the same arrival pipeline.
+- `NotifyArrivedAtPOI` decides whether the arrival completes a pending, arrival-gated intent (`bAwaitingArrival` + matching `PendingPOI`/`PendingAction`) or should be treated as an incidental collision and forwarded to `NotifyPOIOverlap`.
 - Convoy/explorer remain pure event sources; they never crawl to the controller or interaction component.
-**Note:** Moved from `AFCFirstPersonCharacter` to `AFCPlayerController` to work across all scenes.
+ - Routing invariant (0003/0004): the controller only routes input and exposes movement helpers (e.g., `MoveConvoyToLocation`, `MoveExplorerToLocation`); all POI action selection and movement decisions live in `UFCInteractionComponent`.
+
+### World input gating (0004 – UI blocking)
+
+- Exposes two explicit queries used throughout click/interaction handlers:
+   - `bool CanWorldClick() const;` — should the game respond to world clicks (click-to-move, POI click, table object click) right now?
+   - `bool CanWorldInteract() const;` — should the game run FirstPerson focus traces / "E interact" right now?
+- Both methods ask `UFCUIBlockSubsystem` (via the owning `UFCGameInstance`) whether any registered widgets currently block click and/or interact, and fall back to legacy checks while older widgets are migrated.
+- Click handlers (`HandleClick`, `HandleOverworldClickMove`, `HandleTableObjectClick`) call `CanWorldClick()` before touching world actors.
+- Interaction entry points (`HandleInteractPressed`) call `CanWorldInteract()` before running FP traces or delegating to `UFCInteractionComponent`.
+- **Routing invariant:** the controller only routes input and exposes movement helpers; all POI action selection and movement decisions live in `UFCInteractionComponent`.
 
 ### 4) `UFCGameStateManager` (subsystem) — authoritative state + pause stack
 

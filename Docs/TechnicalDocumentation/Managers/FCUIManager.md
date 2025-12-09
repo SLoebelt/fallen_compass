@@ -102,6 +102,16 @@ Core responsibilities:
 * Stores the `InteractionComponent` temporarily in `PendingInteractionComponent`, letting UI remain decoupled from gameplay actor logic.
 * After creating the widget, it looks up and calls a Blueprint function named **`PopulateActions`** via `ProcessEvent` to push the `Actions` array into the widget. 
 * When an action is selected, it calls `PendingInteractionComponent->OnPOIActionSelected(Action)` then closes the widget and clears references.
+* **View-only invariant (0003/0004):** `UFCUIManager` never issues movement, executes POI actions, or mutates `UFCInteractionComponent`'s internal state; it only presents the POI action selection UI and forwards the chosen `EFCPOIAction` back via `OnPOIActionSelected`.
+
+### Blocking widgets and world-input gating
+
+`UFCUIManager` cooperates with `UFCUIBlockSubsystem` to express which widgets block world input:
+
+* Widgets based on blocking-aware base classes (pause menu, table widgets, POI action selection, overworld map, expedition summary) automatically register/unregister as blockers in `UFCUIBlockSubsystem` with `bBlocksWorldClick` / `bBlocksWorldInteract` flags.
+* Legacy blocking widgets are still driven by `UFCUIManager` calling into the subsystem to set/clear a focused blocker until they are migrated.
+* Controllers and interaction components do not inspect widgets directly; they query `AFCPlayerController::CanWorldClick()` / `CanWorldInteract()`, which are backed by `UFCUIBlockSubsystem`.
+* **View-only invariant (0003):** `UFCUIManager` never issues movement, executes POI actions, or mutates `UFCInteractionComponent`’s internal state; it only presents UI and forwards `EFCPOIAction` back to `OnPOIActionSelected`.
 
 ---
 

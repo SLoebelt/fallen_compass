@@ -16,6 +16,8 @@ enum class EFCExplorerType : uint8
     Female  UMETA(DisplayName = "Female")
 };
 
+class UFCInteractionComponent;
+
 UCLASS()
 class FC_API AFC_ExplorerCharacter : public ACharacter
 {
@@ -52,4 +54,19 @@ protected:
     /** Distance threshold to advance to the next path point. */
     UPROPERTY(EditAnywhere, Category = "Movement")
     float AcceptRadius = 50.0f;
+
+	/** Cached reference to the player's interaction component (for POI arrival notifications). */
+    UPROPERTY()
+    TWeakObjectPtr<UFCInteractionComponent> InteractionComponent;
+
+    /** Handle capsule overlap with POIs (Camp arrival). */
+    UFUNCTION()
+    void OnCapsuleBeginOverlap(
+        UPrimitiveComponent* OverlappedComponent,
+        AActor* OtherActor,
+        UPrimitiveComponent* OtherComp,
+        int32 OtherBodyIndex,
+        bool bFromSweep,
+        const FHitResult& SweepResult
+    );
 };

@@ -32,11 +32,13 @@ Key responsibilities:
    * Stores pending action and triggers movement if not already at POI.
    * Immediate execution if already at POI location (left-click scenario).
 
-4. **POI overlap notification**
+4. **Arrival vs incidental overlap notification**
 
-   * `NotifyPOIOverlap(AActor*)` is bound as a handler to world-side POI-overlap delegates (e.g., `AFCOverworldConvoy`), and triggers when convoy/explorer reaches a POI.
-   * Executes stored pending action via `IIFCInteractablePOI::Execute_ExecuteAction()`.
-   * Broadcasts result via `OnPOIActionCompleted` delegate.
+   * Provides two closely-related entry points into the interaction state machine:
+     * `NotifyArrivedAtPOI(AActor* POIActor)` — **canonical arrival** API used by Overworld convoy and Camp explorer when they reach a POI (overlap or path-complete). If `bAwaitingArrival` is set and `PendingPOI`/`PendingAction` match, it executes the pending action via `ExecutePOIActionNow`; otherwise, it falls back to incidental handling.
+     * `NotifyPOIOverlap(AActor* POIActor)` — **incidental overlap** handler for unplanned collisions (enemy ambush, LMB move collisions, exploratory walking). If there is a matching pending POI and action (and we are not still awaiting selection), it completes that execution; otherwise, it auto-executes single-action POIs or opens the selection UI for multi-action POIs.
+   * Both code paths use the internal helper `ExecutePOIActionNow(AActor* POIActor, EFCPOIAction Action)` to clear pending interaction state exactly once (via `ResetInteractionState()`) and then execute the selected action via `IIFCInteractablePOI::Execute_ExecuteAction()`.
+   * This guarantees idempotent execution even if overlaps arrive re-entrantly or multiple arrival events are fired for the same POI.
 
 5. **Office trace-based interaction (legacy)**
 
@@ -52,7 +54,8 @@ Key responsibilities:
 
 * `HandlePOIClick(AActor* POIActor)` → entry point for POI interactions (called by `AFCPlayerController`).
 * `OnPOIActionSelected(EFCPOIAction SelectedAction)` → callback from action selection UI widget.
-* `NotifyPOIOverlap(AActor* POIActor)` → called when convoy/explorer reaches POI to execute action.
+* `NotifyArrivedAtPOI(AActor* POIActor)` → canonical arrival entry point used by convoy/explorer when they reach a POI; completes a pending, arrival-gated action if it matches, otherwise delegates to incidental overlap handling.
+* `NotifyPOIOverlap(AActor* POIActor)` → incidental overlap handler used for unplanned collisions; may still execute pending actions or start a new selection flow depending on current state.
 * `GetPendingInteractionPOI()` → returns currently queued POI actor.
 
 ### Office interaction (FirstPerson)
@@ -104,21 +107,79 @@ Key responsibilities:
 - Internally caches its `AFCPlayerController` owner in `OnRegister`/`BeginPlay` and uses that cached pointer everywhere (no `GetInstigatorController`/`GetFirstPlayerController`), logging a clear error once if mis-owned.
 - Gates FirstPerson focus tracing and prompts behind a boolean (`bFirstPersonFocusEnabled`) that is now toggled explicitly by higher-level configuration (e.g., `UFCPlayerModeCoordinator`) instead of being recomputed every Tick from `UFCCameraManager::GetCameraMode()`. When disabled, it clears the current focus, hides the prompt widget, and early-outs from its trace/prompt update path so Overworld/Camp do not run FP traces.
 
+### Invariants (0003 – pending state + arrival-gated execution)
+
+To keep POI interactions predictable and maintainable, `UFCInteractionComponent` enforces these invariants:
+
+- **Single-action policy**
+  - 0 actions → log and ignore.
+  - 1 action → **auto-run**:
+    - Set `PendingPOI` + `PendingAction`.
+    - Use a distance-based check (`NeedsMovement` inside `HandlePOIClick`) to decide:
+      - If movement is needed → set `bAwaitingArrival = true` and issue movement via a local `IssueMovementToPOI` lambda (which calls `MoveConvoyToLocation` / `MoveExplorerToLocation` on the controller).
+      - If already at POI → call `NotifyArrivedAtPOI` immediately (still arrival-gated, no movement).
+  - >1 actions → **Selecting**:
+    - `bAwaitingSelection = true`, `bAwaitingArrival = false`.
+    - `PendingPOI` stores the clicked POI.
+    - Ask `UFCUIManager` to show the action-selection UI.
+    - No movement until `OnPOIActionSelected` is called.
+
+- **Single movement authority**
+  - Movement for POI interactions is only issued from:
+    - `HandlePOIClick` (for 1‑action POIs), and
+    - `OnPOIActionSelected` (for >1‑action POIs after selection),
+  - Both issue movement exclusively via controller helpers (`MoveConvoyToLocation` / `MoveExplorerToLocation`) inside the shared `IssueMovementToPOI` lambda.
+  - UI widgets and `UFCUIManager` never call movement functions directly.
+
+- **Arrival-gated execution**
+  - Planned arrivals (from convoy or explorer) enter via `NotifyArrivedAtPOI`:
+    - If `bAwaitingArrival` is true and `PendingPOI`/`PendingAction` match the arriving POI, the component executes the action via `ExecutePOIActionNow`.
+    - If arrival does not match the pending POI, it cancels the old intent via `ResetInteractionState()` and falls back to `NotifyPOIOverlap` for incidental handling.
+  - Incidental overlaps (enemy ambush, LMB move collisions, exploratory walking) enter via `NotifyPOIOverlap` and:
+    - Execute a matching pending POI/action if appropriate, or
+    - Auto-execute single-action POIs, or
+    - Start a new selection flow for multi-action POIs.
+
+- **Idempotent execution**
+  - All actual POI action execution goes through `ExecutePOIActionNow(AActor* POIActor, EFCPOIAction Action)`, which:
+    - Calls `ResetInteractionState()` once before executing.
+    - Invokes `IIFCInteractablePOI::Execute_ExecuteAction` on the POI.
+    - Clears the convoy’s `bIsInteractingWithPOI` latch (via the active convoy, if any).
+  - This prevents double-fires even if multiple overlaps or arrival events occur for the same POI.
+
+- **FP carve-out**
+  - FirstPerson / Office flow uses `CurrentInteractable` + `Interact()` only.
+  - FP interactions never call convoy/explorer movement helpers and do not touch POI pending state (`PendingPOI`, `PendingAction`, `bAwaitingSelection`, `bAwaitingArrival`).
+
 ### Movement pattern difference
 
 **Overworld (TopDown):**
 - PlayerController possesses `AFCOverworldConvoy` pawn.
-- Convoy leader has AI controller that drives movement.
-- InteractionComponent calls `MoveConvoyToLocation()` → delegates to convoy AI.
+- Convoy movement is pawn-driven (character movement + path-following on the leader), not via an AIController owned by `UFCInteractionComponent`.
+- InteractionComponent calls `MoveConvoyToLocation()` on the controller; the controller/pawn own the concrete movement implementation.
 
 **Camp (POIScene):**
 - PlayerController possesses `AFC_ExplorerCharacter` pawn (standard pawn possession; camera remains static via `UFCCameraManager`).
-- `AFC_ExplorerCharacter` owns its own NavMesh path + steering logic; movement is pawn-driven, not via a dedicated AIController.
-- InteractionComponent calls `MoveExplorerToLocation()` → delegates to controller, which forwards to the possessed explorer pawn.
+- `AFC_ExplorerCharacter` owns its NavMesh path + steering logic; movement is pawn-driven and steered through `AddMovementInput` in `Tick`.
+- InteractionComponent calls `MoveExplorerToLocation()` on the controller, which forwards to the possessed explorer pawn.
 
 **Office (FirstPerson):**
 - PlayerController possesses `AFCFirstPersonCharacter` pawn.
-- No POI interactions; uses legacy `Interact()` trace-based system for desks.
+- No POI movement; uses legacy `Interact()` trace-based system for desks/objects only.
+
+### Interaction profiles (0004 – mode-specific FP interaction)
+
+`UFCInteractionComponent` can be configured by `UFCInteractionProfile` DataAssets:
+
+* A profile defines:
+  * Probe type (currently applied as line traces; future: sphere trace, overlap, cursor-hit).
+  * Trace channel and range.
+  * Optional radius (for non-line traces).
+  * Optional prompt widget class.
+  * Optional allowed actor tags (filter which actors can ever be considered as interactables in this mode).
+* The current active profile is supplied by `UFCPlayerModeCoordinator` via the current `FPlayerModeProfile::InteractionProfile` and applied through `UFCInteractionComponent::ApplyInteractionProfile(UFCInteractionProfile* NewProfile)`.
+* `DetectInteractables()` resolves the effective profile (`ActiveProfile` or `DefaultProfile`), uses its `Range` and `TraceChannel` to build the trace, and applies `AllowedTags` filtering before checking `IIFCInteractable` and per-object `GetInteractionRange` / `CanInteract`.
+* Before tracing, `DetectInteractables()` checks `AFCPlayerController::CanWorldInteract()` (backed by `UFCUIBlockSubsystem`) and early-outs if world interaction is currently blocked by UI so prompts/logs do not appear behind modals.
 
 ---
 

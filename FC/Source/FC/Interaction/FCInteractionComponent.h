@@ -5,12 +5,23 @@
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
 #include "IFCInteractablePOI.h"
+#include "FCInteractionProfile.h"
 #include "FCInteractionComponent.generated.h"
 
 class IIFCInteractable;
 class UUserWidget;
 
 DECLARE_LOG_CATEGORY_EXTERN(LogFCInteraction, Log, All);
+
+// Optional: logging-only phase enum
+UENUM()
+enum class EFCInteractionPhase : uint8
+{
+	Idle,
+	Selecting,
+	MovingToPOI,
+	Executing
+};
 
 /**
  * UFCInteractionComponent - Handles detection and execution of player interactions
@@ -50,17 +61,16 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Interaction|POI")
 	void NotifyPOIOverlap(AActor* POIActor);
 
+	// Called by convoy/explorer when they arrive at a POI (overlap or path-complete).
+	// If bAwaitingArrival is true and PendingPOI matches POIActor, executes PendingAction.
+	// Otherwise falls back to incidental overlap handling (enemy ambush, LMB move).
+	// Always clears latches on a valid pending execution (idempotent).
+	UFUNCTION()
+	void NotifyArrivedAtPOI(AActor* POIActor);
+
 	/** Called when user selects an action from the selection widget */
 	UFUNCTION()
 	void OnPOIActionSelected(EFCPOIAction SelectedAction);
-
-	/** Returns pending interaction POI */
-	UFUNCTION(BlueprintPure, Category = "Interaction|POI")
-	AActor* GetPendingInteractionPOI() const { return PendingInteractionPOI; }
-
-	/** Returns true if there's a pending POI interaction */
-	UFUNCTION(BlueprintPure, Category = "Interaction|POI")
-	bool HasPendingPOIInteraction() const { return bHasPendingPOIInteraction; }
 
 protected:
 	/** Performs a line trace to detect interactables */
@@ -86,7 +96,44 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Interaction|Debug")
 	bool bShowDebugTrace = false;
 
+	UPROPERTY(EditDefaultsOnly, Category="Interaction|Profile")
+	TSoftObjectPtr<UFCInteractionProfile> DefaultProfile;
+
 private:
+	UPROPERTY()
+	TObjectPtr<UFCInteractionProfile> ActiveProfile;
+
+	UFCInteractionProfile* GetEffectiveProfile() const;
+
+	/** POI actor currently targeted by click (separate from first-person CurrentInteractable). */
+	TWeakObjectPtr<AActor> FocusedTarget;
+
+	/** POI actor for the active POI interaction flow (selection → move → execute). */
+	TWeakObjectPtr<AActor> PendingPOI;
+
+	/** Selected action to execute for PendingPOI once conditions are met (arrival-gated next task). */
+	TOptional<EFCPOIAction> PendingAction;
+
+	/** True when UI selection is open / required before we can proceed. */
+	bool bAwaitingSelection = false;
+
+	/** True when we have a chosen action and must wait until we arrive at PendingPOI. */
+	bool bAwaitingArrival = false;
+
+	/**
+	 * True if we began selection while already at the POI (overlap happened before selection),
+	 * so after selection we execute immediately without issuing movement again.
+	 */
+	bool bPendingPOIAlreadyReached = false;
+
+	EFCInteractionPhase GetCurrentInteractionPhase() const;
+
+	/** Clears pending POI state (safe to call multiple times). */
+	void ResetInteractionState();
+
+	void ExecutePOIActionNow(AActor* POIActor, EFCPOIAction Action);
+
+	// TODO - check if still needed after refactor
 	/** Currently focused interactable actor */
 	TWeakObjectPtr<AActor> CurrentInteractable;
 
@@ -96,15 +143,6 @@ private:
 
 	/** Timer for interaction checks */
 	float InteractionCheckTimer = 0.0f;
-
-	/** Pending POI interaction data */
-	UPROPERTY()
-	TObjectPtr<AActor> PendingInteractionPOI;
-
-	EFCPOIAction PendingInteractionAction;
-	bool bHasPendingPOIInteraction = false;
-
-	bool bConvoyAlreadyAtPOI = false; // True when convoy reached POI before action selection (left-click)
 
 	// Cached because Owner is the PlayerController (GetInstigatorController() can be null here)
 	TWeakObjectPtr<class AFCPlayerController> OwnerPC;
@@ -121,10 +159,15 @@ private:
     /** Clears current focus target and hides the prompt widget, if any. */
     void ClearFocusAndHidePrompt();
 
-    // TODO - delete this function, when coordinator-driven gating tested and robust
-    void UpdateFirstPersonFocusGateFromCameraMode();
-
 public:
-    /** Enables or disables FirstPerson focus tracing + prompts (used by mode system/coordinator). */
-    void SetFirstPersonFocusEnabled(bool bEnabled);
+	AActor* GetPendingInteractionPOI() const { return PendingPOI.Get(); }
+
+	bool HasPendingPOIInteraction() const
+	{
+		return bAwaitingSelection || bAwaitingArrival;
+	}
+
+	void SetFirstPersonFocusEnabled(bool bEnabled);
+
+	void ApplyInteractionProfile(UFCInteractionProfile* NewProfile);
 };
