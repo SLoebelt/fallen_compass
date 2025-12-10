@@ -377,7 +377,7 @@
 
 - [x] **Analysis**
 
-  - [x] What implementations already exist: Check technical documentation (`/Docs/Technical_Documentation.md`) and project file system (`/FC/*`)
+  - [x] What implementations already exist: Check technical documentation (`/Docs/TechnicalDocumentation/FCRuntime.md and linked files`) and project file system (`/FC/*`)
 
 - [x] **Implementation**
   - [x] Verify C++ interface exists at `/FC/Source/FC/Interaction/IFCInteractable.h` (already present)

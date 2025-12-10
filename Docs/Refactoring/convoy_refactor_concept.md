@@ -1,469 +1,531 @@
-# Convoy Movement Refactor Concept (Pre-Interaction 0003)
+# Convoy Movement Refactor Concept (Updated: Manual Movement + Convoy Pivot Follows Leader)
 
-Goal: align Overworld convoy movement with the working Camp explorer pattern (`AFC_ExplorerCharacter`) so walking animations drive from `AddMovementInput` (no AI controllers), and provide a clean foundation for later interaction/arrival-gated work.
+Goal: align Overworld convoy movement with the working Camp explorer pattern (`AFC_ExplorerCharacter`) so walking animations are driven by **velocity from `AddMovementInput`** (no AI `MoveTo`), while keeping the existing Overworld systems intact—especially **world map revelation**, which relies on the convoy actor’s position.
+
+This doc is updated to reflect current project realities:
+- Convoy movement is currently issued via `AAIController::MoveToLocation` inside `AFCPlayerController`.
+- Convoy members are currently spawned and **attached** to spawn point components in `AFCOverworldConvoy`.
+- The OverworldConvoy Blueprint records visited map locations based on `GetActorLocation(self)`, so the **convoy actor transform is currently treated as the “true convoy position.”**
+
+---
+
+## 0. Beginner mental model (why we’re doing this)
+
+There are two common movement approaches in Unreal:
+
+### A) AI `MoveTo` (current convoy)
+- You tell an AI controller “go there.”
+- The AI system moves the character.
+- It works, but animation and movement debugging can be less predictable because movement isn’t driven by explicit per-frame input.
+
+### B) Manual input movement (Explorer pattern)
+- You compute a direction and call `AddMovementInput`.
+- CharacterMovement turns that into velocity.
+- Animations that blend by velocity/speed behave consistently.
+
+Explorer already works using (B). We want convoy to use the same movement pipeline.
 
 ---
 
 ## 1. Current setups (baseline)
 
 ### 1.1 Camp Explorer (`AFC_ExplorerCharacter`)
-
-- Inherits `ACharacter`, **no AI controller**:
-  - `AutoPossessPlayer = EAutoReceiveInput::Player0;`
-  - `AIControllerClass = nullptr;`
-- `UCharacterMovementComponent` configured for top-down:
-  - `bOrientRotationToMovement = true;`
-  - `bUseControllerDesiredRotation = false;`
-  - `bConstrainToPlane = true;`
-  - `bSnapToPlaneAtStart = true;`
-  - `MaxWalkSpeed = 300.0f`.
-- Movement is **manual, pawn-driven**:
-  - `MoveExplorerToLocation(const FVector& TargetLocation)` calls `UNavigationSystemV1::FindPathToLocationSynchronously`.
-  - Stores the resulting path in `PathPoints`, tracks `CurrentPathIndex` and `bIsFollowingPath`.
-  - On `Tick`, if following:
-    - Compute `ToTarget = PathPoints[CurrentPathIndex] - GetActorLocation()` (Z flattened).
-    - If `Distance > AcceptRadius` → `AddMovementInput(Direction, 1.0f)`.
-    - Else advance `CurrentPathIndex` or finish.
-  - **No AI MoveTo**; animations blend correctly from velocity driven by input.
+- Finds a nav path via `UNavigationSystemV1::FindPathToLocationSynchronously`.
+- Stores path state (`PathPoints`, `CurrentPathIndex`, `bIsFollowingPath`).
+- In Tick, steers along the path using `AddMovementInput`.
 
 ### 1.2 Overworld Convoy (`AFCOverworldConvoy` + `AFCConvoyMember`)
 
 #### `AFCOverworldConvoy`
-
-- Pure `AActor` (not a character).
-- Owns a component hierarchy:
-  - Root + `CameraAttachPoint` + `LeaderSpawnPoint` + `Follower1SpawnPoint` + `Follower2SpawnPoint`.
-- Spawns three `AFCConvoyMember` instances at the spawn points and attaches them.
-- Tracks:
-  - `TArray<AFCConvoyMember*> ConvoyMembers;`
-  - `AFCConvoyMember* LeaderMember;`
-  - `bool bIsInteractingWithPOI;`.
-- Movement-related API:
-  - `StopAllMembers()` currently assumes AI:
-    - For each member, casts `Member->GetController()` to `AAIController` and calls `StopMovement()`.
-  - `HandlePOIOverlap(AActor* POIActor)`:
-    - Guards double triggers via `bIsInteractingWithPOI`.
-    - Calls `StopAllMembers()` and broadcasts `OnConvoyPOIOverlap`.
+- Spawns leader + followers and currently attaches them to spawn point components.
+- Has POI overlap handling and a “gate” (`bIsInteractingWithPOI`) to prevent duplicate overlaps.
+- `StopAllMembers()` currently assumes AI controllers and calls `StopMovement()`.
 
 #### `AFCConvoyMember`
-
 - Inherits `ACharacter`.
-- Configures capsule + overlap events.
-- Explicit AI:
-  - `AutoPossessAI = EAutoPossessAI::PlacedInWorldOrSpawned;`
-- No explicit movement API yet; convoy locomotion is implied to be AI-driven elsewhere (likely via `AAIController::MoveTo`), which explains broken animation compared to Explorer.
+- Currently auto-possesses AI (so an AI controller exists).
+- Tick is currently not used for manual path following.
 
-**Key gap:**
+#### Important dependency (OverworldConvoy Blueprint Tick)
+- The OverworldConvoy Event Graph records visited world locations using **`GetActorLocation(self)`** (with a distance threshold).
+- This means many systems implicitly treat the convoy actor as the authoritative “convoy position” (world map, often camera pivot).
 
-- Explorer: manual `AddMovementInput` + internal path state → smooth, predictable animations.
-- Convoy: AI-driven characters stopped via `AAIController::StopMovement()` → animations not tied to explicit input and harder to reason about.
-
-To match Explorer behavior and prepare for interaction 0003, convoy movement should adopt a **manual path-follow driver** (no AI-dependency) and a single clear movement authority.
+**Key gap:** if we move only the leader character and the convoy actor stays still, the world map recording (and any camera anchored to convoy actor) can break.
 
 ---
 
-## 2. Target movement architecture for convoy
+## 2. Target movement architecture
 
-**Goal:** single predictable movement pipeline, shared concepts with Explorer.
+**Goal:** one predictable movement pipeline shared with Explorer, while keeping existing systems stable.
 
-- Exactly **one authoritative path follower** for the convoy leader:
-  - Pathfinding via `UNavigationSystemV1::FindPathToLocationSynchronously`.
-  - Path state stored on the **leader character** (not an AI controller).
-  - `Tick` (or timer) drives `AddMovementInput` along the path.
-- Followers:
-  - Either simple **offset-follow** behind the leader using manual movement, or
-  - Purely visual children of a leader/convoy root (if we choose ultra-simple later).
-- `AFCOverworldConvoy` responsibilities:
-  - Spawner + holder of references (leader + followers).
-  - Small API surface for `MoveConvoyToLocation(Target)` and `StopConvoy()`.
-  - No AI-specific logic; assumes members manage their own movement using character movement.
+### 2.1 Leader (authoritative walker)
+- Only the leader computes a nav path (`FindPathToLocationSynchronously`).
+- Leader follows the path in Tick using `AddMovementInput(..., bForce=true)`.
 
----
+### 2.2 Followers (cheap + animation-friendly)
+- Followers do not compute nav paths.
+- Followers follow the leader using a simple offset target: `LeaderLocation + FollowerOffset`.
+- Followers move via `AddMovementInput(..., bForce=true)` so animations stay correct.
 
-## 3. Step-by-step refactor (pre-interaction)
+### 2.3 Convoy manager actor stays authoritative for “convoy position”
+**Critical decision (Option 1):** `AFCOverworldConvoy` remains the single authoritative transform for:
+- world map visited-location recording
+- camera pivot / camera attach points
+- any future systems that read convoy actor location
 
-Treat this as a mini-milestone to complete before applying the interaction/arrival-gated refactor.
-
-### Step 1 — Remove AI controller dependency from convoy members
-
-**1.1 In `AFCConvoyMember`**
-
-- Disable AI auto-possession:
-  - `AutoPossessAI = EAutoPossessAI::Disabled;` (or remove explicit AI auto-possession).
-- Ensure Blueprint subclasses:
-  - Do **not** assign an `AIControllerClass`, or set it to `nullptr`.
-
-**1.2 In `AFCOverworldConvoy::StopAllMembers()`**
-
-- Stop assuming `AAIController`.
-- Replace AI-based `StopMovement()` with a character-side API, e.g.:
-
-  ```cpp
-  void AFCConvoyMember::StopConvoyMovement();
-  ```
-
-- Implementation sketch:
-  - Clear `bIsFollowingPath` and path indices on each member.
-  - Optionally zero accumulated input or use `GetCharacterMovement()->StopMovementImmediately()`.
-
-**Acceptance:**
-
-- In PIE, convoy members should no longer rely on AI controllers for movement.
-- Calling `StopAllMembers()` should not crash or assume an `AAIController` exists.
+To achieve this:
+- The leader walks.
+- The convoy actor (pivot) follows the leader each tick.
 
 ---
 
-### Step 2 — Design shared path-follow state on convoy members
+## 3. Step-by-step refactor (pre-interaction milestone)
 
-We can later factor this into a reusable component; for now, keep it simple on `AFCConvoyMember`.
+### Step 1 — Stop attaching convoy members to spawn point components
+**Change**
+- In `AFCOverworldConvoy::SpawnConvoyMembers`, remove `AttachToComponent(...)` for leader and followers.
+- Still spawn them at the spawn point world transform.
 
-**2.1 State fields (leader + optionally followers)**
+**Why**
+- Characters are meant to move as independent actors with CharacterMovement.
+- Attachment can fight movement and makes debugging harder.
+- References (`LeaderMember`, `ConvoyMembers`) already give ownership/control.
 
-Add (private):
+**Acceptance**
+- Members spawn at correct locations.
+- Members are not children of spawn point components in the Outliner.
+
+---
+
+### Step 2 — Make `AFCOverworldConvoy` a pivot that follows the center that encloses all convoy members (preserve world map + camera behavior)
+**Change**
+To position the convoy actor at the center that encloses all convoy members (front/back, left/right bounds), do this in AFCOverworldConvoy::Tick:
+
+Gather all valid convoy members’ world locations.
+Calculate their bounding box (FBox) or centroid (average position).
+Set convoy actor location to the bounding box center (for full group coverage).
+Optionally interpolate smoothly with FMath::VInterpTo.
+Example C++ Tick (center based on bounding box):
 
 ```cpp
-TArray<FVector> PathPoints;          // Nav path points
-int32 CurrentPathIndex = INDEX_NONE; // Current waypoint index
-bool bIsFollowingPath = false;       // Are we actively walking a path?
-float AcceptRadius = 50.0f;          // Distance to advance/finish
+void AFCOverworldConvoy::Tick(float DeltaTime)
+{
+    Super::Tick(DeltaTime);
+ 
+    if (ConvoyMembers.Num() == 0)
+    {
+        return;
+    }
+ 
+    TArray<FVector> MemberPositions;
+    for (auto* Member : ConvoyMembers)
+    {
+        if (Member && !Member->IsPendingKill())
+        {
+            MemberPositions.Add(Member->GetActorLocation());
+        }
+    }
+ 
+    if (MemberPositions.Num() == 0)
+    {
+        return;
+    }
+ 
+    FBox ConvoyBounds(MemberPositions);
+ 
+    FVector DesiredLocation = ConvoyBounds.GetCenter();
+ 
+    // Optional smoothing
+    float SmoothSpeed = 5.0f;
+    FVector NewLocation = FMath::VInterpTo(GetActorLocation(), DesiredLocation, DeltaTime, SmoothSpeed);
+ 
+    SetActorLocation(NewLocation);
+}
 ```
 
-**2.2 Minimal movement API**
+**Why**
+The bounding box center ensures the convoy actor is positioned at the middle of the whole group.
+This allows camera systems attached to the convoy actor to frame the entire convoy’s front/back and side-to-side range.
+Smoothing avoids jittery camera movement when members shift quickly.
+
+**Acceptance**
+
+* World map visited-location recording continues to work after refactor.
+* Camera/pivot behavior remains correct (convoy actor keeps moving in the world).
+
+---
+
+### Step 3 — Remove AI controller dependency from convoy members
+
+**Change**
+
+* In `AFCConvoyMember`:
+
+  * Set `AutoPossessAI = Disabled`.
+  * Ensure BP subclasses have `AIControllerClass = None`.
+
+**Why**
+
+* We want one movement authority (manual Tick path-follow), not AI.
+* Removes hidden state and makes movement predictable.
+
+**Acceptance**
+
+* Members no longer spawn AI controllers.
+* No code assumes `AAIController` exists.
+
+---
+
+### Step 4 — Ensure unpossessed characters can still move
+
+**Change**
+In `AFCConvoyMember` constructor:
+
+* `PrimaryActorTick.bCanEverTick = true;`
+* Configure CharacterMovement like Explorer (orient to movement, plane constraints, etc.).
+* Enable physics movement without controller:
+
+  * `GetCharacterMovement()->bRunPhysicsWithNoController = true;`
+
+**Why**
+
+* Without AI and without possession, some movement may be ignored.
+* This is the common “why won’t AddMovementInput work?” pitfall.
+
+**Acceptance**
+
+* With AI disabled, AddMovementInput still moves convoy members.
+
+---
+
+### Step 5 — Add manual path-follow state + API to `AFCConvoyMember` (leader)
+
+**Change**
+Add state:
+
+```cpp
+TArray<FVector> PathPoints;
+int32 CurrentPathIndex = INDEX_NONE;
+bool bIsFollowingPath = false;
+float AcceptRadius = 50.0f;
+FVector FinalTarget = FVector::ZeroVector; // optional
+```
+
+Add API:
 
 ```cpp
 void MoveConvoyMemberToLocation(const FVector& TargetLocation);
 void StopConvoyMovement();
-bool IsMoving() const; // optional helper
 ```
 
-**2.3 Implementation sketch (mirror Explorer)**
+**Why**
 
-- In `MoveConvoyMemberToLocation`:
-  - Obtain `UWorld*` and `UNavigationSystemV1*`.
-  - Call `FindPathToLocationSynchronously(World, StartLocation, TargetLocation, this)`.
-  - If no valid path → log and call `StopConvoyMovement()`.
-  - Else:
-    - Fill `PathPoints` from `NavPath->PathPoints`.
-    - Set `CurrentPathIndex = 0; bIsFollowingPath = true;`.
+* Path-follow requires stored state across frames.
+* Clean API avoids other systems mutating internals.
 
-- In `StopConvoyMovement`:
-  - Set `bIsFollowingPath = false; CurrentPathIndex = INDEX_NONE;`.
-  - Optionally clear `PathPoints` and call `GetCharacterMovement()->StopMovementImmediately()`.
+**Acceptance**
+
+* Leader can start/stop path-follow via clear methods.
 
 ---
 
-### Step 3 — Implement Tick-based path following on the leader
+### Step 6 — Implement Tick-based manual following (leader path + follower offset)
 
-**3.1 Enable Tick + configure movement**
-
-- In `AFCConvoyMember` constructor:
-  - `PrimaryActorTick.bCanEverTick = true;`
-  - Configure `UCharacterMovementComponent` like Explorer:
-    - `bOrientRotationToMovement = true;`
-    - `bUseControllerDesiredRotation = false;`
-    - `bConstrainToPlane = true;`
-    - `bSnapToPlaneAtStart = true;`
-    - `MaxWalkSpeed` tuned for convoy speed.
-
-**3.2 Tick implementation sketch**
+Highlights & Example Snippet for Manual Follow in Tick:
 
 ```cpp
-void AFCConvoyMember::Tick(float DeltaTime)
+void AFCConvoyMember::Tick(float DeltaSeconds)
 {
-    Super::Tick(DeltaTime);
+    Super::Tick(DeltaSeconds);
 
-    if (!bIsFollowingPath || !PathPoints.IsValidIndex(CurrentPathIndex))
+    if (bIsFollowingPath && PathPoints.IsValidIndex(CurrentPathIndex))
     {
-        return;
-    }
+        FVector Target = PathPoints[CurrentPathIndex];
+        FVector ToTarget = Target - GetActorLocation();
+        ToTarget.Z = 0;
 
-    const FVector Target = PathPoints[CurrentPathIndex];
-    FVector ToTarget = Target - GetActorLocation();
-    ToTarget.Z = 0.0f;
-
-    const float Distance = ToTarget.Size();
-    if (Distance <= AcceptRadius)
-    {
-        ++CurrentPathIndex;
-        if (!PathPoints.IsValidIndex(CurrentPathIndex))
+        if (ToTarget.Size() < AcceptRadius)
         {
-            StopConvoyMovement();
-            // (Later) broadcast arrival event to convoy/interaction
-            return;
+            CurrentPathIndex++;
+            if (!PathPoints.IsValidIndex(CurrentPathIndex))
+            {
+                bIsFollowingPath = false;
+                StopConvoyMovement();
+            }
+        }
+        else
+        {
+            FVector Direction = ToTarget.GetSafeNormal();
+            AddMovementInput(Direction, 1.0f, true); // bForce=true important!
         }
     }
-    else
+    else if (bIsFollowingLeader && Leader)
     {
-        const FVector Direction = ToTarget.GetSafeNormal();
-        AddMovementInput(Direction, 1.0f);
+        FVector DesiredPos = Leader->GetActorLocation() + FollowerOffset;
+        FVector ToLeader = DesiredPos - GetActorLocation();
+        ToLeader.Z = 0;
+
+        if (ToLeader.Size() > AcceptRadius)
+        {
+            FVector Direction = ToLeader.GetSafeNormal();
+            AddMovementInput(Direction, 1.0f, true);
+        }
     }
 }
 ```
 
-**Effect:**
+**Why**
 
-- Leader locomotion becomes Explorer-style: animations see character velocity from `AddMovementInput`, not opaque AI moves.
+* This makes movement input explicit and predictable.
+* Animations receive meaningful velocity because CharacterMovement is driven by input.
 
----
+**Acceptance**
 
-### Step 4 — Decide and implement follower movement strategy
-
-Two options; we can start with the simplest and evolve later.
-
-#### 4.1 Option A — Static slot followers (no independent path)
-
-- Keep Follower1/Follower2 as children of sockets on the leader or convoy root.
-- Only the leader uses path-follow logic; followers visually “ride along”.
-
-**Pros:**
-
-- Very simple, minimal runtime cost.
-- Only one path is computed and followed.
-
-**Cons:**
-
-- Less organic following behavior; all members effectively share the same root transform.
-
-#### 4.2 Option B — Offset-follow via manual movement (no AI)
-
-- Each follower tracks a desired offset from the leader (world-space or local-space):
-
-  ```cpp
-  FVector FollowOffset; // configured per member (e.g. -150, 0, 0)
-  ```
-
-- On Tick, followers compute:
-
-  ```cpp
-  const FVector DesiredLocation = Leader->GetActorLocation() + FollowOffset;
-  const FVector ToTarget = DesiredLocation - GetActorLocation();
-  // If within small radius, do nothing; otherwise AddMovementInput()
-  ```
-
-- No extra nav queries; we rely on the leader’s path being nav-valid.
-- Followers still drive animations via `AddMovementInput`.
-
-**Recommended starting point:**
-
-- Make **only the leader** own a nav path.
-- Use **simple offset-follow** for followers if static sockets are too visually rigid.
+* Leader walks with correct animation blending.
+* Followers trail behind, also animated correctly.
 
 ---
 
-### Step 5 — Expose convoy-level movement APIs
+### Step 7 — Expose convoy-level movement APIs (single entry point)
 
-**5.1 In `AFCOverworldConvoy`**
-
-Add:
+**Change**
+In `AFCOverworldConvoy`, add:
 
 ```cpp
-UFUNCTION(BlueprintCallable, Category = "FC|Convoy")
 void MoveConvoyToLocation(const FVector& TargetLocation);
-
-UFUNCTION(BlueprintCallable, Category = "FC|Convoy")
 void StopConvoy();
 ```
 
-**5.2 Implement convoy methods**
+Implementation:
 
-- `MoveConvoyToLocation`:
-  - If `LeaderMember` is valid, call `LeaderMember->MoveConvoyMemberToLocation(TargetLocation);`.
-  - Followers either:
-    - Rely on offset-follow logic, or
-    - (Optional) receive the same target if we later add per-member paths.
+* `MoveConvoyToLocation` calls `LeaderMember->MoveConvoyMemberToLocation(TargetLocation)`.
+* `StopConvoy` calls `StopConvoyMovement` on all members.
 
-- `StopConvoy`:
-  - Iterate `ConvoyMembers` and call `StopConvoyMovement()`.
-  - Replace the internals of `StopAllMembers()` with a call to `StopConvoy()` or remove `StopAllMembers` entirely.
+**Why**
 
-**5.3 Update call sites**
+* Centralizes movement commands.
+* Prevents scattered control and makes future networking easier.
 
-- Any existing logic (e.g. in `AFCPlayerController` or `UFCInteractionComponent`) that used AI-specific movement should now call:
-  - `OverworldConvoy->MoveConvoyToLocation(TargetLocation);`
-  - `OverworldConvoy->StopConvoy();`
+**Acceptance**
 
-This establishes `AFCOverworldConvoy` as the **single entry point** for convoy movement, backed by Explorer-style movement under the hood.
+* All movement requests go through `AFCOverworldConvoy`.
 
 ---
 
-### Step 6 — Update POI/interaction glue to use the new movement
+### Step 8 — Remove AI `MoveTo` usage from `AFCPlayerController` (critical)
 
-**6.1 Within `AFCOverworldConvoy`**
+**Change**
 
-- Keep `HandlePOIOverlap` as the central place that:
-  - Receives overlaps from any `AFCConvoyMember`.
-  - Calls `StopConvoy()` instead of AI `StopMovement()`.
-  - Sets `bIsInteractingWithPOI` and broadcasts `OnConvoyPOIOverlap`.
+* Replace AI `MoveToLocation` usage in:
 
-**6.2 Within `UFCInteractionComponent` (later 0003 work)**
+  * `HandleOverworldClickMove()`
+  * `MoveConvoyToLocation()`
+* With calls to:
 
-- For Overworld clicks, use `MoveConvoyToLocation` when the player selects a POI.
-- Listen to convoy events (or new `NotifyArrivedAtPOI`) to transition from MovingToPOI → Arrived → Executing.
+  * `ActiveConvoy->MoveConvoyToLocation(TargetLocation)`
 
-For this concept, the crucial part is that movement semantics now match Explorer; the interaction refactor simply observes these events instead of owning two different movement patterns.
+**Why**
+
+* If PlayerController keeps issuing AI MoveTo, convoy remains AI-driven and refactor never takes effect.
+
+**Acceptance**
+
+* No convoy-related AI MoveTo remains in PlayerController.
+* Clicking on overworld moves convoy via manual leader path-follow.
 
 ---
 
-## 4. Best practices & pitfalls (UE-aligned)
+### Step 9 — Update POI overlap + stop logic to use manual stop
 
-These notes summarise UE idioms and gotchas relevant to this refactor.
+**Change**
 
-### 4.1 Strengths of this design
+* Replace `StopAllMembers()` internals (AI stop) with `StopConvoy()` (manual stop).
+* In `HandlePOIOverlap`, call `StopConvoy()`.
 
-- **No AI controller dependency:** manual movement is clearer, easier to debug, and better aligned with UE’s standard for direct character control.
-- **Single movement authority & state ownership:** all path state and movement logic live on the leader character (and its followers), not on transient controllers.
-- **Tick-driven path following:** matching `AFC_ExplorerCharacter` ensures consistent animation response and avoids opaque AI state.
-- **Consistent movement component setup:** matching `UCharacterMovementComponent` settings between explorer and convoy members gives a coherent feel across scenes.
-- **Clear API surface:** `MoveConvoyToLocation` / `StopConvoy` make it obvious where convoy movement is controlled.
+**Why**
 
-### 4.2 Pitfalls to watch for
+* Overlap should stop path-follow state reliably without AI.
+* Keeps interaction gating stable.
 
-- **Tick cost:**
-  - Multiple followers ticking can be costly in large convoys.
-  - Mitigations:
-    - Disable Tick on inactive followers.
-    - Use simple distance thresholds to skip tiny adjustments.
-    - Consider timer-based updates or lower Tick frequency if needed.
+**Acceptance**
 
-- **Path validity & failures:**
-  - Always handle invalid paths in `MoveConvoyMemberToLocation`:
-    - Log and call `StopConvoyMovement()` on failure.
-  - Avoid leaving `bIsFollowingPath` true with an empty `PathPoints`.
+* POI overlap stops convoy immediately and triggers existing overlap event flow.
 
-- **Follower collisions & spacing:**
-  - Offset-following may require minimal collision handling if followers bump into each other.
-  - Start simple; add steering/avoidance only if gameplay demands it.
+---
 
-- **Mixed movement authority:**
-  - After this refactor, no other system should directly drive convoy member movement (AI controllers, random `MoveTo`, etc.).
-  - Centralise all calls through `AFCOverworldConvoy` APIs.
+## 4. Best Practices & Pitfalls to Avoid (keep these rules)
 
-- **Replication (if/when multiplayer):**
-  - Replicate simple state (current path index, target) rather than re-running nav on every client.
-  - Keep AI controllers out of the equation to simplify networked behavior.
+* Always use `AddMovementInput(..., bForce=true)` when unpossessed to eliminate ignored input.
+* Avoid attaching characters to spawn points; use spawn location only.
+* Keep leader’s path computed via NavMesh; followers follow leader + offset (no extra nav).
+* Centralize movement commands through convoy manager API to avoid scattered movement control.
+* Use weak pointers or careful lifetime management for leader references in followers.
+* Enable ticking on convoy members and configure CharacterMovement properly (orient to movement, plane constraints).
 
 ---
 
 ## 5. Documentation & downstream updates
 
-Once convoy movement has been refactored:
+After completion:
 
-- Update relevant technical docs (Convoy + Explorer + `FCRuntime.md`) to state:
-  - Explorer and convoy leader both use **manual NavMesh path-following with `AddMovementInput`**.
-  - AI controllers are no longer part of overworld movement.
-- Adjust the interaction refactor tasks (`0003-tasks_refactoring_interaction_predictability.md`):
-  - Movement assumptions for Overworld should reference `MoveConvoyToLocation` (not AI `MoveTo`).
-  - Make it explicit that `AFCOverworldConvoy` is the **single convoy movement authority**, and `UFCInteractionComponent` requests movement only through this API.
+* Document that convoy movement uses manual nav path-follow + `AddMovementInput`, no AI `MoveTo`.
+* Document that `AFCOverworldConvoy` remains the authoritative “convoy position” and follows the leader as a pivot.
+* Update interaction refactor tasks to request movement only via `AFCOverworldConvoy::MoveConvoyToLocation`.
 
-This keeps the movement layer clean and predictable before layering on the 0003 interaction/arrival-gated behavior.
+
+RESOLVED ISSUE:
+Your logs show the **leader is receiving move commands** (click → `HandleOverworldClickMove` → convoy “Moving to location …”), and the convoy can stop everyone on POI overlap. What’s missing is any evidence that the **followers are being driven** (no “start following leader”, no follower Tick movement, no follower target updates).
+
+That almost always boils down to this:
+
+1. **Only the leader has movement logic / gets a destination**, and
+2. **Followers are never put into “follow leader” mode**, *or* they’re still **attached to a spawn point / convoy actor** so they’re not actually walking (and if the parent isn’t moving, they’ll look stuck).
+
+### The fix: implement follower-follow and activate it when spawning
+
+You need two pieces:
+
+* A “follow leader” API on `AFCConvoyMember`
+* The convoy spawner calling it for follower1/follower2
+
+Below is a clean, minimal implementation that works with your concept (“leader path-follow, followers offset-follow”).
 
 ---
 
-## 6. Optional robustness extensions (for scaling & multiplayer)
+## 1) Add follower follow API + state to `AFCConvoyMember`
 
-The core refactor above is intentionally minimal. The following extensions can be layered on top to improve feel, robustness, and scalability as the project grows.
+### `FCConvoyMember.h`
 
-### 6.1 Movement smoothing & interpolation
+Add this (public + private). Keep your overlap code as-is.
 
-**Leader and followers** can use interpolation to avoid abrupt direction or speed changes:
+```cpp
+// Public API
+UFUNCTION(BlueprintCallable, Category="FC|Convoy")
+void StartFollowingLeader(AFCConvoyMember* InLeader, const FVector& InLocalOffset);
 
-- For followers using offset-follow, instead of instantly snapping towards `Leader + FollowOffset`, interpolate:
+UFUNCTION(BlueprintCallable, Category="FC|Convoy")
+void StopFollowingLeader();
+```
 
-  ```cpp
-  FVector CurrentLocation = GetActorLocation();
-  FVector TargetLocation  = Leader->GetActorLocation() + FollowOffset;
-  const float SmoothSpeed = 4.0f; // tune per project
+And add this state:
 
-  SetActorLocation(FMath::VInterpTo(CurrentLocation, TargetLocation, DeltaTime, SmoothSpeed));
-  ```
+```cpp
+private:
+    bool bIsFollowingLeader = false;
 
-- For the leader, you can smooth rotation or speed changes using `FMath::RInterpTo` or speed-based lerps, while still driving motion via `AddMovementInput`.
+    UPROPERTY()
+    TWeakObjectPtr<AFCConvoyMember> Leader;
 
-**Benefit:** more natural convoy motion and less jitter when targets or offsets change.
+    // Offset relative to leader (local space)
+    FVector FollowerLocalOffset = FVector::ZeroVector;
 
-### 6.2 Dynamic path recalculation
+    UPROPERTY(EditAnywhere, Category="FC|Convoy")
+    float FollowAcceptRadius = 80.0f;
+```
 
-If the leader becomes stuck or the path is invalidated (dynamic obstacles, nav mesh changes):
+Why local offset? Because it lets the formation rotate naturally with the leader’s facing.
 
-- Track a simple "stuck" timer or distance moved over time.
-- If the character has not advanced meaningfully towards `PathPoints[CurrentPathIndex]` for a configurable interval, attempt to **recompute the path**:
-  - Call `FindPathToLocationSynchronously` again with the current location and original target.
-- Optionally expose this as a configurable behavior (e.g., max retries, cooldown).
+---
 
-**Benefit:** convoy recovers from dynamic nav issues without manual intervention.
+## 2) Implement it in `FCConvoyMember.cpp`
 
-### 6.3 Movement lifecycle events
+```cpp
+void AFCConvoyMember::StartFollowingLeader(AFCConvoyMember* InLeader, const FVector& InLocalOffset)
+{
+    Leader = InLeader;
+    FollowerLocalOffset = InLocalOffset;
 
-Expose multicast delegates on the leader (and optionally followers) to provide hooks for other systems:
+    bIsFollowingLeader = Leader.IsValid();
 
-- `FOnConvoyPathStarted`
-- `FOnConvoyPathCompleted`
-- `FOnConvoyMovementStopped`
-- `FOnConvoyArrivedAtPOI`
+    // Followers should not run their own nav path
+    bIsFollowingPath = false;
+    PathPoints.Reset();
+    CurrentPathIndex = INDEX_NONE;
 
-These can be broadcast from `MoveConvoyMemberToLocation`, `StopConvoyMovement`, and the point where the leader reaches its final waypoint.
+    UE_LOG(LogFCConvoyMember, Log, TEXT("ConvoyMember %s: Following leader %s Offset=%s"),
+        *GetName(),
+        Leader.IsValid() ? *Leader->GetName() : TEXT("null"),
+        *FollowerLocalOffset.ToString());
+}
 
-**Benefit:** simplifies integration with `UFCInteractionComponent`, logging, debugging, and future systems without tight coupling.
+void AFCConvoyMember::StopFollowingLeader()
+{
+    bIsFollowingLeader = false;
+    Leader = nullptr;
+}
+```
 
-### 6.4 Tick optimisation
+Then in your `Tick`, add (or ensure you have) this follower block:
 
-To keep Tick overhead under control, especially with many followers:
+```cpp
+if (bIsFollowingLeader && Leader.IsValid())
+{
+    // Rotate offset by leader rotation so the formation turns with the leader
+    const FVector DesiredPos =
+        Leader->GetActorLocation() + Leader->GetActorRotation().RotateVector(FollowerLocalOffset);
 
-- Use `PrimaryActorTick.TickGroup` and `PrimaryActorTick.TickInterval` to move less-critical follower updates into a later group or lower frequency.
-- Disable Tick on followers when:
-  - The convoy is idle (`bIsFollowingPath == false`), or
-  - The follower is already within a small radius of its desired offset.
-- Consider a shared manager or timer-driven updates for large convoys.
+    FVector ToDesired = DesiredPos - GetActorLocation();
+    ToDesired.Z = 0.0f;
 
-**Benefit:** preserves performance as convoy size and scene complexity grow.
+    if (ToDesired.Size() > FollowAcceptRadius)
+    {
+        AddMovementInput(ToDesired.GetSafeNormal(), 1.0f, /*bForce=*/true);
+    }
+}
+```
 
-### 6.5 Replication strategy (for multiplayer)
+Also make sure you have:
 
-If/when Overworld convoy movement becomes networked:
+* `GetCharacterMovement()->bRunPhysicsWithNoController = true;`
+* `AddMovementInput(..., true)` (bForce)
 
-- Replicate minimal movement state from the leader:
-  - `bIsFollowingPath`
-  - `CurrentPathIndex`
-  - Current target or final destination
-- Use `RepNotify` to trigger client-side interpolation or re-creation of local steering.
-- Keep `UCharacterMovementComponent` configuration uniform and leverage UE's network smoothing settings.
+Otherwise unpossessed followers often ignore input.
 
-**Benefit:** keeps replicated movement smooth and predictable without re-running full nav logic on every client.
+---
 
-### 6.6 Movement failure handling & fallbacks
+## 3) Activate follower follow when spawning the convoy
 
-Add explicit failure handling for:
+In `AFCOverworldConvoy::SpawnConvoyMembers()` after spawning:
 
-- Empty/invalid paths (already partially covered in Step 2).
-- Stuck characters (no progress over time).
-- Nav failures (null `UNavigationSystemV1`, map misconfigurations).
+* **Remove attachments** (`AttachToComponent`).
+  If followers are attached, they won’t “walk” correctly (and if the parent doesn’t move, they’ll appear stuck).
 
-On failure:
+* Then:
 
-- Call `StopConvoyMovement()`.
-- Log a clear warning with context (target, map, member name).
-- Optionally trigger fallback behaviour (e.g., idle animation, UI hint, or a single retry).
+```cpp
+// After Leader is spawned:
+LeaderMember = Leader;
 
-**Benefit:** more robust behavior in edge cases and clearer diagnostics when level/nav setup is wrong.
+// Example offsets: behind leader in local space
+if (Follower1)
+{
+    Follower1->StartFollowingLeader(LeaderMember, FVector(-150.f, 0.f, 0.f));
+}
 
-### 6.7 Movement mode tagging (for animation & logic)
+if (Follower2)
+{
+    Follower2->StartFollowingLeader(LeaderMember, FVector(-300.f, 0.f, 0.f));
+}
+```
 
-Introduce a small enum or `FGameplayTag` to represent high-level movement modes for convoy members, e.g.:
+If you want to preserve your formation exactly as defined by the spawn points:
 
-- `Idle`
-- `FollowingLeader`
-- `Stopped`
-- `ArrivedAtPOI`
+* compute offsets from the spawn points **relative** to the leader spawn point (local convoy space), then treat that as “local offset”.
 
-Update this mode from the movement code (`MoveConvoyMemberToLocation`, `StopConvoyMovement`, arrival handling) and feed it into animation blueprints or higher-level logic.
+---
 
-**Benefit:** clearer integration between movement, animation state machines, and debugging tools.
+## 4) One more check that matches your “pivot follows leader” choice
 
-### 6.8 Documented extension points for steering/AI
+If your convoy actor is the pivot (camera + world map logic), ensure it actually follows the leader each tick. If the pivot doesn’t move, followers attached to pivot won’t move either (and your world-map recording won’t update).
 
-Even though AI controllers are removed from the core path, we can explicitly document where steering behaviours or more advanced logic could plug in later:
+---
 
-- A future `UFCConvoySteeringComponent` that applies obstacle avoidance forces before calling `AddMovementInput`.
-- Additional movement modes (e.g. flee, escort) layered on top of the same path-follow base.
+## Why the logs fit this diagnosis
 
-**Benefit:** keeps the design open for future gameplay additions without reintroducing AI controller complexity into basic convoy locomotion.
+Your logs show:
+
+* Move requests are happening (`Moving convoy to …`).
+* Stops work on POI overlap (all members get “Stopped member …”).
+* But nothing indicates followers were ever told *how to move* (no follow activation, no follower movement events).
+
+Once you add `StartFollowingLeader` and call it during spawning, you should immediately see your new log lines for follower setup—and visually, followers will start moving.

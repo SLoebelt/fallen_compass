@@ -34,7 +34,7 @@ This week focuses on closing the gameplay loop by implementing the return transi
 
 - `/Docs/Fallen_Compass_DRM.md` - Week 4 Section
 - `/Docs/Tasks/backlog.md` - Issues #1, #2, #4
-- `/Docs/Technical_Documentation.md` - Game State & UI Systems
+- `/Docs/TechnicalDocumentation/FCRuntime.md and linked files` - Game State & UI Systems
 
 ### Scope Limitations & Deferred Requirements
 
@@ -830,7 +830,7 @@ _Goal: Restore explicit game state transitions for Office table view and unify h
 
 - [x] **4.7.1: Document Desired Transition Responsibilities**
   - [x] **Design**:
-    - [x] In `Docs/Technical_Documentation.md`, add a short “Transition Responsibilities” section that states:
+    - [x] In `Docs/TechnicalDocumentation/FCRuntime.md` and linked files, add a short “Transition Responsibilities” section that states:
       - [x] `UFCGameStateManager`: pure game state machine and validated transitions (no level or UI knowledge).
       - [x] `UFCLevelManager`: level identity, metadata, and low-level level loading (`LoadLevel`, `OpenLevel` call site).
       - [x] `UFCTransitionManager`: fades and loading overlays, no game-logic decisions.
@@ -838,7 +838,7 @@ _Goal: Restore explicit game state transitions for Office table view and unify h
       - [x] `UFCLevelTransitionManager`: orchestration of multi-step flows (state + level + fade + UI entry).
       - [x] `AFCPlayerController` / `UFCCameraManager`: react to state changes to set camera + input modes, no direct level loads.
   - [x] **Implementation Tasks**:
-    - [x] Add the new section to `Docs/Technical_Documentation.md` under the existing GameInstance / State / UI chapters.
+    - [x] Add the new section to `Docs/TechnicalDocumentation/FCRuntime.md` and linked files under the existing GameInstance / State / UI chapters.
     - [ ] Cross-link from the `UFCLevelTransitionManager` and `UFCGameStateManager` sections to this responsibility overview.
     - [ ] Add a short comment block to `FCLevelTransitionManager.h` summarizing its orchestrator role (matching the doc text).
 
@@ -855,7 +855,7 @@ _Goal: Restore explicit game state transitions for Office table view and unify h
   - [ ] **Implementation Tasks**:
     - [x] Add these function declarations (or a subset) to `FCLevelTransitionManager.h` with TODO comments referencing Step 4.7.
     - [x] Add stub implementations in `FCLevelTransitionManager.cpp` that log and early-return.
-    - [x] Update `Docs/Technical_Documentation.md` with a small “Transition API” diagram showing how requests flow into LevelTransitionManager.
+    - [x] Update `Docs/TechnicalDocumentation/FCRuntime.md` and linked files with a small “Transition API” diagram showing how requests flow into LevelTransitionManager.
 
 - [x] **4.7.3: Plan Table View State Flow**
   - [x] **Design**:
@@ -870,7 +870,7 @@ _Goal: Restore explicit game state transitions for Office table view and unify h
       - [x] `Office_TableView`: TableView camera, static-scene/input-for-UI IMC.
       - [x] `ExpeditionSummary`: table-view camera + summary widget blocking input (just like now).
   - [x] **Implementation Tasks**:
-    - [x] In `Docs/Technical_Documentation.md`, add a small “Office Table View Flow” subsection with a simple state diagram and the entry/exit triggers.
+    - [x] In `Docs/TechnicalDocumentation/FCRuntime.md` and linked files, add a small “Office Table View Flow” subsection with a simple state diagram and the entry/exit triggers.
     - [x] Add TODO comments in `AFCPlayerController::OnTableObjectClicked` and the table-view branch of `HandlePausePressed` pointing to `EnterOfficeTableView` / `ExitOfficeTableView` (without changing behavior yet).
     - [x] Add stub functions `EnterOfficeTableView` / `ExitOfficeTableView` in `FCLevelTransitionManager.cpp` that currently just log and return.
 
@@ -884,7 +884,7 @@ _Goal: Restore explicit game state transitions for Office table view and unify h
         - [x] For other states (e.g., `Office_Exploration` loaded from save): call a helper to restore camera/input without re-showing the main menu.
     - [x] Decide whether `AFCPlayerController::InitializeMainMenu` remains as an internal helper (called only from LevelTransitionManager) or is deprecated.
   - [x] **Implementation Tasks**:
-    - [x] In `Docs/Technical_Documentation.md`, update the “L_Office dual purpose” section to describe the new `InitializeOnLevelStart` orchestration instead of the Level BP calling `InitializeMainMenu` directly.
+    - [x] In `Docs/TechnicalDocumentation/FCRuntime.md` and linked files, update the “L_Office dual purpose” section to describe the new `InitializeOnLevelStart` orchestration instead of the Level BP calling `InitializeMainMenu` directly.
     - [x] Add a TODO comment near the existing `UFCLevelTransitionManager::InitializeLevelTransitionOnLevelStart` noting it will be folded into `InitializeOnLevelStart` in a later task.
     - [x] Add a brief comment above `AFCPlayerController::InitializeMainMenu` marking it as “called only from LevelTransitionManager in future (see 4.7.4)” without changing call sites yet.
 
@@ -892,7 +892,7 @@ _Goal: Restore explicit game state transitions for Office table view and unify h
   - [x] **Design**:
     - [x] Enumerate where code should change once the new API is ready, without touching behavior now.
   - [x] **Implementation Tasks**:
-    - [x] In `0004-tasks.md` or a new small section in `Docs/Technical_Documentation.md`, create a checklist of call sites to migrate:
+    - [x] In `0004-tasks.md` or a new small section in `Docs/TechnicalDocumentation/FCRuntime.md` and linked files, create a checklist of call sites to migrate:
       - [x] `AFCPlayerController::OnTableObjectClicked` (table view entry).
       - [x] `AFCPlayerController::HandlePausePressed` (table view exit and ExpeditionSummary ESC path).
       - [x] `AFCPlayerController::InitializeMainMenu` and `TransitionToGameplay`.

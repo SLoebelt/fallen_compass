@@ -41,7 +41,7 @@ Implement the first version of the 3D Overworld level with top-down camera contr
 - `/Docs/Fallen_Compass_DRM.md` - Week 3 features (Overworld Level, Convoy Movement, POI Stubs)
 - `/Docs/UE_CodeConventions.md` - Blueprint/C++ hybrid approach, pathfinding patterns
 - `/Docs/UE_NamingConventions.md` - BP*/IA*/IMC\_ prefixes, folder structure
-- `/Docs/Technical_Documentation.md` - UFCInputManager, UFCCameraManager, UFCLevelManager, UFCGameStateManager subsystems
+- `/Docs/TechnicalDocumentation/FCRuntime.md and linked files` - UFCInputManager, UFCCameraManager, UFCLevelManager, UFCGameStateManager subsystems
 
 ---
 
@@ -103,7 +103,7 @@ Implement the first version of the 3D Overworld level with top-down camera contr
 
 - [x] **Analysis**
 
-  - [x] Read `/Docs/Technical_Documentation.md` sections:
+  - [x] Read `/Docs/TechnicalDocumentation/FCRuntime.md and linked files` sections:
     - [x] §2.1.5: UFCLevelManager (LoadLevel() method, level type detection)
     - [x] §2.1.6: UFCUIManager (widget management, ShowPauseMenu())
     - [x] §2.1.7: UFCGameStateManager (state transitions, Overworld_Travel state)
@@ -4078,7 +4078,7 @@ IMC_FC_TopDown`
   - [x] Added to Task 0003 backlog: Known Issues #1, #2, #3
   - [x] Note: Camera error in L_Overworld expected (Task 3 pending)
 
-**COMMIT POINT 7.4**: `git add Docs/Technical_Documentation.md Docs/Tasks/0003-tasks.md && git commit -m "docs(transition): Document Office ↔ Overworld transition system and known issues"`
+**COMMIT POINT 7.4**: `git add Docs/TechnicalDocumentation/FCRuntime.md and linked files Docs/Tasks/0003-tasks.md && git commit -m "docs(transition): Document Office ↔ Overworld transition system and known issues"`
 
 ---
 
@@ -4866,7 +4866,7 @@ IMC_FC_TopDown`
 
 - [ ] **Implementation (Technical_Documentation.md)**
 
-  - [ ] Open `Docs/Technical_Documentation.md`
+  - [ ] Open `Docs/TechnicalDocumentation/FCRuntime.md` and linked files
   - [ ] Add section: **Week 3: Overworld Systems**
   - [ ] Document:
     - [ ] **AFCPlayerController**:
@@ -4923,7 +4923,7 @@ IMC_FC_TopDown`
   - [ ] Directory structure reflects Week 3 additions
   - [ ] File saves without errors
 
-**COMMIT POINT 9.4.1**: `git add Docs/Technical_Documentation.md && git commit -m "docs(overworld): Add Week 3 systems to Technical_Documentation.md"`
+**COMMIT POINT 9.4.1**: `git add Docs/TechnicalDocumentation/FCRuntime.md and linked files && git commit -m "docs(overworld): Add Week 3 systems to Technical_Documentation.md"`
 
 ---
 
@@ -5156,7 +5156,7 @@ IMC_FC_TopDown`
 
 - [ ] **Implementation (Technical_Documentation.md)**
 
-  - [ ] Open `Docs/Technical_Documentation.md`
+  - [ ] Open `Docs/TechnicalDocumentation/FCRuntime.md` and linked files
   - [ ] Locate **UFCGameStateManager** section
   - [ ] Under **Valid State Transitions**, ensure `None` state documentation reads:
     ```
@@ -5172,7 +5172,7 @@ IMC_FC_TopDown`
   - [ ] Note about testing-only change documented
   - [ ] File saves without errors
 
-**COMMIT POINT 10.1.3**: `git add Docs/Technical_Documentation.md && git commit -m "docs(state): Document production state flow, note Week 3 testing revert"`
+**COMMIT POINT 10.1.3**: `git add Docs/TechnicalDocumentation/FCRuntime.md and linked files && git commit -m "docs(state): Document production state flow, note Week 3 testing revert"`
 
 ---
 

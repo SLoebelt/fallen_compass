@@ -18,7 +18,7 @@ class UFCExpeditionManager;
  * loading (UFCLevelManager), screen fades (UFCTransitionManager), and
  * major UI flows (UFCUIManager).
  *
- * See Docs/Technical_Documentation.md "Transition Responsibilities &
+ * See Docs/TechnicalDocumentation/FCRuntime.md and linked files "Transition Responsibilities &
  * Orchestration (Week 4 - Step 4.7)" for design details and examples.
  */
 UCLASS()

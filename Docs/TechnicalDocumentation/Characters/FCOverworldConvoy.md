@@ -9,18 +9,19 @@
 
 ## Responsibilities (what this “manager” owns)
 
-**`AFCOverworldConvoy`** is the project’s **Overworld convoy root actor**. It owns the convoy hierarchy, member spawning, and aggregation of POI overlap events.
+**`AFCOverworldConvoy`** is the project’s **Overworld convoy root actor**. It owns the convoy hierarchy, member spawning, **convoy pivot position**, and aggregation of POI overlap events.
 
 1. **Convoy composition and hierarchy**
 
    * Owns editor-visible spawn points for the leader and followers (`LeaderSpawnPoint`, `Follower1SpawnPoint`, `Follower2SpawnPoint`) attached to a common `ConvoyRoot`.
-   * Spawns instances of `ConvoyMemberClass` at runtime in `SpawnConvoyMembers()`, attaches them to their respective spawn points, and records them in the `ConvoyMembers` array.
-   * Tracks the designated `LeaderMember` for convenience (camera follow, movement commands via the player controller).
+   * Spawns instances of `ConvoyMemberClass` at runtime in `SpawnConvoyMembers()`, attaches them logically to the convoy, and records them in the `ConvoyMembers` array.
+   * Tracks the designated `LeaderMember` for convenience (movement API + follower formation setup).
    * Exposes `GetLeaderMember()` and `GetCameraAttachPoint()` for other systems (e.g., `UFCCameraManager`, `AFCPlayerController`).
 
-2. **Camera attachment for top-down view**
+2. **Convoy pivot + camera attachment for top-down view**
 
    * Provides `CameraAttachPoint` above the convoy root so the overworld camera can track the convoy in top-down mode.
+   * On `Tick`, computes the bounding box that encloses all valid convoy members and lerps the convoy actor’s location toward the **bounds center**. This keeps cameras, sampling, and meta-systems centered on the group instead of a single pawn.
 
 3. **POI interaction aggregation**
 
@@ -29,13 +30,14 @@
    * On `HandlePOIOverlap(AActor* POIActor)`:
      * Early-outs if `POIActor` is null or `bIsInteractingWithPOI` is already true.
      * Sets `bIsInteractingWithPOI = true`.
-     * Calls `StopAllMembers()` to halt AI movement for all members.
+     * Calls `StopConvoy()` to halt movement for all members.
      * Broadcasts `OnConvoyPOIOverlap.Broadcast(POIActor)` so higher-level systems (via the player controller and `UFCInteractionComponent`) can treat this as an arrival into the interaction state machine.
    * `SetInteractingWithPOI(bool)` allows the interaction component to clear the latch once a POI action finishes (via `ExecutePOIActionNow`).
 
-4. **Member movement stop utility**
+4. **Movement API surface (delegating to members)**
 
-   * `StopAllMembers()` iterates over `ConvoyMembers`, finds each member's `AAIController`, and calls `StopMovement()` so the convoy stops immediately on interaction.
+   * `MoveConvoyToLocation(const FVector& TargetLocation)` logs the command and forwards it to `LeaderMember->MoveConvoyMemberToLocation(TargetLocation)`, which performs NavMesh pathfinding and path-follow movement.
+   * `StopConvoy()` iterates over `ConvoyMembers` and calls `StopConvoyMovement()` on each member, ensuring both leader path-follow and follower formation movement are stopped immediately.
 
 ---
 

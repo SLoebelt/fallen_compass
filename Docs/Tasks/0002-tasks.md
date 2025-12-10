@@ -44,7 +44,7 @@ Establish foundational architecture for the map table interaction system, includ
 - `/Docs/Fallen_Compass_DRM.md` - Week 2 features (Expedition Data, Table Objects, Map Widget, Interaction Flow, Level Manager, Game State)
 - `/Docs/UE_CodeConventions.md` - Subsystem patterns, interface usage, Blueprint exposure rules
 - `/Docs/UE_NamingConventions.md` - C++ class prefixes, Blueprint naming, folder structure
-- `/Docs/Technical_Documentation.md` - Week 1 systems (FCPlayerController, UFCGameInstance, UFCTransitionManager, UFCLevelManager, UFCUIManager)
+- `/Docs/TechnicalDocumentation/FCRuntime.md and linked files` - Week 1 systems (FCPlayerController, UFCGameInstance, UFCTransitionManager, UFCLevelManager, UFCUIManager)
 - `/Docs/Analysis_TableMap_TimeEstimation.md` - 7-week feature breakdown and timeline validation
 
 ---
@@ -101,7 +101,7 @@ Establish foundational architecture for the map table interaction system, includ
 
 - [x] **Analysis**
 
-  - [x] Read `/Docs/Technical_Documentation.md` sections:
+  - [x] Read `/Docs/TechnicalDocumentation/FCRuntime.md and linked files` sections:
     - [x] §2.1: UFCGameInstance (global state owner, subsystem configuration) ✅
     - [x] §2.1.5: UFCLevelManager (level tracking subsystem pattern) ✅
     - [x] §2.1.6: UFCUIManager (widget lifecycle subsystem pattern) ✅

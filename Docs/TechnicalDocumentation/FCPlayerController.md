@@ -47,7 +47,7 @@ Key responsibilities:
 
 6. **Movement command delegation**
 
-   * `MoveConvoyToLocation(FVector)` → commands Overworld convoy AI controller (TopDown mode, unchanged).
+   * `MoveConvoyToLocation(FVector)` → in Overworld, forwards click-to-move requests to the active `AFCOverworldConvoy` actor, which in turn starts/stops **manual path-follow** on its leader `AFCConvoyMember` (no AI `MoveTo`). The controller never talks to a convoy AI controller directly.
    * `MoveExplorerToLocation(FVector)` → in Camp/POIScene, routes Camp click-to-move to the **possessed** `AFC_ExplorerCharacter` (no AIController). The controller delegates pathfinding + steering to the pawn instead of driving movement via an AI controller.
 
 7. **Pause / resume behavior**
@@ -87,8 +87,7 @@ Key responsibilities:
 > Note: the header comment says "Bound to IA_TableClick", but in code the click action loaded is `/Game/FC/Input/IA_Click` and it's bound to `HandleClick(...)`, which then routes to table click behavior based on camera mode.
 
 ### Movement commands (Overworld + Camp)
-
-* `GetPossessedConvoy()` / `MoveConvoyToLocation(const FVector&)` → Overworld click-to-move sends commands to the convoy leader's `AAIController` (projected onto NavMesh).
+* `GetPossessedConvoy()` / `MoveConvoyToLocation(const FVector&)` → Overworld click-to-move calls into the active `AFCOverworldConvoy` instance, which exposes `MoveConvoyToLocation` / `StopConvoy` and drives leader + follower movement via manual NavMesh path-follow and `AddMovementInput` (no AI `MoveTo`).
 * `MoveExplorerToLocation(const FVector&)` → in Camp/POIScene, routes Camp click-to-move to the **possessed** `AFC_ExplorerCharacter` (no AIController). The controller delegates NavMesh pathfinding and steering to the pawn via `AFC_ExplorerCharacter::MoveExplorerToLocation` (which computes a NavMesh path and follows it in `Tick` using `AddMovementInput`).
 * `SetMenuCameraActor(ACameraActor*)`, `SetPOISceneCameraActor(ACameraActor*)` → assign cameras used by the camera manager / POI scenes. 
 

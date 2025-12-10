@@ -14,7 +14,7 @@ DEFINE_LOG_CATEGORY_STATIC(LogFCOverworldConvoy, Log, All);
 
 AFCOverworldConvoy::AFCOverworldConvoy()
 {
-	PrimaryActorTick.bCanEverTick = false;
+	PrimaryActorTick.bCanEverTick = true;
 	bIsInteractingWithPOI = false;
 
 	// Create component hierarchy
@@ -54,6 +54,39 @@ void AFCOverworldConvoy::OnConstruction(const FTransform& Transform)
 
 	// Note: Spawning moved to BeginPlay to avoid editor duplication
 	// OnConstruction spawns actors in editor, but they get destroyed at PIE start
+}
+
+void AFCOverworldConvoy::Tick(float DeltaTime)
+{
+    Super::Tick(DeltaTime);
+
+    if (ConvoyMembers.Num() == 0)
+    {
+        return;
+    }
+
+    TArray<FVector> MemberPositions;
+    for (AFCConvoyMember* Member : ConvoyMembers)
+    {
+        if (Member)
+        {
+            MemberPositions.Add(Member->GetActorLocation());
+        }
+    }
+
+    if (MemberPositions.Num() == 0)
+    {
+        return;
+    }
+
+    FBox ConvoyBounds(MemberPositions);
+
+    FVector DesiredLocation = ConvoyBounds.GetCenter();
+
+    float SmoothSpeed = 5.0f;
+    FVector NewLocation = FMath::VInterpTo(GetActorLocation(), DesiredLocation, DeltaTime, SmoothSpeed);
+
+    SetActorLocation(NewLocation);
 }
 
 void AFCOverworldConvoy::SpawnConvoyMembers()
@@ -97,7 +130,6 @@ void AFCOverworldConvoy::SpawnConvoyMembers()
 
 	if (Leader)
 	{
-		Leader->AttachToComponent(LeaderSpawnPoint, FAttachmentTransformRules::SnapToTargetNotIncludingScale);
 		Leader->SetParentConvoy(this);
 		LeaderMember = Leader;
 		ConvoyMembers.Add(Leader);
@@ -114,9 +146,9 @@ void AFCOverworldConvoy::SpawnConvoyMembers()
 
 	if (Follower1)
 	{
-		Follower1->AttachToComponent(Follower1SpawnPoint, FAttachmentTransformRules::SnapToTargetNotIncludingScale);
 		Follower1->SetParentConvoy(this);
 		ConvoyMembers.Add(Follower1);
+		Follower1->StartFollowingLeader(LeaderMember, FVector(-150.f, 0.f, 0.f));
 		UE_LOG(LogFCOverworldConvoy, Log, TEXT("OverworldConvoy %s: Spawned follower 1"), *GetName());
 	}
 
@@ -130,29 +162,32 @@ void AFCOverworldConvoy::SpawnConvoyMembers()
 
 	if (Follower2)
 	{
-		Follower2->AttachToComponent(Follower2SpawnPoint, FAttachmentTransformRules::SnapToTargetNotIncludingScale);
 		Follower2->SetParentConvoy(this);
 		ConvoyMembers.Add(Follower2);
+		Follower2->StartFollowingLeader(LeaderMember, FVector(-300.f, 0.f, 0.f));
 		UE_LOG(LogFCOverworldConvoy, Log, TEXT("OverworldConvoy %s: Spawned follower 2"), *GetName());
 	}
 
 	UE_LOG(LogFCOverworldConvoy, Log, TEXT("OverworldConvoy %s: Spawned %d convoy members"), *GetName(), ConvoyMembers.Num());
 }
 
-void AFCOverworldConvoy::StopAllMembers()
+void AFCOverworldConvoy::MoveConvoyToLocation(const FVector& TargetLocation)
 {
-	UE_LOG(LogFCOverworldConvoy, Log, TEXT("Convoy %s: Stopping all members"), *GetName());
+	UE_LOG(LogFCOverworldConvoy, Log, TEXT("Convoy %s: Moving to location %s"), *GetName(), *TargetLocation.ToString());
+
+	LeaderMember->MoveConvoyMemberToLocation(TargetLocation);
+}
+
+void AFCOverworldConvoy::StopConvoy()
+{
+	UE_LOG(LogFCOverworldConvoy, Log, TEXT("Convoy %s: Stopping convoy"), *GetName());
 
 	for (AFCConvoyMember* Member : ConvoyMembers)
 	{
 		if (Member)
 		{
-			AAIController* AIController = Cast<AAIController>(Member->GetController());
-			if (AIController)
-			{
-				AIController->StopMovement();
-				UE_LOG(LogFCOverworldConvoy, Log, TEXT("  Stopped member: %s"), *Member->GetName());
-			}
+			Member->StopConvoyMovement();
+			UE_LOG(LogFCOverworldConvoy, Log, TEXT("  Stopped member: %s"), *Member->GetName());
 		}
 	}
 }
@@ -175,8 +210,7 @@ void AFCOverworldConvoy::HandlePOIOverlap(AActor* POIActor)
 	// Set interaction flag
 	bIsInteractingWithPOI = true;
 
-	// Stop all convoy members immediately
-	StopAllMembers();
+	StopConvoy();
 
 	UE_LOG(LogFCOverworldConvoy, Log, TEXT("Convoy POI overlap broadcast: %s"), *POIActor->GetName());
 	OnConvoyPOIOverlap.Broadcast(POIActor);

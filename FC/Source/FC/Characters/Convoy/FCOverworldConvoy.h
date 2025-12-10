@@ -13,7 +13,7 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnConvoyPOIOverlap, AActor*, POIAct
 
 /**
  * AFCOverworldConvoy - Base class for convoy parent actor
- * 
+ *
  * Manages array of AConvoyMember actors, handles spawning, and aggregates POI overlap events.
  * Blueprint children configure spawn point locations and visual properties.
  */
@@ -28,6 +28,7 @@ public:
 protected:
 	virtual void BeginPlay() override;
 	virtual void OnConstruction(const FTransform& Transform) override;
+	virtual void Tick(float DeltaTime) override;
 
 private:
 	/** Array of convoy member actors */
@@ -38,9 +39,9 @@ private:
 	UPROPERTY()
 	AFCConvoyMember* LeaderMember;
 
-	/** Blueprint class to spawn for convoy members */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "FC|Convoy", meta = (AllowPrivateAccess = "true"))
-	TSubclassOf<AFCConvoyMember> ConvoyMemberClass;
+    /** Blueprint class to spawn for convoy members */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "FC|Convoy", meta = (AllowPrivateAccess = "true"))
+    TSubclassOf<AFCConvoyMember> ConvoyMemberClass;
 
 	/** Root component for convoy hierarchy */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "FC|Convoy", meta = (AllowPrivateAccess = "true"))
@@ -85,9 +86,11 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "FC|Convoy")
 	void SetInteractingWithPOI(bool bInteracting) { bIsInteractingWithPOI = bInteracting; }
 
-	/** Stop all convoy members' AI movement */
 	UFUNCTION(BlueprintCallable, Category = "FC|Convoy")
-	void StopAllMembers();
+	void MoveConvoyToLocation(const FVector& TargetLocation);
+
+	UFUNCTION(BlueprintCallable, Category = "FC|Convoy")
+	void StopConvoy();
 
 	/** Handle POI overlap detected by any convoy member (coordinates stop and delegates interaction) */
 	UFUNCTION(BlueprintCallable, Category = "FC|Convoy")

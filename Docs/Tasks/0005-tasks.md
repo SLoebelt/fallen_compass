@@ -91,7 +91,7 @@ Implement the first playable **Camp** scene and a basic **Overworld fog-of-war s
 - `/Docs/UE_CodeConventions.md` - Unreal Engine coding conventions
 - `/Docs/Fallen_Compass_GDD_v0.2.md` - Game Design Document (Overworld, Camp, Fog-of-War; esp. 3.2.2, 3.2.3)
 - `/Docs/DRM_Draft.md` - Development Roadmap, Weeks 4–6
-- `/Docs/Technical_Documentation.md` - Current technical architecture and class overview (Level/State managers, Expedition system, Overworld input)
+- `/Docs/TechnicalDocumentation/FCRuntime.md and linked files` - Current technical architecture and class overview (Level/State managers, Expedition system, Overworld input)
 
 ---
 
@@ -102,7 +102,7 @@ Implement the first playable **Camp** scene and a basic **Overworld fog-of-war s
 - [x] **Analysis of Existing Implementations**
    - [x] Read `/Docs/Fallen_Compass_GDD_v0.2.md` sections on Camp, local scenes, and Overworld (3.2.2, 3.2.3, 4.9).
    - [x] Read `/Docs/DRM_Draft.md` Week 4–6 descriptions (Expedition Loop, World Map/Exploration, Camp, Fog-of-War, Quick-Save Hooks).
-   - [x] Read `/Docs/Technical_Documentation.md` sections on:
+   - [x] Read `/Docs/TechnicalDocumentation/FCRuntime.md and linked files` sections on:
       - [x] `UFCLevelManager`, `UFCTransitionManager`, `UFCGameStateManager`, `UFCLevelTransitionManager`.
       - [x] `UFCExpeditionManager` / `FFCWorldMapExploration` (expedition state, exploration mask, Overworld mapping).
       - [x] `AFCPlayerController`, `UFCInputManager`, and Overworld input/interaction logic.
@@ -176,7 +176,7 @@ Implement the first playable **Camp** scene and a basic **Overworld fog-of-war s
 - [x] **Review Design & Tech Docs**
    - [x] `/Docs/Fallen_Compass_GDD_v0.2.md` (3.2.2, 3.2.3, 4.9): Camp and local scenes are small, bounded top-down levels with Point & Click control; Overworld is a 3D top-down convoy map with LMB move / RMB interact; Camp is conceptually a local scene sitting on top of Overworld travel.
    - [x] `/Docs/DRM_Draft.md` Week 5: Camp scope is a single generic `L_Camp` layout; Camp control must mirror Overworld input (LMB move, RMB interact, LMB-on-interactable queues interaction on overlap); Set Up/Break Camp are explicit HUD/shortcut actions, not POI-bound; fog-of-war stub is convoy-radius based and uses existing exploration grid.
-   - [x] `/Docs/Technical_Documentation.md`: Camp will plug into the existing Office ↔ Overworld stack: `UFCGameInstance` → `UFCLevelManager` / `UFCGameStateManager` / `UFCTransitionManager` / `UFCLevelTransitionManager`, with `AFCPlayerController` + `UFCInputManager` owning input and camera for both Overworld and future Camp.
+   - [x] `/Docs/TechnicalDocumentation/FCRuntime.md and linked files`: Camp will plug into the existing Office ↔ Overworld stack: `UFCGameInstance` → `UFCLevelManager` / `UFCGameStateManager` / `UFCTransitionManager` / `UFCLevelTransitionManager`, with `AFCPlayerController` + `UFCInputManager` owning input and camera for both Overworld and future Camp.
 - [x] **Scan Existing Project Assets**
    - [x] Confirmed existing world levels under `/Content/FC/World/Levels/` include at least `L_Office` and `L_Overworld`; there is **no existing `L_Camp`** or dedicated Camp/local-scene level, so Week 5 will introduce `L_Camp` as a new map.
    - [x] Identified reusable character/convoy meshes under `/Content/FC/Characters/` (e.g. mannequin or convoy leader mesh) that can be used as the visual for the Camp leader pawn; Overworld meshes can be reused for consistency.
@@ -367,7 +367,7 @@ Implement the first playable **Camp** scene and a basic **Overworld fog-of-war s
 ### 0005-Y.1: Expedition Loop with Camp Verification
 
 - [ ] **Analysis**
-   - [ ] Re-read `/Docs/Technical_Documentation.md` sections on Office↔Overworld transitions, conditional pause, and expedition loop.
+   - [ ] Re-read `/Docs/TechnicalDocumentation/FCRuntime.md and linked files` sections on Office↔Overworld transitions, conditional pause, and expedition loop.
    - [ ] List test cases needed to cover Office → Overworld → Camp → Overworld → Office, including ESC and Abort behavior.
 
 - [ ] **Test Sequence – Expedition + Camp Flow**
@@ -479,7 +479,7 @@ Implement the first playable **Camp** scene and a basic **Overworld fog-of-war s
 
 ### 0005-V.3: Documentation Updates
 
-- [ ] Update `/Docs/Technical_Documentation.md` with:
+- [ ] Update `/Docs/TechnicalDocumentation/FCRuntime.md and linked files` with:
    - [ ] New/updated classes (Camp pawn, fog-of-war helpers, transition hooks).
    - [ ] Updated call flows for Set Up Camp / Break Camp.
 - [ ] Update `/Docs/DRM_Draft.md` to reflect Week 5 implementation status.

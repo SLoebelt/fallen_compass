@@ -34,7 +34,7 @@ Primary Files Affected: [List key files/directories]
 - `/Docs/Fallen_Compass_DRM.md` - [Relevant phase/week]
 - `/Docs/UE_CodeConventions.md` - [Relevant conventions]
 - `/Docs/UE_NamingConventions.md` - [Relevant naming rules]
-- `/Docs/Technical_Documentation.md` - [Relevant technical specs]
+- `Docs/TechnicalDocumentation/FCRuntime.md` and linked files - [Relevant technical specs]
 
 ---
 
@@ -44,7 +44,7 @@ Primary Files Affected: [List key files/directories]
 
 - [ ] **Analysis of Existing Implementations**
 
-  - [ ] Read `/Docs/Technical_Documentation.md` sections: [list specific sections]
+  - [ ] Read `Docs/TechnicalDocumentation/FCRuntime.md` and linked files sections: [list specific sections]
   - [ ] Check project file system for existing classes/Blueprints: [list paths to check]
   - [ ] Identify existing patterns to follow (e.g., subsystem initialization, widget management)
   - [ ] Document what already exists and what needs to be created:
@@ -326,7 +326,7 @@ Primary Files Affected: [List key files/directories]
   - [ ] Run: `git push origin master --tags`
 
 - [ ] **Update Documentation**
-  - [ ] Update `/Docs/Technical_Documentation.md` with new systems/classes
+  - [ ] Update `Docs/TechnicalDocumentation/FCRuntime.md` and linked files with new systems/classes
   - [ ] Update `/Docs/Fallen_Compass_DRM.md` to mark task/week complete
   - [ ] Commit: `git commit -am "docs: Update technical docs and roadmap for [task name]"`
 
@@ -368,7 +368,7 @@ Primary Files Affected: [List key files/directories]
 
 ### Mandatory Workflow
 
-1. **Read Before Writing**: Always check `Technical_Documentation.md` before creating new code
+1. **Read Before Writing**: Always check `Docs/TechnicalDocumentation/FCRuntime.md` and linked files before creating new code
 2. **Compliance First**: Verify code/naming conventions before any implementation step
 3. **Compile and Test Immediately**: Let the user compile and manually test checkpoints after EVERY implementation step (X.Y.Z format)
 4. **Document Findings**: Record all warnings/errors in "Known Issues" section as discovered
@@ -403,7 +403,7 @@ Example:
 Executing Step X.1.1: Create Base Character Class
 
 Analysis:
-- Checked Technical_Documentation.md §3.2 - No existing character class found
+- Checked `Docs/TechnicalDocumentation/FCRuntime.md` and linked files §3.2 - No existing character class found
 - Convention check: Will use AFCCharacterName (Actor prefix)
 - Will create at /Source/FC/Characters/FCCharacterName.h
 

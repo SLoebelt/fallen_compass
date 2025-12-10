@@ -41,7 +41,7 @@ Following files MUST be respected and taken in consideration:
       ```
 
   3. If the implementation differs from the documentation in the PRD or GDD, update the documents.
-  4. Create a detailed technical documentation after each task and add it to the main documentation `Documentations/technical_documentation.md`. Work with Heading, subheadings and always update the TOC.
+  4. Create a detailed technical documentation after each task and add it to the main documentation `Docs/TechnicalDocumentation/FCRuntime.md` and linked files. Work with Heading, subheadings and always update the TOC.
 
 - Stop after each sub‑task and wait for the user's go‑ahead.
 

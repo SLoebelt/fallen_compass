@@ -24,6 +24,7 @@ public:
 
 protected:
 	virtual void BeginPlay() override;
+	virtual void Tick(float DeltaTime) override;
 
 private:
 	/** Reference to parent convoy actor */
@@ -41,7 +42,38 @@ private:
 		const FHitResult& SweepResult
 	);
 
+	TArray<FVector> PathPoints;
+	int32 CurrentPathIndex = INDEX_NONE;
+	bool bIsFollowingPath = false;
+
+	// NEW: leader-following state (used in .cpp)
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "FC|Convoy", meta = (AllowPrivateAccess = "true"))
+    bool bIsFollowingLeader = false;
+
+    UPROPERTY()
+    TWeakObjectPtr<AFCConvoyMember> Leader;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "FC|Convoy", meta = (AllowPrivateAccess = "true"))
+    FVector FollowerOffset = FVector::ZeroVector;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "FC|Pathfinding", meta = (AllowPrivateAccess = "true"))
+    float AcceptRadius = 50.0f;
+
+    FVector FinalTarget = FVector::ZeroVector;
+
 public:
 	/** Set parent convoy reference */
 	void SetParentConvoy(AFCOverworldConvoy* InConvoy);
+
+	UFUNCTION(BlueprintCallable, Category="FC|Convoy")
+    void MoveConvoyMemberToLocation(const FVector& TargetLocation);
+
+    UFUNCTION(BlueprintCallable, Category="FC|Convoy")
+    void StopConvoyMovement();
+
+	UFUNCTION(BlueprintCallable, Category="FC|Convoy")
+	void StartFollowingLeader(AFCConvoyMember* InLeader, const FVector& InLocalOffset);
+
+	UFUNCTION(BlueprintCallable, Category="FC|Convoy")
+	void StopFollowingLeader();
 };

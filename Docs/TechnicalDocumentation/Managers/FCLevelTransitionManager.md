@@ -208,5 +208,5 @@ Concretely, it owns:
 * **Hardcoded level names** are currently embedded in the helpers:
 
   * `"L_Overworld"`, `"L_Office"`, `"L_Camp"` (one TODO notes making overworld level configurable from expedition data).
-* The header points to a design doc: `Docs/Technical_Documentation.md` section *“Transition Responsibilities & Orchestration (Week 4 - Step 4.7)”*. 
+* The header points to a design doc: `Docs/TechnicalDocumentation/FCRuntime.md` and linked files section *“Transition Responsibilities & Orchestration (Week 4 - Step 4.7)”*. 
 * There is a private `PendingLoadingTarget` field declared but not used in the current `.cpp` implementation (looks like a placeholder for future refactors).

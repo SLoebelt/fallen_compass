@@ -144,7 +144,21 @@ Details: `Characters/FCFirstPersonCharacter.md` → `FCFirstPersonCharacter.h/.c
 - `AFC_ExplorerCharacter::MoveExplorerToLocation` computes a NavMesh path (via `UNavigationSystemV1::FindPathToLocationSynchronously`) and stores path points; `Tick` then steers along this path using `AddMovementInput` until the destination is reached.
 - Static Camp/POI camera is handled by `UFCCameraManager::BlendToPOISceneCamera`, which ultimately calls `SetViewTargetWithBlend` on the owning controller, targeting a level-placed `ACameraActor` tagged `CampCamera` (or matching that name pattern).
 
-Details: `FC_ExplorerCharacter.h/.cpp`.
+Details: `Characters/FC_ExplorerCharacter.md` → `FC_ExplorerCharacter.h/.cpp`.
+
+### `AFCOverworldConvoy` + `AFCConvoyMember` — "Overworld convoy pivot + walkers"
+
+- `AFCOverworldConvoy` is the **authoritative convoy pivot** in Overworld: world map revelation and camera systems continue to treat its actor transform as “the convoy position”.
+- On `Tick`, the convoy actor follows the **bounding box center** that encloses all valid convoy members, with optional smoothing, so cameras and world-map sampling stay centered on the group instead of a single pawn.
+- Convoy movement is driven manually via `UCharacterMovementComponent` (no AI `MoveTo`):
+  - The **leader** `AFCConvoyMember` computes a NavMesh path using `UNavigationSystemV1::FindPathToLocationSynchronously` and follows it in `Tick` using `AddMovementInput(..., bForce=true)`.
+  - **Followers** do not own their own paths; they follow the leader using a local-space offset (e.g. behind/in formation), also via `AddMovementInput`.
+- `AFCOverworldConvoy` exposes a single movement API surface:
+  - `MoveConvoyToLocation(const FVector& TargetLocation)` → asks the leader member to start path-follow to `TargetLocation`.
+  - `StopConvoy()` → stops leader path-follow and follower following (used by POI overlap handling and interaction system).
+- `AFCPlayerController` routes Overworld click-to-move into `ActiveConvoy->MoveConvoyToLocation(...)`; no AI controllers are required for convoy members, and `GetCharacterMovement()->bRunPhysicsWithNoController` is used so unpossessed convoy characters still respond to `AddMovementInput`.
+
+Details: `Characters/FCOverworldConvoy.md`, `Characters/FCConvoyMember.md` → `FCOverworldConvoy.h/.cpp`, `FCConvoyMember.h/.cpp`.
 
 ---
 

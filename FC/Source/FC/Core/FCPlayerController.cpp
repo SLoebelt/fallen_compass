@@ -1240,22 +1240,6 @@ void AFCPlayerController::HandleOverworldClickMove()
 		return;
 	}
 
-	// Get leader member from convoy
-	AFCConvoyMember* LeaderMember = ActiveConvoy->GetLeaderMember();
-	if (!LeaderMember)
-	{
-		UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("HandleOverworldClickMove: No leader member found"));
-		return;
-	}
-
-	// Get leader's AI controller
-	AAIController* AIController = Cast<AAIController>(LeaderMember->GetController());
-	if (!AIController)
-	{
-		UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("HandleOverworldClickMove: Leader has no AI controller"));
-		return;
-	}
-
 	// Project hit location to NavMesh
 	UNavigationSystemV1* NavSys = FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld());
 	if (NavSys)
@@ -1266,7 +1250,7 @@ void AFCPlayerController::HandleOverworldClickMove()
 		if (bFoundPath)
 		{
 			// Send move command to AI controller
-			AIController->MoveToLocation(NavLocation.Location);
+			ActiveConvoy->MoveConvoyToLocation(NavLocation.Location);
 			UE_LOG(LogFallenCompassPlayerController, Log, TEXT("HandleOverworldClickMove: Moving convoy to %s"),
 				*NavLocation.Location.ToString());
 
@@ -1315,22 +1299,6 @@ void AFCPlayerController::MoveConvoyToLocation(const FVector& TargetLocation)
 		return;
 	}
 
-	// Get convoy leader
-	AFCConvoyMember* LeaderMember = ActiveConvoy->GetLeaderMember();
-	if (!LeaderMember)
-	{
-		UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("MoveConvoyToLocation: No leader member found"));
-		return;
-	}
-
-	// Get AI controller
-	AAIController* AIController = Cast<AAIController>(LeaderMember->GetController());
-	if (!AIController)
-	{
-		UE_LOG(LogFallenCompassPlayerController, Warning, TEXT("MoveConvoyToLocation: Leader has no AI controller"));
-		return;
-	}
-
 	// Project to NavMesh and move
 	UNavigationSystemV1* NavSys = FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld());
 	if (NavSys)
@@ -1340,7 +1308,7 @@ void AFCPlayerController::MoveConvoyToLocation(const FVector& TargetLocation)
 
 		if (bFoundPath)
 		{
-			AIController->MoveToLocation(NavLocation.Location);
+			ActiveConvoy->MoveConvoyToLocation(NavLocation.Location);
 			UE_LOG(LogFallenCompassPlayerController, Log, TEXT("MoveConvoyToLocation: Moving to %s"),
 				*NavLocation.Location.ToString());
 		}
